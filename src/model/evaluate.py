@@ -1,0 +1,42 @@
+#!/usr/bin/env python3
+
+from ..data.waterbirds import Dataset, get_generators
+import torch.nn.functional as F
+import matplotlib.pyplot as plt
+from .arch import Model
+from src import const
+import random
+import torch
+import sys
+
+
+def visualize(model, gen):
+    fig = plt.figure(figsize=(14, 14),
+                     facecolor='white')
+
+    for idx, sample in enumerate(random.sample(range(len(gen)), 16)):
+        X, y = gen[sample]
+        y_pred, cam = model(X.unsqueeze(0).to(const.DEVICE))
+        cam = F.normalize((cam[0][0] - cam[0][1]).detach().abs())
+        fig.add_subplot(4, 4, idx + 1)
+        plt.xlabel(f'Pred: {str(y_pred.argmax().item())}, Actual: {str(y.argmax().item())}')
+        plt.imshow(X.permute(1, 2, 0).detach().numpy(), alpha=0.5)
+        plt.imshow(F.interpolate(cam[None, None, ...], const.IMAGE_SIZE, mode='bilinear')[0][0].numpy(), cmap='jet', alpha=0.5)
+
+    plt.tight_layout()
+    plt.show()
+    fig.savefig(const.DATA_DIR / 'evals' / f'{model.name}.png')
+
+
+if __name__ == '__main__':
+    name = sys.argv[2] if len(sys.argv) > 2 else const.MODEL_NAME
+
+    model = Model(input_shape=const.IMAGE_SHAPE)
+    model.load_state_dict(torch.load(const.SAVE_MODEL_PATH / f'{name}.pt', map_location=const.DEVICE))
+    model.name = name
+    model.eval()
+
+    if sys.argv[1] == 'group':
+        with open(const.DATA_DIR / 'evals' / f'{model.name}.txt', 'w') as f:
+            for gen in get_generators(state='evaluation'): f.write(gen.dataset.split + ': ' + str(group_accuracy(model, gen)) + '\n')
+    else: visualize(model, Dataset(const.DATA_DIR / 'waterbirds' / 'metadata.csv', split='test'))

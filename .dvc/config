@@ -1,0 +1,5 @@
+['remote "origin"']
+    url = s3://dvc
+    endpointurl = https://dagshub.com/jinensetpal/contrastive-optimization.s3
+['remote "http"']
+    url = https://dagshub.com/jinensetpal/contrastive-optimization.dvc
