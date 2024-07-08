@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from ..data.waterbirds import Dataset, get_generators
+from ..data.oxford_iiit_pet import Dataset
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 from .arch import Model
@@ -29,14 +29,11 @@ def visualize(model, gen):
 
 
 if __name__ == '__main__':
-    name = sys.argv[2] if len(sys.argv) > 2 else const.MODEL_NAME
+    name = sys.argv[1]
 
     model = Model(input_shape=const.IMAGE_SHAPE)
-    model.load_state_dict(torch.load(const.SAVE_MODEL_PATH / f'{name}.pt', map_location=const.DEVICE))
+    model.load_state_dict(torch.load(const.MODELS_DIR / f'{name}.pt', map_location=const.DEVICE))
     model.name = name
     model.eval()
 
-    if sys.argv[1] == 'group':
-        with open(const.DATA_DIR / 'evals' / f'{model.name}.txt', 'w') as f:
-            for gen in get_generators(state='evaluation'): f.write(gen.dataset.split + ': ' + str(group_accuracy(model, gen)) + '\n')
-    else: visualize(model, Dataset(const.DATA_DIR / 'waterbirds' / 'metadata.csv', split='test'))
+    visualize(model, Dataset(const.DATA_DIR / 'waterbirds' / 'metadata.csv', split='test'))

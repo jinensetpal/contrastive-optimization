@@ -22,7 +22,7 @@ class Model(torch.nn.Module):
         self.feature_grad = None
         self.feature_rect = None
 
-        self.linear = nn.LazyLinear(2)
+        self.linear = nn.LazyLinear(const.N_CLASSES)
         self.softmax = nn.Softmax(dim=1)  # ~equivalent to sigmoid since classes = 2; relevant for CAMs
 
         self.to(const.DEVICE)
@@ -45,10 +45,13 @@ class Model(torch.nn.Module):
         logits = self.linear(x)
         return self.softmax(logits), self._compute_hi_res_cam(logits)
 
-    # configured only for binary classification
     @staticmethod
-    def get_constrastive_cam(self, y, cams):
-        return cams[:, y.argmax()] - cams[:, y.argmin()]
+    def get_constrastive_cams(y, cams):
+        contrastive_cams = torch.empty((y.shape[0], cams.shape[-3] - 1, *cams.shape[-2:]))
+        for idx, (cam, y_idx) in enumerate(zip(cams, y.argmax(dim=1))):
+            cam = cam[y_idx] - cam
+            contrastive_cams[idx] = torch.cat([cam[:y_idx], cam[y_idx+1:]])
+        return contrastive_cams
 
     def _compute_hi_res_cam(self, logits):
         cams = torch.zeros(*logits.shape, *self.feature_rect.shape[2:])
