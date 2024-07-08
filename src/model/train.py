@@ -24,11 +24,11 @@ def fit(model, optimizer, loss, train, val):
         interval = max(1, (const.EPOCHS // 10))
         for epoch in range(const.EPOCHS):
             if not (epoch+1) % interval: print('-' * 10)
-            train_loss = torch.empty(1)
-            valid_loss = torch.empty(1)
-            train_acc = torch.empty(1)
-            valid_acc = torch.empty(1)
-            cse_loss =  torch.empty(1)
+            train_loss = torch.empty(1, device=const.DEVICE)
+            valid_loss = torch.empty(1, device=const.DEVICE)
+            train_acc = torch.empty(1, device=const.DEVICE)
+            valid_acc = torch.empty(1, device=const.DEVICE)
+            cse_loss =  torch.empty(1, device=const.DEVICE)
 
             for train_batch, valid_batch in zip(train, val):
                 optimizer.zero_grad()
@@ -37,8 +37,8 @@ def fit(model, optimizer, loss, train, val):
                 y_pred_train = model(X_train)
                 y_pred_valid = model(X_valid)
 
-                train_acc = torch.vstack([train_acc.to(const.DEVICE), (torch.argmax(y_train[1], dim=1) == torch.argmax(y_pred_train[0], dim=1)).unsqueeze(1)])
-                valid_acc = torch.vstack([valid_acc.to(const.DEVICE), (torch.argmax(y_valid[1], dim=1) == torch.argmax(y_pred_valid[0], dim=1)).unsqueeze(1)])
+                train_acc = torch.vstack([train_acc, (torch.argmax(y_train[1], dim=1) == torch.argmax(y_pred_train[0], dim=1)).unsqueeze(1)])
+                valid_acc = torch.vstack([valid_acc, (torch.argmax(y_valid[1], dim=1) == torch.argmax(y_pred_valid[0], dim=1)).unsqueeze(1)])
 
                 train_batch_loss = loss(y_pred_train, y_train)
                 train_loss = torch.vstack([train_loss, torch.tensor(train_batch_loss)])

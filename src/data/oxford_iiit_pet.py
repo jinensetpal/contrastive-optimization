@@ -23,7 +23,7 @@ class Dataset(torch.utils.data.Dataset):
         return len(self.df)
 
     def __getitem__(self, idx):
-        X = torchvision.transforms.functional.resize(torchvision.io.read_image((self.images_dir / f'{self.df["Image"].iloc[idx]}.jpg').as_posix()), const.IMAGE_SIZE, antialias=True)
+        X = torchvision.transforms.functional.resize(torchvision.io.read_image((self.images_dir / f'{self.df["Image"].iloc[idx]}.jpg').as_posix()), const.IMAGE_SIZE, antialias=True)[:3]
         X = X / 255  # normalization
 
         heatmap = torchvision.transforms.functional.resize(torchvision.io.read_image((self.annotations_dir / 'trimaps' / f'{self.df["Image"].iloc[idx]}.png').as_posix()), const.CAM_SIZE, antialias=True).squeeze(0)
