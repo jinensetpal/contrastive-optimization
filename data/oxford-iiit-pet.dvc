@@ -1,6 +1,6 @@
 outs:
-- md5: f24efadffa0d858ad2f599e2fb934b36.dir
-  size: 821045236
-  nfiles: 25864
+- md5: b2e5c7b30e71cc2adf71c663ba984a0f.dir
+  size: 820951207
+  nfiles: 25862
   hash: md5
   path: oxford-iiit-pet
