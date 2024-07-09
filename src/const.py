@@ -19,10 +19,11 @@ MOMENTUM = 0.9
 EPOCHS = 20
 
 # dataset
+SPLITS = ['train', 'valid', 'test']
 IMAGE_SIZE = (224, 224)
 N_CHANNELS = 3
-N_CLASSES = 37
-SPLITS = ['train', 'valid', 'test']
+BINARY_CLS = True
+N_CLASSES = 2 if BINARY_CLS else 37
 IMAGE_SHAPE = (N_CHANNELS,) + IMAGE_SIZE
 
 # logging

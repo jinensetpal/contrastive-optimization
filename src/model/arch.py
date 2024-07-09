@@ -49,7 +49,7 @@ class Model(torch.nn.Module):
     def get_constrastive_cams(y, cams):
         contrastive_cams = torch.empty((y.shape[0], cams.shape[-3] - 1, *cams.shape[-2:]), device=const.DEVICE)
         for idx, (cam, y_idx) in enumerate(zip(cams, y.argmax(dim=1))):
-            cam = cam[y_idx] - cam
+            cam = cam[y_idx] - cam  # objective: maximize this difference, constraining contrast to segmentation target region only
             contrastive_cams[idx] = torch.cat([cam[:y_idx], cam[y_idx+1:]])
         return contrastive_cams
 

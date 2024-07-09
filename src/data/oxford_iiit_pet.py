@@ -10,6 +10,7 @@ class Dataset(torch.utils.data.Dataset):
     def __init__(self, split=None):
         self.images_dir = const.DATA_DIR / 'oxford-iiit-pet' / 'images'
         self.annotations_dir = const.DATA_DIR / 'oxford-iiit-pet' / 'annotations'
+        self.y_col = 'SPECIES' if const.BINARY_CLS else 'CLASS-ID'
 
         df = pd.read_csv(self.annotations_dir / 'list.txt')
         if split:
@@ -27,11 +28,12 @@ class Dataset(torch.utils.data.Dataset):
         X = X / 255  # normalization
 
         heatmap = torchvision.transforms.functional.resize(torchvision.io.read_image((self.annotations_dir / 'trimaps' / f'{self.df["Image"].iloc[idx]}.png').as_posix()), const.CAM_SIZE, antialias=True).squeeze(0)
+        heatmap = heatmap.to(torch.float)
         heatmap[heatmap == 3] = 0  # set unclassified points to background; erring towards safety
         heatmap[heatmap == 2] = 0  # set background to 0 (for optimization objective)
 
         y = torch.zeros((const.N_CLASSES))
-        y[self.df['CLASS-ID'][idx] - 1] = 1
+        y[self.df[self.y_col][idx] - 1] = 1
 
         return X.to(const.DEVICE), (heatmap.to(const.DEVICE), y.to(const.DEVICE))
 
