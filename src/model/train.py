@@ -77,13 +77,13 @@ def fit(model, optimizer, loss, train, val):
 
 
 if __name__ == '__main__':
-    name = sys.argv[1]
+    const.MODEL_NAME = sys.argv[1]
 
     model = Model(const.IMAGE_SHAPE)  # initialize before loss functions to ensure accurate cam size configuration
     train, val, test = get_generators()
     optimizer = torch.optim.SGD(model.parameters(),
                                 lr=const.LEARNING_RATE,
                                 momentum=const.MOMENTUM)
-    loss = ContrastiveLoss(model.get_constrastive_cams) if name != 'default' else torch.nn.CrossEntropyLoss()
+    loss = ContrastiveLoss(model.get_constrastive_cams) if const.MODEL_NAME != 'default' else torch.nn.CrossEntropyLoss()
     fit(model, optimizer, loss, train, val)
-    torch.save(model.state_dict(), const.MODELS_DIR / f'{name}.pt')
+    torch.save(model.state_dict(), const.MODELS_DIR / f'{const.MODEL_NAME}.pt')
