@@ -1,0 +1,21 @@
+stages:
+  default-train:
+    cmd: python -m src.model.train default
+    deps:
+    - data/oxford-iiit-pet
+    - src/const.py
+    - src/model/arch.py
+    - src/model/loss.py
+    - src/model/train.py
+    outs:
+    - models/default.pt
+  contrastiveloss-train:
+    cmd: python -m src.model.train contrastiveloss
+    deps:
+    - data/oxford-iiit-pet
+    - src/const.py
+    - src/model/arch.py
+    - src/model/loss.py
+    - src/model/train.py
+    outs:
+    - models/contrastiveloss.pt

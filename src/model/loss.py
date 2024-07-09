@@ -16,4 +16,4 @@ class ContrastiveLoss(nn.Module):
         y[0] /= y[0].sum()
 
         # if const.QUANTILE_CLIP_CAMS: cc[(cc < cc.view(-1, 56**2).quantile(.1, dim=1) & (cc > cc.quantile(.1))] = 0
-        return self.kld(cc, y[0].repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3), reduction='batchmean')
+        return self.kld(cc, y[0].repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3))

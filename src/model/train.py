@@ -40,11 +40,11 @@ def fit(model, optimizer, loss, train, val):
                 train_acc = torch.vstack([train_acc, (torch.argmax(y_train[1], dim=1) == torch.argmax(y_pred_train[0], dim=1)).unsqueeze(1)])
                 valid_acc = torch.vstack([valid_acc, (torch.argmax(y_valid[1], dim=1) == torch.argmax(y_pred_valid[0], dim=1)).unsqueeze(1)])
 
-                train_batch_loss = loss(y_pred_train, y_train)
+                train_batch_loss = loss(y_pred_train, y_train) if loss._get_name() != 'CrossEntropyLoss' else loss(y_pred_train[0], y_train[1])
                 train_loss = torch.vstack([train_loss, torch.tensor(train_batch_loss)])
                 cse_loss = torch.vstack([cse_loss, F.cross_entropy(y_pred_train[0], y_train[1])])
 
-                valid_batch_loss = loss(y_pred_valid, y_valid)
+                valid_batch_loss = loss(y_pred_valid, y_valid) if loss._get_name() != 'CrossEntropyLoss' else loss(y_pred_valid[0], y_valid[1])
                 valid_loss = torch.vstack([valid_loss, torch.tensor(valid_batch_loss)])
 
                 train_batch_loss.backward()
@@ -57,7 +57,7 @@ def fit(model, optimizer, loss, train, val):
             cse_loss = cse_loss[1:].mean()
             metrics = {'train_contrast_loss': train_loss.item(),
                        'val_contrast_loss': valid_loss.item(),
-                       'train_cse_loss': cse_loss.item(),
+                       'benchmark_cse_loss': cse_loss.item(),
                        'train_acc': (train_acc[1:].sum() / train_acc.shape[0]).item(),
                        'valid_acc': (valid_acc[1:].sum() / valid_acc.shape[0]).item()}
             mlflow.log_metrics(metrics, step=epoch)
@@ -84,5 +84,6 @@ if __name__ == '__main__':
     optimizer = torch.optim.SGD(model.parameters(),
                                 lr=const.LEARNING_RATE,
                                 momentum=const.MOMENTUM)
-    fit(model, optimizer, ContrastiveLoss(model.get_constrastive_cams), train, val)
+    loss = ContrastiveLoss(model.get_constrastive_cams) if name != 'default' else torch.nn.CrossEntropyLoss()
+    fit(model, optimizer, loss, train, val)
     torch.save(model.state_dict(), const.MODELS_DIR / f'{name}.pt')
