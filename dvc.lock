@@ -10,20 +10,24 @@ stages:
       nfiles: 25862
     - path: src/const.py
       hash: md5
-      md5: ca8fa63e2763cd4a3dc5eb0a45edb157
-      size: 675
+      md5: c908c44cd7982a09e230db4c6704cf4e
+      size: 676
+    - path: src/data/oxford_iiit_pet.py
+      hash: md5
+      md5: a6847199d97e9a7b6b1256b55c6749e8
+      size: 1783
     - path: src/model/arch.py
       hash: md5
-      md5: 7bbd7449e64c2e14d9cd8e921966d0da
-      size: 2609
+      md5: 77349cdd89e279d9d25fdaccc6bc5589
+      size: 2608
     - path: src/model/loss.py
       hash: md5
       md5: b3dc6e0d417c918145bc58d89af4d9fd
       size: 634
     - path: src/model/train.py
       hash: md5
-      md5: 2a47b28f5f7d18ff975866e71c1b4d7c
-      size: 4077
+      md5: 0eafe85cf0c1e8b6c1e083c61316c463
+      size: 4113
     outs:
     - path: models/default.pt
       hash: md5
@@ -39,22 +43,92 @@ stages:
       nfiles: 25862
     - path: src/const.py
       hash: md5
-      md5: ca8fa63e2763cd4a3dc5eb0a45edb157
-      size: 675
+      md5: c908c44cd7982a09e230db4c6704cf4e
+      size: 676
+    - path: src/data/oxford_iiit_pet.py
+      hash: md5
+      md5: a6847199d97e9a7b6b1256b55c6749e8
+      size: 1783
     - path: src/model/arch.py
       hash: md5
-      md5: 7bbd7449e64c2e14d9cd8e921966d0da
-      size: 2609
+      md5: 77349cdd89e279d9d25fdaccc6bc5589
+      size: 2608
     - path: src/model/loss.py
       hash: md5
       md5: b3dc6e0d417c918145bc58d89af4d9fd
       size: 634
     - path: src/model/train.py
       hash: md5
-      md5: 2a47b28f5f7d18ff975866e71c1b4d7c
-      size: 4077
+      md5: 0eafe85cf0c1e8b6c1e083c61316c463
+      size: 4113
     outs:
     - path: models/contrastiveloss.pt
       hash: md5
       md5: 2c0723664d5d3b9f363a5d9ab1d9daca
       size: 856672
+  default-evaluate:
+    cmd: python -m src.model.evaluate default
+    deps:
+    - path: data/oxford-iiit-pet
+      hash: md5
+      md5: b2e5c7b30e71cc2adf71c663ba984a0f.dir
+      size: 820951207
+      nfiles: 25862
+    - path: src/const.py
+      hash: md5
+      md5: c908c44cd7982a09e230db4c6704cf4e
+      size: 676
+    - path: src/data/oxford_iiit_pet.py
+      hash: md5
+      md5: a6847199d97e9a7b6b1256b55c6749e8
+      size: 1783
+    - path: src/model/arch.py
+      hash: md5
+      md5: 77349cdd89e279d9d25fdaccc6bc5589
+      size: 2608
+    - path: src/model/evaluate.py
+      hash: md5
+      md5: 4b4832d560f57cfb9e56337dbd863138
+      size: 1298
+    - path: src/model/train.py
+      hash: md5
+      md5: 0eafe85cf0c1e8b6c1e083c61316c463
+      size: 4113
+    outs:
+    - path: data/evals/default.png
+      hash: md5
+      md5: b748aba8663cb3bafa843364f9d8c113
+      size: 1157759
+  constrastiveloss-evaluate:
+    cmd: python -m src.model.evaluate constrastiveloss
+    deps:
+    - path: data/oxford-iiit-pet
+      hash: md5
+      md5: b2e5c7b30e71cc2adf71c663ba984a0f.dir
+      size: 820951207
+      nfiles: 25862
+    - path: src/const.py
+      hash: md5
+      md5: c908c44cd7982a09e230db4c6704cf4e
+      size: 676
+    - path: src/data/oxford_iiit_pet.py
+      hash: md5
+      md5: a6847199d97e9a7b6b1256b55c6749e8
+      size: 1783
+    - path: src/model/arch.py
+      hash: md5
+      md5: 77349cdd89e279d9d25fdaccc6bc5589
+      size: 2608
+    - path: src/model/evaluate.py
+      hash: md5
+      md5: 4b4832d560f57cfb9e56337dbd863138
+      size: 1298
+    - path: src/model/train.py
+      hash: md5
+      md5: 0eafe85cf0c1e8b6c1e083c61316c463
+      size: 4113
+    outs:
+    - path: data/evals/contrastiveloss.png
+      hash: md5
+      md5: d502cbbba04fc84a6d509669be66b37f
+      size: 1317589

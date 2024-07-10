@@ -4,6 +4,7 @@ stages:
     deps:
     - data/oxford-iiit-pet
     - src/const.py
+    - src/data/oxford_iiit_pet.py
     - src/model/arch.py
     - src/model/loss.py
     - src/model/train.py
@@ -14,8 +15,31 @@ stages:
     deps:
     - data/oxford-iiit-pet
     - src/const.py
+    - src/data/oxford_iiit_pet.py
     - src/model/arch.py
     - src/model/loss.py
     - src/model/train.py
     outs:
     - models/contrastiveloss.pt
+  default-evaluate:
+    cmd: python -m src.model.evaluate default
+    deps:
+    - data/oxford-iiit-pet
+    - src/const.py
+    - src/data/oxford_iiit_pet.py
+    - src/model/arch.py
+    - src/model/evaluate.py
+    - src/model/train.py
+    outs:
+    - data/evals/default.png
+  constrastiveloss-evaluate:
+    cmd: python -m src.model.evaluate constrastiveloss
+    deps:
+    - data/oxford-iiit-pet
+    - src/const.py
+    - src/data/oxford_iiit_pet.py
+    - src/model/arch.py
+    - src/model/evaluate.py
+    - src/model/train.py
+    outs:
+    - data/evals/contrastiveloss.png

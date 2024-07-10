@@ -15,11 +15,11 @@ def visualize(model, gen):
                      facecolor='white')
 
     for idx, sample in enumerate(random.sample(range(len(gen)), 16)):
-        X, y = gen[sample]
+        X, (heatmap, y) = gen[sample]
         y_pred, cam = model(X.unsqueeze(0).to(const.DEVICE))
-        cam = F.normalize((cam[0][0] - cam[0][1]).detach().abs())
+        cam = model.get_contrastive_cams(y.unsqueeze(0).to(const.DEVICE), cam)[0, 0].detach()
         fig.add_subplot(4, 4, idx + 1)
-        plt.xlabel(f'Pred: {str(y_pred.argmax().item())}, Actual: {str(y.argmax().item())}')
+        plt.xlabel(f'Pred: {str(y_pred.argmax().item())}, Actual: {str(y[1].argmax().item())}')
         plt.imshow(X.permute(1, 2, 0).detach().numpy(), alpha=0.5)
         plt.imshow(F.interpolate(cam[None, None, ...], const.IMAGE_SIZE, mode='bilinear')[0][0].numpy(), cmap='jet', alpha=0.5)
 
@@ -36,4 +36,4 @@ if __name__ == '__main__':
     model.name = name
     model.eval()
 
-    visualize(model, Dataset(const.DATA_DIR / 'waterbirds' / 'metadata.csv', split='test'))
+    visualize(model, Dataset('test'))

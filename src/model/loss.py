@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-from src import const
 from torch import nn
 
 

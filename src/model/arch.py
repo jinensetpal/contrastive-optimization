@@ -46,7 +46,7 @@ class Model(torch.nn.Module):
         return self.softmax(logits), self._compute_hi_res_cam(logits)
 
     @staticmethod
-    def get_constrastive_cams(y, cams):
+    def get_contrastive_cams(y, cams):
         contrastive_cams = torch.empty((y.shape[0], cams.shape[-3] - 1, *cams.shape[-2:]), device=const.DEVICE)
         for idx, (cam, y_idx) in enumerate(zip(cams, y.argmax(dim=1))):
             cam = cam[y_idx] - cam  # objective: maximize this difference, constraining contrast to segmentation target region only

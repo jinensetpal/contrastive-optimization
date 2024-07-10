@@ -41,5 +41,6 @@ class Dataset(torch.utils.data.Dataset):
 def get_generators(state='training'):
     return [torch.utils.data.DataLoader(Dataset(split=split), batch_size=const.BATCH_SIZE, shuffle=True) for split in const.SPLITS]
 
+
 if __name__ == '__main__':
     print(Dataset()[0])

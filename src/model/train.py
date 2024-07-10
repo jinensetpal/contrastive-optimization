@@ -28,7 +28,7 @@ def fit(model, optimizer, loss, train, val):
             valid_loss = torch.empty(1, device=const.DEVICE)
             train_acc = torch.empty(1, device=const.DEVICE)
             valid_acc = torch.empty(1, device=const.DEVICE)
-            cse_loss =  torch.empty(1, device=const.DEVICE)
+            cse_loss = torch.empty(1, device=const.DEVICE)
 
             for train_batch, valid_batch in zip(train, val):
                 optimizer.zero_grad()
@@ -84,6 +84,6 @@ if __name__ == '__main__':
     optimizer = torch.optim.SGD(model.parameters(),
                                 lr=const.LEARNING_RATE,
                                 momentum=const.MOMENTUM)
-    loss = ContrastiveLoss(model.get_constrastive_cams) if const.MODEL_NAME != 'default' else torch.nn.CrossEntropyLoss()
+    loss = ContrastiveLoss(model.get_contrastive_cams) if const.MODEL_NAME != 'default' else torch.nn.CrossEntropyLoss()
     fit(model, optimizer, loss, train, val)
     torch.save(model.state_dict(), const.MODELS_DIR / f'{const.MODEL_NAME}.pt')
