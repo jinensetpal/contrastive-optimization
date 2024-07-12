@@ -10,28 +10,28 @@ stages:
       nfiles: 25862
     - path: src/const.py
       hash: md5
-      md5: c908c44cd7982a09e230db4c6704cf4e
-      size: 676
+      md5: ca8fa63e2763cd4a3dc5eb0a45edb157
+      size: 675
     - path: src/data/oxford_iiit_pet.py
       hash: md5
-      md5: a6847199d97e9a7b6b1256b55c6749e8
-      size: 1783
+      md5: 4438abc00743c6c050ba284422442811
+      size: 1784
     - path: src/model/arch.py
       hash: md5
       md5: 77349cdd89e279d9d25fdaccc6bc5589
       size: 2608
     - path: src/model/loss.py
       hash: md5
-      md5: b3dc6e0d417c918145bc58d89af4d9fd
-      size: 634
+      md5: 4a9d31bdad4fc6dc79579db13ed09cba
+      size: 993
     - path: src/model/train.py
       hash: md5
-      md5: 0eafe85cf0c1e8b6c1e083c61316c463
-      size: 4113
+      md5: bb1b9b9a67d98e5ca49ad9cc9cf8c107
+      size: 4111
     outs:
     - path: models/default.pt
       hash: md5
-      md5: 3c1d311233cae549585ca63cfcf1e7f4
+      md5: 5ad253763fc3cd305a1ba6d42a26798c
       size: 856128
   contrastiveloss-train:
     cmd: python -m src.model.train contrastiveloss
@@ -43,28 +43,28 @@ stages:
       nfiles: 25862
     - path: src/const.py
       hash: md5
-      md5: c908c44cd7982a09e230db4c6704cf4e
-      size: 676
+      md5: ca8fa63e2763cd4a3dc5eb0a45edb157
+      size: 675
     - path: src/data/oxford_iiit_pet.py
       hash: md5
-      md5: a6847199d97e9a7b6b1256b55c6749e8
-      size: 1783
+      md5: 4438abc00743c6c050ba284422442811
+      size: 1784
     - path: src/model/arch.py
       hash: md5
       md5: 77349cdd89e279d9d25fdaccc6bc5589
       size: 2608
     - path: src/model/loss.py
       hash: md5
-      md5: b3dc6e0d417c918145bc58d89af4d9fd
-      size: 634
+      md5: 4a9d31bdad4fc6dc79579db13ed09cba
+      size: 993
     - path: src/model/train.py
       hash: md5
-      md5: 0eafe85cf0c1e8b6c1e083c61316c463
-      size: 4113
+      md5: bb1b9b9a67d98e5ca49ad9cc9cf8c107
+      size: 4111
     outs:
     - path: models/contrastiveloss.pt
       hash: md5
-      md5: 2c0723664d5d3b9f363a5d9ab1d9daca
+      md5: 9212d833346cf27dded8d39e00c85fdf
       size: 856672
   default-evaluate:
     cmd: python -m src.model.evaluate default

@@ -12,4 +12,4 @@ cd ~/git/contrastive-optimization
 
 MLFLOW_TRACKING_USERNAME=jinensetpal \
 MLFLOW_TRACKING_PASSWORD=$MLFLOW_TOKEN \
-python -m src.model.train default
+dvc repro -f
