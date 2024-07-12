@@ -16,8 +16,8 @@ def visualize(model, gen):
 
     for idx, sample in enumerate(random.sample(range(len(gen)), 16)):
         X, (heatmap, y) = gen[sample]
-        y_pred, cam = model(X.unsqueeze(0).to(const.DEVICE))
-        cam = model.get_contrastive_cams(y.unsqueeze(0).to(const.DEVICE), cam)[0, 0].detach()
+        y_pred, cam = model(X.detach().cpu().unsqueeze(0))
+        cam = model.get_contrastive_cams(y.unsqueeze(0), cam)[0, 0].detach()
         fig.add_subplot(4, 4, idx + 1)
         plt.xlabel(f'Pred: {str(y_pred.argmax().item())}, Actual: {str(y[1].argmax().item())}')
         plt.imshow(X.permute(1, 2, 0).detach().numpy(), alpha=0.5)

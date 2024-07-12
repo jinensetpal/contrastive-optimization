@@ -10,8 +10,8 @@ stages:
     - src/model/train.py
     outs:
     - models/default.pt
-  contrastiveloss-train:
-    cmd: python -m src.model.train contrastiveloss
+  contrastive-train:
+    cmd: python -m src.model.train contrastive
     deps:
     - data/oxford-iiit-pet
     - src/const.py
@@ -20,11 +20,12 @@ stages:
     - src/model/loss.py
     - src/model/train.py
     outs:
-    - models/contrastiveloss.pt
+    - models/contrastive.pt
   default-evaluate:
     cmd: python -m src.model.evaluate default
     deps:
     - data/oxford-iiit-pet
+    - models/default.pt
     - src/const.py
     - src/data/oxford_iiit_pet.py
     - src/model/arch.py
@@ -32,14 +33,15 @@ stages:
     - src/model/train.py
     outs:
     - data/evals/default.png
-  constrastiveloss-evaluate:
-    cmd: python -m src.model.evaluate constrastiveloss
+  contrastive-evaluate:
+    cmd: python -m src.model.evaluate contrastive
     deps:
     - data/oxford-iiit-pet
+    - models/contrastive.pt
     - src/const.py
     - src/data/oxford_iiit_pet.py
     - src/model/arch.py
     - src/model/evaluate.py
     - src/model/train.py
     outs:
-    - data/evals/contrastiveloss.png
+    - data/evals/contrastive.png
