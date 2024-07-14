@@ -21,7 +21,7 @@ def visualize(model, gen):
         fig.add_subplot(4, 4, idx + 1)
         plt.xlabel(f'Pred: {str(y_pred.argmax().item())}, Actual: {str(y[1].argmax().item())}')
         plt.imshow(X.permute(1, 2, 0).detach().numpy(), alpha=0.5)
-        plt.imshow(F.interpolate(cam[None, None, ...], const.IMAGE_SIZE, mode='bilinear')[0][0].numpy(), cmap='jet', alpha=0.5)
+        plt.imshow(F.interpolate(cam[None, None], const.IMAGE_SIZE, mode='bilinear')[0][0].numpy(), cmap='jet', alpha=0.5)
 
     plt.tight_layout()
     plt.show()

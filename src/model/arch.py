@@ -10,7 +10,7 @@ class Model(torch.nn.Module):
     def __init__(self, input_shape):
         super().__init__()
 
-        units = [3, 16, 64, 32]
+        units = [3, 8, 16, 32, 64, 32]
         self.convs = nn.ModuleList([nn.Conv2d(*units[:2], 2, padding='same')] +
                                    [nn.Conv2d(*features, 2, 2) for features in pairwise(units[1:])])
         self.convs[-1].register_forward_hook(self._hook)
