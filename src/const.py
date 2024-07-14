@@ -10,7 +10,6 @@ MODELS_DIR = BASE_DIR / 'models'
 
 # training
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
-QUANTILE_CLIP_CAMS = True
 SCALE_HEATMAPS = 1E3
 LEARNING_RATE = 1E-3
 SELECT_BEST = True
