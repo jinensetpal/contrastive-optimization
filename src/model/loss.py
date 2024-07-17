@@ -15,4 +15,4 @@ class ContrastiveLoss(nn.Module):
         cc = self.get_contrastive_cam(y[1], y_pred[1])
         heatmap = y[0].repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
 
-        return F.binary_cross_entropy(F.sigmoid(cc[heatmap == 1]), torch.ones(int(heatmap.sum().item())), device=const.DEVICE) + 1E2 * cc[heatmap == 0].pow(2).mean()
+        return F.binary_cross_entropy(F.sigmoid(cc[heatmap == 1]), torch.ones(int(heatmap.sum().item()), device=const.DEVICE))
