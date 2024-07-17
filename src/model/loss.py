@@ -15,4 +15,4 @@ class ContrastiveLoss(nn.Module):
         cc = self.get_contrastive_cam(y[1], y_pred[1])
         heatmap = y[0].repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
 
-        return cc[heatmap == 0].pow(2).mean() - cc[heatmap == 1].mean()
+        return cc[heatmap == 0].pow(2).mean() - cc[heatmap == 1].pow(3).mean()
