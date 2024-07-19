@@ -3,6 +3,7 @@
 from itertools import pairwise
 from src import const
 from torch import nn
+import torchvision
 import torch
 
 
@@ -10,14 +11,11 @@ class Model(torch.nn.Module):
     def __init__(self, input_shape):
         super().__init__()
 
-        units = [3, 8, 16, 32, 64, 32]
-        self.convs = nn.ModuleList([nn.Conv2d(*units[:2], 2, padding='same')] +
-                                   [nn.Conv2d(*features, 2, 2) for features in pairwise(units[1:])])
-        self.convs[-1].register_forward_hook(self._hook)
-
-        self.batchnorms = [nn.BatchNorm2d(n_features, device=const.DEVICE) for n_features in units[1:]]
-        self.relu = nn.ReLU()
-        self.flatten = nn.Flatten()
+        self.backbone = torchvision.models.resnet50(weights=None)
+        self.backbone.layer4[0].conv2 = torch.nn.Conv2d(512, 512, kernel_size=(1,1), stride=(1,1), bias=False)
+        self.backbone.layer4[0].downsample[0] = torch.nn.Conv2d(1024, 2048, kernel_size=(1,1), stride=(1,1), bias=False)
+        self.backbone.fc = nn.Identity()
+        self.backbone.layer4[-1].conv3.register_forward_hook(self._hook)
 
         self.feature_grad = None
         self.feature_rect = None
@@ -36,12 +34,7 @@ class Model(torch.nn.Module):
         o.register_hook(assign)
 
     def forward(self, x):
-        for conv, bn in zip(self.convs, self.batchnorms):
-            x = conv(x)
-            x = bn(x)
-            x = self.relu(x)
-        x = self.flatten(x)
-
+        x = self.backbone(x)
         logits = self.linear(x)
         return self.softmax(logits), self._compute_hi_res_cam(logits)
 

@@ -13,7 +13,7 @@ DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 SCALE_HEATMAPS = 1E3
 LEARNING_RATE = 1E-3
 SELECT_BEST = True
-BATCH_SIZE = 16
+BATCH_SIZE = 2
 EPOCHS = 20
 
 # dataset
