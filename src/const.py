@@ -10,13 +10,13 @@ MODELS_DIR = BASE_DIR / 'models'
 
 # training
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
-SCALE_HEATMAPS = 1E3
 LEARNING_RATE = 1E-3
 SELECT_BEST = True
-BATCH_SIZE = 2
+BATCH_SIZE = 16
 EPOCHS = 20
 
 # dataset
+SEED = 1024
 SPLITS = ['train', 'valid', 'test']
 IMAGE_SIZE = (224, 224)
 N_CHANNELS = 3

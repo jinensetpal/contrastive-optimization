@@ -10,20 +10,20 @@ stages:
       nfiles: 25862
     - path: src/const.py
       hash: md5
-      md5: ed1a40bb67d1158d48c8a4f5442197c3
-      size: 635
+      md5: 5010cbb62685f890e74b558602c39e37
+      size: 626
     - path: src/data/oxford_iiit_pet.py
       hash: md5
       md5: 4438abc00743c6c050ba284422442811
       size: 1784
     - path: src/model/arch.py
       hash: md5
-      md5: 8ff943ca97630bcfd847aad9e09cbb12
-      size: 2615
+      md5: c7875b263449b08af77c4e48e0e3afca
+      size: 2465
     - path: src/model/loss.py
       hash: md5
-      md5: 1639cc54f5d87c63d084d312ac1752de
-      size: 525
+      md5: 053ce7cafd934ec185ea98bd7836aab5
+      size: 530
     - path: src/model/train.py
       hash: md5
       md5: ebe59dc9f15c16d45024f42a0b5bcd4b
@@ -31,8 +31,8 @@ stages:
     outs:
     - path: models/default.pt
       hash: md5
-      md5: c3bdd690da4bd5d0acf583d47037ae64
-      size: 130930
+      md5: d97210c1fb32c70bdc9d8fafc56c843a
+      size: 85981426
   contrastive-train:
     cmd: python -m src.model.train contrastive
     deps:
@@ -43,20 +43,20 @@ stages:
       nfiles: 25862
     - path: src/const.py
       hash: md5
-      md5: 2a6afc5fcf56850224cf9190abef1669
-      size: 634
+      md5: 5010cbb62685f890e74b558602c39e37
+      size: 626
     - path: src/data/oxford_iiit_pet.py
       hash: md5
       md5: 4438abc00743c6c050ba284422442811
       size: 1784
     - path: src/model/arch.py
       hash: md5
-      md5: 8ff943ca97630bcfd847aad9e09cbb12
-      size: 2615
+      md5: c7875b263449b08af77c4e48e0e3afca
+      size: 2465
     - path: src/model/loss.py
       hash: md5
-      md5: d4d09f5cfaf026a7220906351b3444df
-      size: 531
+      md5: 053ce7cafd934ec185ea98bd7836aab5
+      size: 530
     - path: src/model/train.py
       hash: md5
       md5: ebe59dc9f15c16d45024f42a0b5bcd4b
@@ -64,8 +64,8 @@ stages:
     outs:
     - path: models/contrastive.pt
       hash: md5
-      md5: 1ff85a9c8babf57865a7d171632f2153
-      size: 131506
+      md5: eca0e0c68a715a9de6f017944df2b2dc
+      size: 85983106
   default-evaluate:
     cmd: python -m src.model.evaluate default
     deps:
@@ -76,24 +76,24 @@ stages:
       nfiles: 25862
     - path: models/default.pt
       hash: md5
-      md5: c3bdd690da4bd5d0acf583d47037ae64
-      size: 130930
+      md5: d97210c1fb32c70bdc9d8fafc56c843a
+      size: 85981426
     - path: src/const.py
       hash: md5
-      md5: ed1a40bb67d1158d48c8a4f5442197c3
-      size: 635
+      md5: 5010cbb62685f890e74b558602c39e37
+      size: 626
     - path: src/data/oxford_iiit_pet.py
       hash: md5
       md5: 4438abc00743c6c050ba284422442811
       size: 1784
     - path: src/model/arch.py
       hash: md5
-      md5: 8ff943ca97630bcfd847aad9e09cbb12
-      size: 2615
+      md5: c7875b263449b08af77c4e48e0e3afca
+      size: 2465
     - path: src/model/evaluate.py
       hash: md5
-      md5: ffffbece6707ec7f246ae0a8700151bb
-      size: 1264
+      md5: e85aa4b5918972f31443e3b011a45e14
+      size: 1292
     - path: src/model/train.py
       hash: md5
       md5: ebe59dc9f15c16d45024f42a0b5bcd4b
@@ -101,8 +101,8 @@ stages:
     outs:
     - path: data/evals/default.png
       hash: md5
-      md5: ab46f873d294cd2c1aff6797a1880bfe
-      size: 1752341
+      md5: 4a2ba6435bcd5ce5c28b1a35ad7eba73
+      size: 1788837
   contrastive-evaluate:
     cmd: python -m src.model.evaluate contrastive
     deps:
@@ -113,24 +113,24 @@ stages:
       nfiles: 25862
     - path: models/contrastive.pt
       hash: md5
-      md5: 1ff85a9c8babf57865a7d171632f2153
-      size: 131506
+      md5: eca0e0c68a715a9de6f017944df2b2dc
+      size: 85983106
     - path: src/const.py
       hash: md5
-      md5: 2a6afc5fcf56850224cf9190abef1669
-      size: 634
+      md5: 5010cbb62685f890e74b558602c39e37
+      size: 626
     - path: src/data/oxford_iiit_pet.py
       hash: md5
       md5: 4438abc00743c6c050ba284422442811
       size: 1784
     - path: src/model/arch.py
       hash: md5
-      md5: 8ff943ca97630bcfd847aad9e09cbb12
-      size: 2615
+      md5: c7875b263449b08af77c4e48e0e3afca
+      size: 2465
     - path: src/model/evaluate.py
       hash: md5
-      md5: ffffbece6707ec7f246ae0a8700151bb
-      size: 1264
+      md5: e85aa4b5918972f31443e3b011a45e14
+      size: 1292
     - path: src/model/train.py
       hash: md5
       md5: ebe59dc9f15c16d45024f42a0b5bcd4b
@@ -138,5 +138,5 @@ stages:
     outs:
     - path: data/evals/contrastive.png
       hash: md5
-      md5: 40cf0f0523d1229ac5afc220d00e8d79
-      size: 1733340
+      md5: 74d4f57d05de64a8ed5e7b66ba753956
+      size: 1655429

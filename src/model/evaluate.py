@@ -24,12 +24,13 @@ def visualize(model, gen):
         plt.imshow(F.interpolate(cam[None, None], const.IMAGE_SIZE, mode='bilinear')[0][0].cpu().detach(), cmap='jet', alpha=0.5)
 
     plt.tight_layout()
-    plt.show()
     fig.savefig(const.DATA_DIR / 'evals' / f'{model.name}.png')
+    plt.show()
 
 
 if __name__ == '__main__':
     name = sys.argv[1]
+    random.seed(const.SEED)
 
     model = Model(input_shape=const.IMAGE_SHAPE)
     model.load_state_dict(torch.load(const.MODELS_DIR / f'{name}.pt', map_location=const.DEVICE))
