@@ -10,6 +10,11 @@ import torch
 import sys
 
 
+def kernel_diff(model):
+    plt.plot(model.linear.weight[0] - model.linear.weight[1]).sort(descending=True).values.pow(2).detach())
+    fig.savefig(const.DATA_DIR / 'evals' / f'kerneldiff_{model.name}.png')
+    plt.show()
+
 def visualize(model, gen):
     fig = plt.figure(figsize=(14, 14),
                      facecolor='white')
@@ -24,7 +29,7 @@ def visualize(model, gen):
         plt.imshow(F.interpolate(cam[None, None], const.IMAGE_SIZE, mode='bilinear')[0][0].cpu().detach(), cmap='jet', alpha=0.5)
 
     plt.tight_layout()
-    fig.savefig(const.DATA_DIR / 'evals' / f'{model.name}.png')
+    fig.savefig(const.DATA_DIR / 'evals' / f'cam_{model.name}.png')
     plt.show()
 
 
