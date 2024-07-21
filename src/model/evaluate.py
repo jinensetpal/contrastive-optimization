@@ -11,9 +11,10 @@ import sys
 
 
 def kernel_diff(model):
-    plt.plot(model.linear.weight[0] - model.linear.weight[1]).sort(descending=True).values.pow(2).detach())
-    fig.savefig(const.DATA_DIR / 'evals' / f'kerneldiff_{model.name}.png')
+    plt.plot((model.linear.weight[0] - model.linear.weight[1]).sort(descending=True).values.pow(2).detach())
+    plt.savefig(const.DATA_DIR / 'evals' / f'kerneldiff_{model.name}.png')
     plt.show()
+
 
 def visualize(model, gen):
     fig = plt.figure(figsize=(14, 14),

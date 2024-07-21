@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 
-import torch.nn.functional as F
-from src import const
 from torch import nn
 import torch
 

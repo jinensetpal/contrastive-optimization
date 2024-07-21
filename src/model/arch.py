@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-from itertools import pairwise
 from src import const
 from torch import nn
 import torchvision
@@ -12,8 +11,8 @@ class Model(torch.nn.Module):
         super().__init__()
 
         self.backbone = torchvision.models.resnet50(weights=None)
-        self.backbone.layer4[0].conv2 = torch.nn.Conv2d(512, 512, kernel_size=(1,1), stride=(1,1), bias=False)
-        self.backbone.layer4[0].downsample[0] = torch.nn.Conv2d(1024, 2048, kernel_size=(1,1), stride=(1,1), bias=False)
+        self.backbone.layer4[0].conv2 = torch.nn.Conv2d(512, 512, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        self.backbone.layer4[0].downsample[0] = torch.nn.Conv2d(1024, 2048, kernel_size=(1, 1), stride=(1, 1), bias=False)
         self.backbone.fc = nn.Identity()
         self.backbone.layer4[-1].conv3.register_forward_hook(self._hook)
 

@@ -82,7 +82,7 @@ if __name__ == '__main__':
     model = Model(const.IMAGE_SHAPE)  # initialize before loss functions to ensure accurate cam size configuration
     train, val, test = get_generators()
     optimizer = torch.optim.Adam(model.parameters(),
-                                lr=const.LEARNING_RATE)
+                                 lr=const.LEARNING_RATE)
     loss = ContrastiveLoss(model.get_contrastive_cams) if const.MODEL_NAME != 'default' else torch.nn.CrossEntropyLoss()
     fit(model, optimizer, loss, train, val)
     torch.save(model.state_dict(), const.MODELS_DIR / f'{const.MODEL_NAME}.pt')

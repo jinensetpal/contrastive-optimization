@@ -29,7 +29,7 @@ class Dataset(torch.utils.data.Dataset):
 
         heatmap = torchvision.io.read_image((self.annotations_dir / 'trimaps' / f'{self.df["Image"].iloc[idx]}.png').as_posix())
         heatmap = heatmap.to(torch.float)
-        heatmap[heatmap == 3] = 1  # set unclassified points to target; downsampling requires greater margin of approximation
+        heatmap[heatmap == 3] = 0  # set unclassified points to target; downsampling requires greater margin of approximation
         heatmap[heatmap == 2] = 0  # set background to 0 (for optimization objective)
         heatmap = torchvision.transforms.functional.resize(heatmap, const.CAM_SIZE, antialias=True).squeeze(0)
 
