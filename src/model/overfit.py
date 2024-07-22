@@ -39,7 +39,6 @@ if __name__ == '__main__':
 
     ani = animation.ArtistAnimation(fig, frames, interval=100, blit=True)
     ani.save(const.DATA_DIR / 'evals' / 'overfit_test.mp4')
-    plt.clf()
 
     fig = plt.figure(figsize=(1, 2),
                      facecolor='white')
