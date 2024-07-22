@@ -37,6 +37,8 @@ if __name__ == '__main__':
 
         optim.step()
 
+    print(cc.mean().item(), y_pred[0].detach(), y[1])
+
     ani = animation.ArtistAnimation(fig, frames, interval=100, blit=True)
     ani.save(const.DATA_DIR / 'evals' / 'overfit_test.mp4')
 
