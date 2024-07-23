@@ -32,7 +32,7 @@ stages:
     - src/model/evaluate.py
     - src/model/train.py
     outs:
-    - data/evals/default.png
+    - data/evals/default_cam.png
   contrastive-evaluate:
     cmd: python -m src.model.evaluate contrastive
     deps:
@@ -44,4 +44,4 @@ stages:
     - src/model/evaluate.py
     - src/model/train.py
     outs:
-    - data/evals/contrastive.png
+    - data/evals/contrastive_cam.png
