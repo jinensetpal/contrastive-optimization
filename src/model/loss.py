@@ -13,7 +13,7 @@ class PieceWiseLoss(nn.Module):
         cc = self.get_contrastive_cam(y[1], y_pred[1])
         heatmap = y[0].repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
 
-        return torch.exp(-cc[heatmap > .3]).min() + torch.exp(cc[heatmap <= .3].pow(2)).max()
+        return torch.exp(-cc[heatmap > .3]).mean() + torch.exp(cc[heatmap <= .3].abs()).mean()
 
 
 class KLDLoss(nn.Module):
@@ -34,7 +34,7 @@ class KLDLoss(nn.Module):
         return self.kld(cc.log(), y[0].repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3))
 
 
-class ContrastiveLoss(nn.Module):
+class NonPositiveLoss(nn.Module):
     def __init__(self, get_contrastive_cam_fn):
         super().__init__()
         self.get_contrastive_cam = get_contrastive_cam_fn
@@ -44,4 +44,21 @@ class ContrastiveLoss(nn.Module):
         cc = self.get_contrastive_cam(y[1], y_pred[1])
         heatmap = y[0].repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
 
-        return (cc[heatmap <= .5]).abs().mean() - torch.nan_to_num(cc[(heatmap > .5) & (cc < 0)]).mean()
+        return (cc[heatmap <= .5]).pow(2).mean() - torch.nan_to_num(cc[(heatmap > .5) & (cc < 0)]).mean()
+
+
+class ContrastiveLoss(nn.Module):
+    def __init__(self, get_contrastive_cam_fn):
+        super().__init__()
+        self.get_contrastive_cam = get_contrastive_cam_fn
+        self.cse = nn.CrossEntropyLoss()
+        self.softmax_1 = nn.Softmax(dim=1)
+        self.softmax_2 = nn.Softmax(dim=2)
+        self.kld = nn.KLDivLoss(reduction='batchmean')
+
+    def forward(self, y_pred, y):
+        cc = self.get_contrastive_cam(y[1], y_pred[1])
+        cc = self.softmax_2((cc * 1E1).flatten(start_dim=2)).reshape(*cc.shape)
+        heatmap = self.softmax_1((y[0] * 5E1).flatten(start_dim=1)).reshape(cc.shape[0], *cc.shape[-2:]).repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
+
+        return self.kld(cc.log(), heatmap) + (cc[heatmap <= .2]).abs().mean()
