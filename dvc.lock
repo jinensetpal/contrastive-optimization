@@ -43,7 +43,7 @@ stages:
       nfiles: 25862
     - path: src/const.py
       hash: md5
-      md5: ff763ad76b40d6ca6de5416c05b348b4
+      md5: c22ed7fb93a2f8cf8249a8acd788f1e6
       size: 625
     - path: src/data/oxford_iiit_pet.py
       hash: md5
@@ -51,12 +51,12 @@ stages:
       size: 1838
     - path: src/model/arch.py
       hash: md5
-      md5: 4789c45cc09f4455fdd2a92f2677e067
-      size: 2438
+      md5: ab3e75b82b3947bb9436b9eb7d79faf0
+      size: 2611
     - path: src/model/loss.py
       hash: md5
-      md5: 4d5a88b7984cd08de7a873887d6b08f8
-      size: 2532
+      md5: 0b83163109cfccc7beec7e974a13dde5
+      size: 2534
     - path: src/model/train.py
       hash: md5
       md5: b0bc74b608233b6a14100b9ad6743c74
@@ -64,7 +64,7 @@ stages:
     outs:
     - path: models/contrastive.pt
       hash: md5
-      md5: bbcd10608c6b5af2f2f52963f9f892c2
+      md5: 74af9932f6e6cd65c47f88db55453b09
       size: 85983106
   default-evaluate:
     cmd: python -m src.model.evaluate default
@@ -113,11 +113,11 @@ stages:
       nfiles: 25862
     - path: models/contrastive.pt
       hash: md5
-      md5: bbcd10608c6b5af2f2f52963f9f892c2
+      md5: 74af9932f6e6cd65c47f88db55453b09
       size: 85983106
     - path: src/const.py
       hash: md5
-      md5: ff763ad76b40d6ca6de5416c05b348b4
+      md5: c22ed7fb93a2f8cf8249a8acd788f1e6
       size: 625
     - path: src/data/oxford_iiit_pet.py
       hash: md5
@@ -125,8 +125,8 @@ stages:
       size: 1838
     - path: src/model/arch.py
       hash: md5
-      md5: 4789c45cc09f4455fdd2a92f2677e067
-      size: 2438
+      md5: ab3e75b82b3947bb9436b9eb7d79faf0
+      size: 2611
     - path: src/model/evaluate.py
       hash: md5
       md5: 4b10ab1ba6c494a4409146701b8a0b17
@@ -138,5 +138,5 @@ stages:
     outs:
     - path: data/evals/contrastive_cam.png
       hash: md5
-      md5: a4f957f59800b963adaab090fac84210
-      size: 1718602
+      md5: ec113fa53622232cee0e3e66772721e1
+      size: 1784682
