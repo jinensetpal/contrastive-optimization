@@ -61,4 +61,4 @@ class ContrastiveLoss(nn.Module):
         cc = self.softmax_2((cc * 1E1).flatten(start_dim=2)).reshape(*cc.shape)
         heatmap = self.softmax_1((y[0] * 5E1).flatten(start_dim=1)).reshape(cc.shape[0], *cc.shape[-2:]).repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
 
-        return self.kld(cc.log(), heatmap) + (cc[heatmap <= .2]).abs().mean()
+        return self.kld(cc.log(), heatmap) # + (cc[heatmap <= .2]).abs().mean()

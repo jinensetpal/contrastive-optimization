@@ -43,8 +43,8 @@ stages:
       nfiles: 25862
     - path: src/const.py
       hash: md5
-      md5: 5010cbb62685f890e74b558602c39e37
-      size: 626
+      md5: ff763ad76b40d6ca6de5416c05b348b4
+      size: 625
     - path: src/data/oxford_iiit_pet.py
       hash: md5
       md5: d50ac63e387ffbf9d1a7ef8a6b9e0a0f
@@ -64,7 +64,7 @@ stages:
     outs:
     - path: models/contrastive.pt
       hash: md5
-      md5: 80f35087239fe27c38bc7682bb5afe16
+      md5: bbcd10608c6b5af2f2f52963f9f892c2
       size: 85983106
   default-evaluate:
     cmd: python -m src.model.evaluate default
@@ -113,12 +113,12 @@ stages:
       nfiles: 25862
     - path: models/contrastive.pt
       hash: md5
-      md5: 80f35087239fe27c38bc7682bb5afe16
+      md5: bbcd10608c6b5af2f2f52963f9f892c2
       size: 85983106
     - path: src/const.py
       hash: md5
-      md5: 5010cbb62685f890e74b558602c39e37
-      size: 626
+      md5: ff763ad76b40d6ca6de5416c05b348b4
+      size: 625
     - path: src/data/oxford_iiit_pet.py
       hash: md5
       md5: d50ac63e387ffbf9d1a7ef8a6b9e0a0f
@@ -138,5 +138,5 @@ stages:
     outs:
     - path: data/evals/contrastive_cam.png
       hash: md5
-      md5: ff5b2ac645ece4514833daf23858859e
-      size: 1736569
+      md5: a4f957f59800b963adaab090fac84210
+      size: 1718602
