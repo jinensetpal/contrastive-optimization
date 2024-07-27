@@ -55,8 +55,8 @@ stages:
       size: 2611
     - path: src/model/loss.py
       hash: md5
-      md5: 0b83163109cfccc7beec7e974a13dde5
-      size: 2534
+      md5: c2e1c1fbbe7e17ca41d471e12328aee3
+      size: 2560
     - path: src/model/train.py
       hash: md5
       md5: b0bc74b608233b6a14100b9ad6743c74
@@ -64,7 +64,7 @@ stages:
     outs:
     - path: models/contrastive.pt
       hash: md5
-      md5: 74af9932f6e6cd65c47f88db55453b09
+      md5: 686c5c838ee832509cf8e383324f71cd
       size: 85983106
   default-evaluate:
     cmd: python -m src.model.evaluate default
@@ -113,7 +113,7 @@ stages:
       nfiles: 25862
     - path: models/contrastive.pt
       hash: md5
-      md5: 74af9932f6e6cd65c47f88db55453b09
+      md5: 686c5c838ee832509cf8e383324f71cd
       size: 85983106
     - path: src/const.py
       hash: md5
@@ -138,5 +138,5 @@ stages:
     outs:
     - path: data/evals/contrastive_cam.png
       hash: md5
-      md5: ec113fa53622232cee0e3e66772721e1
-      size: 1784682
+      md5: 724df4de192e9f667da0ef00bff27d9f
+      size: 1752729

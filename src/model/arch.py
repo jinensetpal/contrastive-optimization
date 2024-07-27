@@ -19,7 +19,7 @@ class Model(torch.nn.Module):
         self.feature_grad = None
         self.feature_rect = None
 
-        self.linear = nn.Linear(2048, const.N_CLASSES)
+        self.linear = nn.Linear(2048, const.N_CLASSES, bias=False)
         self.softmax = nn.Softmax(dim=1)  # ~equivalent to sigmoid since classes = 2; relevant for CAMs
 
         self.to(const.DEVICE)
@@ -34,9 +34,16 @@ class Model(torch.nn.Module):
 
     def forward(self, x):
         self.pre_logit = self.backbone(x)
-        x = self.pre_logit.pow(3)  # scale activations to ignore lower, noisy values
-        logits = x @ self.linear.weight.pow(1 if self.training else 3).T
-        return self.softmax(logits * (1 if self.training else 1E3)), self._compute_hi_res_cam(logits)
+        x = self.pre_logit.pow(1)  # scale activations to ignore lower, noisy values
+
+        if self.training or not const.ACTIVATION_CLIPPING: logits = self.linear(x)
+        else:
+            activations = x * self.linear.weight
+            activation_diffs = (activations[0] - activations[1]).abs()
+            activations[(activation_diffs < activation_diffs.quantile(.75)).repeat(2, 1)] = 0
+            logits = (activations.sum(dim=1) + self.linear.bias).unsqueeze(0)
+
+        return self.softmax(logits), self._compute_hi_res_cam(logits)
 
     @staticmethod
     def get_contrastive_cams(y, cams):

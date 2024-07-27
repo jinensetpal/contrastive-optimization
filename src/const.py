@@ -10,6 +10,7 @@ MODELS_DIR = BASE_DIR / 'models'
 
 # training
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
+ACTIVATION_CLIPPING = True
 LEARNING_RATE = 1E-3
 SELECT_BEST = True
 BATCH_SIZE = 16

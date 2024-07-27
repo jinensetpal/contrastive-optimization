@@ -38,7 +38,6 @@ class NonPositiveLoss(nn.Module):
     def __init__(self, get_contrastive_cam_fn):
         super().__init__()
         self.get_contrastive_cam = get_contrastive_cam_fn
-        self.cse = nn.CrossEntropyLoss()
 
     def forward(self, y_pred, y):
         cc = self.get_contrastive_cam(y[1], y_pred[1])
@@ -51,14 +50,13 @@ class ContrastiveLoss(nn.Module):
     def __init__(self, get_contrastive_cam_fn):
         super().__init__()
         self.get_contrastive_cam = get_contrastive_cam_fn
-        self.cse = nn.CrossEntropyLoss()
         self.softmax_1 = nn.Softmax(dim=1)
         self.softmax_2 = nn.Softmax(dim=2)
         self.kld = nn.KLDivLoss(reduction='batchmean')
 
-    def forward(self, y_pred, y):
+    def forward(self, y_pred, y, debug=False):
         cc = self.get_contrastive_cam(y[1], y_pred[1])
         cc = self.softmax_2((cc * 1E1).flatten(start_dim=2)).reshape(*cc.shape)
         heatmap = self.softmax_1((y[0] * 5E1).flatten(start_dim=1)).reshape(cc.shape[0], *cc.shape[-2:]).repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
 
-        return self.kld(cc.log(), heatmap) + (cc[heatmap <= .2]).abs().mean() - cc.mean()
+        return (heatmap.log() - cc.log()).abs().sum() / cc.size(0)
