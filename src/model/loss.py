@@ -56,7 +56,9 @@ class ContrastiveLoss(nn.Module):
 
     def forward(self, y_pred, y, debug=False):
         cc = self.get_contrastive_cam(y[1], y_pred[1])
-        cc = self.softmax_2((cc * 1E1).flatten(start_dim=2)).reshape(*cc.shape)
-        heatmap = self.softmax_1((y[0] * 5E1).flatten(start_dim=1)).reshape(cc.shape[0], *cc.shape[-2:]).repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
+        cc_softmax = self.softmax_2((cc * 1E1).flatten(start_dim=2)).reshape(*cc.shape)
 
-        return (heatmap.log() - cc.log()).abs().sum() / cc.size(0)
+        heatmap_softmax = self.softmax_1((y[0] * 5E1).flatten(start_dim=1)).reshape(cc.shape[0], *cc.shape[-2:]).repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
+        heatmap = y[0].repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
+
+        return self.kld(cc_softmax.log(), heatmap_softmax) + cc[heatmap == 0].abs().mean() - cc[heatmap != 0].mean()
