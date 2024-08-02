@@ -43,29 +43,29 @@ stages:
       nfiles: 25862
     - path: src/const.py
       hash: md5
-      md5: df9d0e599ba6fffff4dc878b5f4494e5
-      size: 654
+      md5: 5a48756fb33d0fac6d3e9be21f53fe2b
+      size: 626
     - path: src/data/oxford_iiit_pet.py
       hash: md5
       md5: d50ac63e387ffbf9d1a7ef8a6b9e0a0f
       size: 1838
     - path: src/model/arch.py
       hash: md5
-      md5: 287348b1406e095b5687e760792459d5
-      size: 2909
+      md5: 14874221a9405ec4268976ac92ea6ec6
+      size: 2618
     - path: src/model/loss.py
       hash: md5
-      md5: 20e1234bca2b8b6bfa725c1d9c1c77f6
-      size: 2593
+      md5: 9cf71f05d057e18ec207a255c314fec6
+      size: 2475
     - path: src/model/train.py
       hash: md5
-      md5: b0bc74b608233b6a14100b9ad6743c74
-      size: 4057
+      md5: 6941e0fee2ee9b176ac79142b1e259bc
+      size: 4103
     outs:
     - path: models/contrastive.pt
       hash: md5
-      md5: f7e717c0f726752b8fb4cd8a0d2b2810
-      size: 85982784
+      md5: 373b2f4e0996397919e335c75ccf3cd7
+      size: 85948406
   default-evaluate:
     cmd: python -m src.model.evaluate default
     deps:
@@ -113,30 +113,30 @@ stages:
       nfiles: 25862
     - path: models/contrastive.pt
       hash: md5
-      md5: f7e717c0f726752b8fb4cd8a0d2b2810
-      size: 85982784
+      md5: 373b2f4e0996397919e335c75ccf3cd7
+      size: 85948406
     - path: src/const.py
       hash: md5
-      md5: df9d0e599ba6fffff4dc878b5f4494e5
-      size: 654
+      md5: 5a48756fb33d0fac6d3e9be21f53fe2b
+      size: 626
     - path: src/data/oxford_iiit_pet.py
       hash: md5
       md5: d50ac63e387ffbf9d1a7ef8a6b9e0a0f
       size: 1838
     - path: src/model/arch.py
       hash: md5
-      md5: 287348b1406e095b5687e760792459d5
-      size: 2909
+      md5: 14874221a9405ec4268976ac92ea6ec6
+      size: 2618
     - path: src/model/evaluate.py
       hash: md5
-      md5: 4b10ab1ba6c494a4409146701b8a0b17
-      size: 1521
+      md5: c1a3a6e5ac3b7adbaa714f817a73f386
+      size: 1494
     - path: src/model/train.py
       hash: md5
-      md5: b0bc74b608233b6a14100b9ad6743c74
-      size: 4057
+      md5: 6941e0fee2ee9b176ac79142b1e259bc
+      size: 4103
     outs:
     - path: data/evals/contrastive_cam.png
       hash: md5
-      md5: 20b333b37e5b5d23bcbfa8f824a80eee
-      size: 1687966
+      md5: 526e80b1d69b53d7ab5bd16e8567725a
+      size: 1671263

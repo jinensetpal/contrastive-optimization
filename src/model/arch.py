@@ -14,8 +14,9 @@ class Model(torch.nn.Module):
         self.backbone.layer4[0].conv2 = torch.nn.Conv2d(512, 512, kernel_size=(1, 1), stride=(1, 1), bias=False)
         self.backbone.layer4[0].downsample[0] = torch.nn.Conv2d(1024, 2048, kernel_size=(1, 1), stride=(1, 1), bias=False)
 
-        self.backbone.layer4[-1].bn3 = nn.Identity()
-        self.backbone.layer4[-1].relu = nn.Identity()
+        if is_contrastive:
+            self.backbone.layer4[-1].bn3 = nn.Identity()
+            self.backbone.layer4[-1].relu = nn.Identity()
         self.backbone.layer4[-1].conv3.register_forward_hook(self._hook)
 
         self.backbone.fc = nn.Identity()
