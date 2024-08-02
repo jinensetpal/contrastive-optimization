@@ -13,13 +13,17 @@ class Model(torch.nn.Module):
         self.backbone = torchvision.models.resnet50(weights=None)
         self.backbone.layer4[0].conv2 = torch.nn.Conv2d(512, 512, kernel_size=(1, 1), stride=(1, 1), bias=False)
         self.backbone.layer4[0].downsample[0] = torch.nn.Conv2d(1024, 2048, kernel_size=(1, 1), stride=(1, 1), bias=False)
-        self.backbone.fc = nn.Identity()
+
+        self.backbone.layer4[-1].bn3 = nn.Identity()
+        self.backbone.layer4[-1].relu = nn.Identity()
         self.backbone.layer4[-1].conv3.register_forward_hook(self._hook)
+
+        self.backbone.fc = nn.Identity()
 
         self.feature_grad = None
         self.feature_rect = None
 
-        self.linear = nn.Linear(2048, const.N_CLASSES, bias=not is_contrastive)
+        self.linear = nn.LazyLinear(const.N_CLASSES, bias=not is_contrastive)
         self.softmax = nn.Softmax(dim=1)  # ~equivalent to sigmoid since classes = 2; relevant for CAMs
 
         self.to(const.DEVICE)
@@ -50,8 +54,8 @@ class Model(torch.nn.Module):
         cams = torch.zeros(*logits.shape, *self.feature_rect.shape[2:])
         for img_idx in range(logits.shape[0]):
             for class_idx in range(logits.shape[1]):
-                logits[img_idx, class_idx].backward(retain_graph=True, inputs=self.feature_rect)
-                cams[img_idx, class_idx] = (self.feature_rect * self.feature_grad).sum(1)[img_idx]
+                logits[img_idx, class_idx].backward(retain_graph=True, inputs=self.backbone.layer4[-1].conv3.weight)
+                cams[img_idx, class_idx] = (self.feature_rect * self.feature_grad).sum(dim=1)[img_idx]
         return cams
 
 
