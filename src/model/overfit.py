@@ -18,7 +18,6 @@ if __name__ == '__main__':
     loss_fn = ContrastiveLoss(model.get_contrastive_cams)
 
     idx = random.randint(0, len(data) - 1)
-    print(idx)
     X = data[idx][0].unsqueeze(0)
     y = [x.unsqueeze(0) for x in data[idx][1]]
 
@@ -53,6 +52,3 @@ if __name__ == '__main__':
 
     plt.tight_layout()
     plt.show()
-
-    from IPython import embed
-    embed()
