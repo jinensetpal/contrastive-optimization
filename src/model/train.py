@@ -31,8 +31,6 @@ def fit(model, optimizer, loss, train, val):
             cse_loss = torch.empty(1, device=const.DEVICE)
 
             for train_batch, valid_batch in zip(train, val):
-                optimizer.zero_grad()
-
                 X_train, y_train, X_valid, y_valid = [*train_batch, *valid_batch]
                 y_pred_train = model(X_train)
                 y_pred_valid = model(X_valid)
@@ -47,6 +45,7 @@ def fit(model, optimizer, loss, train, val):
                 valid_batch_loss = loss(y_pred_valid, y_valid) if loss._get_name() != 'CrossEntropyLoss' else loss(y_pred_valid[0], y_valid[1])
                 valid_loss = torch.vstack([valid_loss, torch.tensor(valid_batch_loss)])
 
+                optimizer.zero_grad()
                 train_batch_loss.backward()
                 optimizer.step()
 
