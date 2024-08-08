@@ -131,7 +131,7 @@ The standard interpretation of this result uses the obtained activation maps as 
 
 We can consider the backbone as a kernel \citep{jacot2018neural} that fundamentally attempts to linearly separate the correct class, and the softmax-activated final layer being logistic regression.
 
-In this setup, each class has it's own set of weights that feedforwards independently, but trains collaboratively. It assigns a score for it's specific value, which is independent since one set of weights does not affect the other over a forward pass. If we take as example logits $[1,2]$ and $[-2,-1]$, we see that $\sigma([1,2]) = \sigma([-2,1]) = [0.2689, 0.7311]$. The prediction probabilities remain the same, despite different values for the same score $s_c$. Therefore, comparing \textit{absolute score} is a misrepresentation of the internal model state.
+In this setup, each class has it's own set of weights that feedforwards independently, but trains collaboratively. It assigns a score for it's specific value, which is independent since one set of weights does not affect the other over a forward pass. If we take as example logits $[1,2]$ and $[-2,-1]$, we see that $\sigma([1,2]) = \sigma([-2,1]) = [0.2689, 0.7311]$. The prediction probabilities remain the same, despite different values for the same score $s_c$. Therefore, comparing \textit{absolute score} is a misrepresentation of the internal model state. Instead, the objective is to maximize the \textbf{difference between class logits}.
 
 \subsection{Defining the Contrastive Optimization Objective}
 
@@ -141,35 +141,49 @@ We therefore derive an optimization objective that attempts to maximize the cont
 \begin{gather}
 	\max_{\theta} s_c + b_c - s_{c'} - b_{c'} \equiv \max_{\theta} \tilde{\mathcal{\bm{A}}}_{c}^{\text{HiResCAM}} + b_c - \tilde{\mathcal{\bm{A}}}_{c'}^{\text{HiResCAM}} - b_{c'}
 \end{gather}
-This is equivalent to the original ERM optimization objective, with the difference being the resultant values, which is an activation map instead. If $\tilde{\mathcal{\bm{A}}}_{c}^{\text{HiResCAM}} - \tilde{\mathcal{\bm{A}}}_{c'}^{\text{HiResCAM}} > 0$, the classification is correct -- if not, the classification is incorrect. Ignoring the bias terms, our new optimization objective is:
+Ignoring the bias terms, our new optimization objective is:
 \begin{gather}
-	\max_{\theta} \tilde{\mathcal{\bm{A}}}_{c}^{\text{HiResCAM}} - \tilde{\mathcal{\bm{A}}}_{c'}^{\text{HiResCAM}}
+	\max_{\theta} \mathcal{\bm{A}}^{\text{contrastive}} := \tilde{\mathcal{\bm{A}}}_{c}^{\text{HiResCAM}} - \tilde{\mathcal{\bm{A}}}_{c'}^{\text{HiResCAM}}
+\end{gather}
+This is equivalent to the original ERM optimization objective, with the difference being the resultant values preserving spatial information as an activation map instead of flattening the feature map. If $\tilde{\mathcal{\bm{A}}}_{c}^{\text{HiResCAM}} - \tilde{\mathcal{\bm{A}}}_{c'}^{\text{HiResCAM}} > 0$, the classification is correct -- if not, the classification is incorrect. 
+
+For the multiclass case, our setup now considers a set of classes $c$; $c_t$ is our target class, and $c_{t'}$ consists of a sampled non-target class. The definition for multiclass contrastive activation maps now results in a set of activation maps, defined as follows:
+\begin{gather}
+	\mathcal{\bm{A}}^{\text{contrastive}} := \{\tilde{\mathcal{\bm{A}}}_{c_t}^{\text{HiResCAM}} - \tilde{\mathcal{\bm{A}}}_{c'}^{\text{HiResCAM}}\}^{|c|-1}_{c_{t'} \in c - c_t}
+\end{gather}
+This is a generalization of the binary case, as the same formula applied to a binary classification challenge returns a set of contrastive maps containing a single element.
+
+To ensure that the model accurately predicts the target class, each contrastive comparison should yield a positive result. Therefore, the multiclass optimization objective under this paradigm is as follows:
+\begin{gather}
+	\max_{\theta} \tilde{\mathcal{\bm{A}}}_{i}^{\text{contrastive}}\ \forall i \in \mathbb{N}(|c| - 1)
 \end{gather}
 
 \subsection{Constraining Optimization to an Interpretable Basis}
 
-The distinctive feature of the contrastive optimization objective over standard risk is that this preserves spatial information. We know at a pointwise level how each feature contributes to the final prediction.
+As discussed in the previous section, the distinctive feature of the contrastive optimization objective over standard risk is that this preserves spatial information. We know at a pointwise level how each feature contributes to the final prediction.
 
-We can use this to constrain the way optimization occurs -- namely, we only want the model to increase the likelihood of an object belonging to a certain class by actually looking at the features of the class, and not features of spurious correlation like the environment in which the object is present.
+We can use this to constrain the way optimization occurs -- namely, we only want the model to increase the likelihood of an object belonging to a certain class by actually looking at the features of the class, and not features of spurious correlation like the environment in which the object is present. The model through the process of training should learn to distinguish and subsequently ignore the background in determining the final prediction.
 
-Segmentations maps provide this exact information. It describes the region over which the object is present. We therefore define a constrastive cost function as follows:
+Segmentations maps describes the region over which the object is present. We can leverage this information to define a constrastive cost function as follows:
 \begin{gather}
-	\{(x, (h, y))\}^N \in \mathcal{D} \\
-	\mathcal{\bm{A}}^{\text{contrastive}} := \tilde{\mathcal{\bm{A}}}_{y}^{\text{HiResCAM}} - \tilde{\mathcal{\bm{A}}}_{y'}^{\text{HiResCAM}} \\
-	\mathcal{\bm{A}}^{\text{background}}_{i,j} := \begin{cases}
-		\mathcal{\bm{A}}^{\text{contrastive}}_{i,j} & h_{i,j} = 0 \\
+	\{(x, (h, y))\}^N \in \mathcal{D} \text{ where } h_{i,j} := \begin{cases}
+		1 & \text{pixel contains subject} \\
 		0 & \text{otherwise}
 	\end{cases} \\
-	\mathcal{\bm{A}}^{\text{foreground}}_{i,j} := \begin{cases}
-		0 & h_{i,j} = 0 \\
-		\mathcal{\bm{A}}^{\text{contrastive}}_{i,j} & \text{otherwise}
+	\mathcal{\bm{A}}^{\text{background}}_{c,i,j} := \begin{cases}
+		\mathcal{\bm{A}}^{\text{contrastive}}_{c,i,j} & h_{i,j} = 0 \\
+		0 & \text{otherwise}
 	\end{cases} \\
-	D_{KL}(P || Q) := P \cdot \log \frac{P'}{Q} \text{ where }
+	\mathcal{\bm{A}}^{\text{foreground}}_{c,i,j} := \begin{cases}
+		0 & h_{i,j} = 0 \\
+		\mathcal{\bm{A}}^{\text{contrastive}}_{c,i,j} & \text{otherwise}
+	\end{cases} \\
+	D_{KL}(P || Q) := \frac{1}{|c|-1}\sum^{|c|-1}_c P \cdot \log \frac{P'}{Q_c} \text{ where } 
 	P'_{i,j} := \begin{cases}
 		1 & P_{i,j} \neq 0 \\
 		P_{i,j} & \text{otherwise}
-	\end{cases} \\
-	\mathcal{\bm{J}}(\theta, \mathcal{D}) := D_{KL}(\sigma_{\text{softmax}}(\lambda_1 \mathcal{\bm{A}}^{\text{contrastive}})\ ||\ \sigma_{\text{softmax}}(\lambda_2 \cdot h)) + \frac{\lambda_3}{D_1 D_2} ||\mathcal{\bm{A}}^{\text{background}}||^2_2 - \frac{1}{D_1 D_2} \sum^{D_1,D_2}_{i,j} \mathcal{\bm{A}}^{\text{foreground}}_{i,j}
+	\end{cases} \label{d_kl} \\
+	\mathcal{\bm{J}}(\theta, \mathcal{D}) := D_{KL}(\sigma_{\text{softmax}}(\lambda_1 \mathcal{\bm{A}}^{\text{contrastive}})\ ||\ \sigma_{\text{softmax}}(\lambda_2 \cdot h)) + \frac{\lambda_3}{D_1 D_2} ||\mathcal{\bm{A}}^{\text{background}}||^2_2 - \frac{1}{D_1 D_2} \sum^{|c|-1,D_1,D_2}_{c,i,j} \mathcal{\bm{A}}^{\text{foreground}}_{c,i,j}
 \end{gather}
 
 The cost function has a threefold purpose:
@@ -179,13 +193,13 @@ The cost function has a threefold purpose:
 	\item Maximize the value of the contrastive map where the segmentation map is the foreground.
 \end{enumerate}
 
-$D_{KL}$ is modified such that the likelihood comparator sets point probability to 1 if it is part of the foreground. While this violates the probability distribution definition, it motivates the optimizer to maximize the foreground activation. During training, observing pointwise divergence revealed that the model was penalized for `over-activating' the foreground, which this modification negates.
+$D_{KL}$ is modified per (10), such that the likelihood comparator sets point probability to 1 if it is part of the foreground. While this violates the probability distribution definition, it motivates the optimizer to maximize the foreground activation. During training, observing pointwise divergence revealed that the model was penalized for `over-activating' the foreground, which this modification corrects. In addition, it also averages the divergence from the target segmenetation map to each contrastive activation map.
 
 $\lambda_1$ \& $\lambda_2$ are hyperparameters that scale the activation maps, since softmax computer over highly similar values close to zero produces uniform probability distributions. $\lambda_3$ weights the importance of the background not affecting the final prediction. For our experiments, $\lambda_1 = 10, \lambda_2 = 50, \lambda_3 = 100$ were set empirically, without rigorous optimization.
 
 \subsection{Training Detail}
 
-The Oxford-IIIT Pets dataset contains a classification goal alongside high-quality segmentation maps, and the binary classification case (image containing a dog or cat) was trained on. The architecture used for training was ResNet-50, initialized with random parameters and two key modifications:
+The Oxford-IIIT Pets dataset is an image dataset with a classification objective alongside high-quality segmentation maps. We train the model on the binary classification case (image containing a dog or cat) as well as the fine-grained, breed specific 37 class split. The architecture used for training was ResNet-50, initialized with random parameters and three key modifications:
 
 \paragraph{Removed final downsampling} The final downsampling layer converts the latent feature maps from $D_1 = D_2 = 14$ to $7$. This prohibitively reduces the size of the activation map, and makes it hard to capture relevant features. Therefore, we replace the stride of the final downsampling convolution to $(1,1)$, matching that of the definition used through the rest of ResNet. 
 
@@ -193,11 +207,13 @@ The Oxford-IIIT Pets dataset contains a classification goal alongside high-quali
 
 \paragraph{Removed final BatchNormalization \& ReLU} Since the HiResCAM definition for CAM architectures assumes the convolution followed by global average pooling and the final linear layer only, the current explanation does not directly explain the class score. We therefore also neutralize the final two-layers, which successfully recovers the faithfulness guarantee.
 
-The model was trained for $150$ epochs with the Adam optimizer with a learning rate of $10^{-3}$, a batch size of $32$ on a 32GB V100 on a randomly shuffled dataset using the original data splits. The total time for training was $\approx$1hr.
-
 \paragraph{Reproducibility.} The source code, dataset, experiments, evals, and model weights can be found at \url{https://dagshub.com/jinensetpal/contrastive-optimization}.
 
 \section{Results}
+
+\subsection{Binary Classification}
+
+For binary classification, the model was trained for $150$ epochs with the Adam optimizer with a learning rate of $10^{-3}$, a batch size of $32$ on a 32GB V100 on a randomly shuffled dataset using the original data splits. The total time for training was $\approx$1hr.
 
 An encouraging result from this experiment is that the model trained on the contrastive objective outperforms the exact same model architecture (with the final bias, batchnorm and ReLU re-added in) on cross entropy loss, even though the control case was trained explicitly to reduce cross entropy.
 
@@ -233,9 +249,26 @@ Crucially, on comparing contrastive activation maps, we can see that each of the
 	\caption{Left: contrastive activation maps from the default training run. Right: contrastive activation maps from the contrastive training run.}
 \end{figure}
 
+\subsection{Multiclass Classification}
+
+Our approach's performance on the Oxford-IIIT Pets Dataset to the default is as follows:
+
+%TODO: update results
+\begin{table}[h]
+	\centering
+	\begin{tabular}{c|ccc}
+		\toprule
+		\textbf{Method}  & \textbf{Cross Entropy Loss}  & \textbf{Training Accuracy}   & \textbf{Validation Accuracy} \\
+		\midrule
+		Cross-Entropy & 0.000 & 3.0\% & 3.0\% \\
+		Interpretable (Ours) & \bf 0.000 & \bf 92.0\% & \bf 50.0\% \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
 \section{Upcoming / In Progress Tasks} 
 
-\paragraph{Extending to the Multiclass Setting} Currently, the implementation computes contrastive activation maps from the target to each other class. However, the best approach to optimization needs to be tested. The likely approach would be to compute the mean error over each contrastive activation map.
+\paragraph{Understanding the Generalization Gap} While the model for the multiclass paradigm is able to fit the training dataset excellently -- achieving $\approx 92\%$ training accuracy -- the validation accuracy is significantly behind at $\approx 50\%$. This could imply memorization of samples, which was something that the approach was intended to mitigate. Further investigation could help support or disprove this result.
 
 \paragraph{Evaluating Generalization Capabilities} If we take another dog / cat dataset, could a well trained model perform better than traditional optimization, since it isn't relying as much on memorization of noise or distribution specific data?
 

@@ -13,7 +13,6 @@ import sys
 
 
 def fit(model, optimizer, loss, train, val, best=None, init_epoch=1, mlflow_run_id=None):
-    if const.LOG_REMOTE: mlflow.set_tracking_uri(const.MLFLOW_TRACKING_URI)
     start_time = time.time()
     best = best or {'param': model.state_dict(),
                     'epoch': 0,
@@ -52,7 +51,6 @@ def fit(model, optimizer, loss, train, val, best=None, init_epoch=1, mlflow_run_
                 if not (batch_idx+1) % const.GRAD_ACCUMULATION_STEPS:
                     optimizer.step()
                     optimizer.zero_grad()
-                    break
 
             train_acc = train_acc[1:]
             valid_acc = valid_acc[1:]
@@ -86,6 +84,7 @@ def fit(model, optimizer, loss, train, val, best=None, init_epoch=1, mlflow_run_
 
 if __name__ == '__main__':
     const.MODEL_NAME = sys.argv[1]
+    if const.LOG_REMOTE: mlflow.set_tracking_uri(const.MLFLOW_TRACKING_URI)
 
     model = Model(const.IMAGE_SHAPE, is_contrastive=const.MODEL_NAME != 'default')  # initialize before loss functions to ensure accurate cam size configuration
     train, val, test = get_generators()
