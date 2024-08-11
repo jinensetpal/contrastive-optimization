@@ -164,7 +164,7 @@ As discussed in the previous section, the distinctive feature of the contrastive
 
 We can use this to constrain the way optimization occurs -- namely, we only want the model to increase the likelihood of an object belonging to a certain class by actually looking at the features of the class, and not features of spurious correlation like the environment in which the object is present. The model through the process of training should learn to distinguish and subsequently ignore the background in determining the final prediction.
 
-Segmentations maps describes the region over which the object is present. We can leverage this information to define a constrastive cost function as follows:
+Segmentations maps describe the region over which the object is present. We can leverage this information to define a constrastive cost function as follows:
 \begin{gather}
 	\{(x, (h, y))\}^N \in \mathcal{D} \text{ where } h_{i,j} := \begin{cases}
 		1 & \text{pixel contains subject} \\
@@ -183,7 +183,11 @@ Segmentations maps describes the region over which the object is present. We can
 		1 & P_{i,j} \neq 0 \\
 		P_{i,j} & \text{otherwise}
 	\end{cases} \label{d_kl} \\
-	\mathcal{\bm{J}}(\theta, \mathcal{D}) := D_{KL}(\sigma_{\text{softmax}}(\lambda_1 \mathcal{\bm{A}}^{\text{contrastive}})\ ||\ \sigma_{\text{softmax}}(\lambda_2 \cdot h)) + \frac{\lambda_3}{D_1 D_2} ||\mathcal{\bm{A}}^{\text{background}}||^2_2 - \frac{1}{D_1 D_2} \sum^{|c|-1,D_1,D_2}_{c,i,j} \mathcal{\bm{A}}^{\text{foreground}}_{c,i,j}
+	\begin{split}
+		\mathcal{\bm{J}}(\theta, \mathcal{D}) := &D_{KL}(\sigma_{\text{softmax}}(\lambda_1 \mathcal{\bm{A}}^{\text{contrastive}})\ ||\ \sigma_{\text{softmax}}(\lambda_2 h)) \\
+		&+ \frac{\lambda_3}{D_1 D_2} ||\mathcal{\bm{A}}^{\text{background}}||^2_2 \\
+		&- \frac{1}{D_1 D_2} \sum^{|c|-1,D_1,D_2}_{c,i,j} \mathcal{\bm{A}}^{\text{foreground}}_{c,i,j}
+	\end{split}
 \end{gather}
 
 The cost function has a threefold purpose:
@@ -193,9 +197,11 @@ The cost function has a threefold purpose:
 	\item Maximize the value of the contrastive map where the segmentation map is the foreground.
 \end{enumerate}
 
-$D_{KL}$ is modified per (10), such that the likelihood comparator sets point probability to 1 if it is part of the foreground. While this violates the probability distribution definition, it motivates the optimizer to maximize the foreground activation. During training, observing pointwise divergence revealed that the model was penalized for `over-activating' the foreground, which this modification corrects. In addition, it also averages the divergence from the target segmenetation map to each contrastive activation map.
+$D_{KL}$ is modified per (10), such that the likelihood comparator sets point probability to 1 if it is part of the foreground. While this violates the probability distribution under which KL Divergence is defined, it motivates the optimizer to maximize the foreground activation, which is especially crucial for cases where the image contains large sections of foreground. During training, observing pointwise divergence revealed that the model was penalized for `over-activating' the foreground, which this modification corrects. In addition, it also averages the divergence from the target segmentation map to each contrastive activation map.
 
 $\lambda_1$ \& $\lambda_2$ are hyperparameters that scale the activation maps, since softmax computer over highly similar values close to zero produces uniform probability distributions. $\lambda_3$ weights the importance of the background not affecting the final prediction. For our experiments, $\lambda_1 = 10, \lambda_2 = 50, \lambda_3 = 100$ were set empirically, without rigorous optimization.
+
+In addition to classifying the input image, the model returns a provably accurate attention map used to distinguish between the two classes. This can be obtained by simply computing the absolute values of the contrastive map compared against any two classes, and subsequently performing normalization.
 
 \subsection{Training Detail}
 
@@ -251,24 +257,29 @@ Crucially, on comparing contrastive activation maps, we can see that each of the
 
 \subsection{Multiclass Classification}
 
+For multiclass classification, the objective is to distinguish between the features of species within the cat and dog families. There are a total of 37 classes, with a success of rate of $\approx 2.7\%$ with random guessing.
+
 Our approach's performance on the Oxford-IIIT Pets Dataset to the default is as follows:
 
-%TODO: update results
 \begin{table}[h]
 	\centering
 	\begin{tabular}{c|ccc}
 		\toprule
 		\textbf{Method}  & \textbf{Cross Entropy Loss}  & \textbf{Training Accuracy}   & \textbf{Validation Accuracy} \\
 		\midrule
-		Cross-Entropy & 0.000 & 3.0\% & 3.0\% \\
-		Interpretable (Ours) & \bf 0.000 & \bf 92.0\% & \bf 50.0\% \\
+		Cross-Entropy & 3.627 & 2.8\% & 3.1\% \\
+		Interpretable (Ours) & \bf 2.743 & \bf 93.0\% & \bf 51.5\% \\
 		\bottomrule
 	\end{tabular}
 \end{table}
 
+We can observe that the default model is unable to learn any valuable information, the contrastive model is able to learn a significant portion of the information, although with a substantial generalization gap.
+
+The model was trained for 731 epochs with the Adam optimizer with a learning rate of $10^{-3}$ with a batch size of 12, with 5 gradient accumulation steps (effective batch size of 60) on a 32GB V100 on a randomly shuffled dataset using the original splits. The default model was only trained for 30 epochs, by which point it had already converged. For posterity, we will run the default setup for 731 epochs as well before publication.
+
 \section{Upcoming / In Progress Tasks} 
 
-\paragraph{Understanding the Generalization Gap} While the model for the multiclass paradigm is able to fit the training dataset excellently -- achieving $\approx 92\%$ training accuracy -- the validation accuracy is significantly behind at $\approx 50\%$. This could imply memorization of samples, which was something that the approach was intended to mitigate. Further investigation could help support or disprove this result.
+\paragraph{Understanding the Generalization Gap} While the model for the multiclass paradigm is able to fit the training dataset excellently -- achieving $\approx 93\%$ training accuracy -- the validation accuracy is significantly behind at $\approx 51\%$. This could imply memorization of samples, which was something that this approach was intended to mitigate. Further investigation could help support or disprove this hypothesis.
 
 \paragraph{Evaluating Generalization Capabilities} If we take another dog / cat dataset, could a well trained model perform better than traditional optimization, since it isn't relying as much on memorization of noise or distribution specific data?
 
