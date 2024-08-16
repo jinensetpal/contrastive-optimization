@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import torch.nn.functional as F
+from src import const
 from torch import nn
 import torch
 
@@ -57,9 +58,9 @@ class ContrastiveLoss(nn.Module):
         cc = self.get_contrastive_cam(y[1], y_pred[1])
         heatmap = y[0].repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
 
-        cc_log_probs = F.softmax((cc * 1E1).flatten(start_dim=2), dim=2).reshape(*cc.shape).log()
-        heatmap_probs = F.softmax(((y[0] + 5) * 5E1).flatten(start_dim=1), dim=1).reshape(cc.shape[0], *cc.shape[-2:]).repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
+        cc_log_probs = F.softmax((cc * const.LAMBDAS[0]).flatten(start_dim=2), dim=2).reshape(*cc.shape).log()
+        heatmap_probs = F.softmax(((y[0] + 5) * const.LAMBDAS[1]).flatten(start_dim=1), dim=1).reshape(cc.shape[0], *cc.shape[-2:]).repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
         heatmap_log_probs = heatmap_probs.log()
         heatmap_log_probs[heatmap != 0] == 0
 
-        return (heatmap_probs * (heatmap_log_probs - cc_log_probs)).sum() / cc.size(0) + 50 * cc[heatmap == 0].pow(2).mean() - cc.mean()
+        return const.LAMBDAS[2] * (heatmap_probs * (heatmap_log_probs - cc_log_probs)).sum() / cc.size(0) + const.LAMBDAS[3] * cc[heatmap == 0].pow(2).mean() - const.LAMBDAS[4] * cc.mean()

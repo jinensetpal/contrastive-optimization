@@ -39,7 +39,7 @@ class Dataset(torch.utils.data.Dataset):
         return X.to(const.DEVICE), (heatmap.to(const.DEVICE), y.to(const.DEVICE))
 
 
-def get_generators(state='training'):
+def get_generators():
     return [torch.utils.data.DataLoader(Dataset(split=split), batch_size=const.BATCH_SIZE, shuffle=True) for split in const.SPLITS]
 
 
