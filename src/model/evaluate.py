@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
-from ..data.oxford_iiit_pet import Dataset
+from ..data.oxford_iiit_pet import Dataset as oxford_iiit_pets
+from ..data.pet_image import Dataset as pet_image
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 from .arch import Model
@@ -34,6 +35,17 @@ def visualize(model, gen):
     plt.show()
 
 
+def accuracy(model, gen, samples=1000):
+    score = 0
+
+    for sample in random.sample(range(len(gen)), samples):
+        X, y = gen[sample]
+        y_pred, cam = model(X.unsqueeze(0))
+        score += (y.argmax(dim=0) == y_pred.argmax(dim=1)).sum()
+
+    return score / samples
+
+
 if __name__ == '__main__':
     name = sys.argv[1]
     random.seed(const.SEED)
@@ -43,4 +55,5 @@ if __name__ == '__main__':
     model.name = name
     model.eval()
 
-    visualize(model, Dataset('test'))
+    if sys.argv[2] == 'visualize': visualize(model, oxford_iiit_pets('test'))
+    else: print(accuracy(model, pet_image()))

@@ -18,7 +18,7 @@ class Dataset(torch.utils.data.Dataset):
         X = X / 255  # normalization
 
         y = torch.zeros((2))
-        y[int('cat' in self.images[idx])] = 1
+        y[int('dog' in self.images[idx])] = 1
 
         return X.to(const.DEVICE), y.to(const.DEVICE)
 

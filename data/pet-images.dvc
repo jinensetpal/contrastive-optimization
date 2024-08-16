@@ -1,6 +1,6 @@
 outs:
-- md5: 2be60ab3db40b76d995e60da6ffae2b7.dir
-  size: 866190740
-  nfiles: 25002
+- md5: 15b7697ce6e60abf91daa2063bf1552f.dir
+  size: 531574474
+  nfiles: 24999
   hash: md5
   path: pet-images
