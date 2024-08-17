@@ -32,7 +32,7 @@ class ContrastiveLoss(nn.Module):
     def forward(self, y_pred, y):
         cc = self.get_contrastive_cam(y[1], y_pred[1])
         heatmap = y[0].repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
-        heatmap[heatmap < .3] = .5
+        heatmap[heatmap < .5] = .5
         heatmap[heatmap >= 1] = 1.  # glitching torch, my theory -> some values are 1.0000 and extra 0's are counted as extending the [0,1] range
 
         return F.binary_cross_entropy(F.sigmoid(cc), heatmap) + const.LAMBDAS[3] * cc[heatmap == .5].pow(2).mean() - const.LAMBDAS[4] * cc.mean()
