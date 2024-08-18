@@ -12,11 +12,11 @@ MODELS_DIR = BASE_DIR / 'models'
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 TRAIN_CUTOFF = 12600  # max training time in seconds
 LAMBDAS = [1E1, 5E1, 1, 5E1, 1]
-GRAD_ACCUMULATION_STEPS = 5
+GRAD_ACCUMULATION_STEPS = 1
 CHECKPOINTING = True
 LEARNING_RATE = 1E-3
 SELECT_BEST = True
-BATCH_SIZE = 12
+BATCH_SIZE = 32
 EPOCHS = 150
 
 # dataset

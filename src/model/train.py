@@ -26,14 +26,19 @@ def fit(model, optimizer, loss, train, val, best=None, init_epoch=1, mlflow_run_
         interval = max(1, (const.EPOCHS // 10))
         for epoch in range(init_epoch, const.EPOCHS + init_epoch):
             if not (epoch) % interval: print('-' * 10)
-            train_loss = torch.empty(1, device=const.DEVICE)
-            valid_loss = torch.empty(1, device=const.DEVICE)
+            train_contrast_loss = torch.empty(1, device=const.DEVICE)
+            train_kld_loss = torch.empty(1, device=const.DEVICE)
+            train_background_loss = torch.empty(1, device=const.DEVICE)
+            train_foreground_loss = torch.empty(1, device=const.DEVICE)
+            valid_contrast_loss = torch.empty(1, device=const.DEVICE)
+            valid_kld_loss = torch.empty(1, device=const.DEVICE)
+            valid_background_loss = torch.empty(1, device=const.DEVICE)
+            valid_foreground_loss = torch.empty(1, device=const.DEVICE)
             train_acc = torch.empty(1, device=const.DEVICE)
             valid_acc = torch.empty(1, device=const.DEVICE)
             cse_loss = torch.empty(1, device=const.DEVICE)
 
-            for batch_idx, (train_batch, valid_batch) in enumerate(zip(train, val)):
-                X_train, y_train, X_valid, y_valid = [*train_batch, *valid_batch]
+            for batch_idx, ((X_train, y_train), (X_valid, y_valid)) in enumerate(zip(train, val)):
                 y_pred_train = model(X_train)
                 y_pred_valid = model(X_valid)
 
@@ -41,11 +46,17 @@ def fit(model, optimizer, loss, train, val, best=None, init_epoch=1, mlflow_run_
                 valid_acc = torch.vstack([valid_acc, (torch.argmax(y_valid[1], dim=1) == torch.argmax(y_pred_valid[0], dim=1)).unsqueeze(1)])
 
                 train_batch_loss = loss(y_pred_train, y_train) if loss._get_name() != 'CrossEntropyLoss' else loss(y_pred_train[0], y_train[1])
-                train_loss = torch.vstack([train_loss, torch.tensor(train_batch_loss)])
+                train_contrast_loss = torch.vstack([train_contrast_loss, torch.tensor(train_batch_loss)])
                 cse_loss = torch.vstack([cse_loss, F.cross_entropy(y_pred_train[0], y_train[1])])
+                train_kld_loss = torch.vstack([train_kld_loss, loss.prev[0]])
+                train_background_loss = torch.vstack([train_background_loss, loss.prev[1]])
+                train_foreground_loss = torch.vstack([train_foreground_loss, loss.prev[2]])
 
                 valid_batch_loss = loss(y_pred_valid, y_valid) if loss._get_name() != 'CrossEntropyLoss' else loss(y_pred_valid[0], y_valid[1])
-                valid_loss = torch.vstack([valid_loss, torch.tensor(valid_batch_loss)])
+                valid_contrast_loss = torch.vstack([valid_contrast_loss, torch.tensor(valid_batch_loss)])
+                valid_kld_loss = torch.vstack([valid_kld_loss, loss.prev[0]])
+                valid_background_loss = torch.vstack([valid_background_loss, loss.prev[1]])
+                valid_foreground_loss = torch.vstack([valid_foreground_loss, loss.prev[2]])
 
                 train_batch_loss.backward()
                 if not (batch_idx+1) % const.GRAD_ACCUMULATION_STEPS:
@@ -54,11 +65,23 @@ def fit(model, optimizer, loss, train, val, best=None, init_epoch=1, mlflow_run_
 
             train_acc = train_acc[1:]
             valid_acc = valid_acc[1:]
-            train_loss = train_loss[1:].mean()
-            valid_loss = valid_loss[1:].mean()
+            train_contrast_loss = train_contrast_loss[1:].mean()
+            train_kld_loss = train_kld_loss[1:].mean()
+            train_background_loss = train_background_loss[1:].mean()
+            train_foreground_loss = train_foreground_loss[1:].mean()
+            valid_contrast_loss = valid_contrast_loss[1:].mean()
+            valid_kld_loss = valid_kld_loss[1:].mean()
+            valid_background_loss = valid_background_loss[1:].mean()
+            valid_foreground_loss = valid_foreground_loss[1:].mean()
             cse_loss = cse_loss[1:].mean()
-            metrics = {'train_contrast_loss': train_loss.item(),
-                       'val_contrast_loss': valid_loss.item(),
+            metrics = {'train_contrast_loss': train_contrast_loss.item(),
+                       'train_kld_loss': train_kld_loss.item(),
+                       'train_background_loss': train_background_loss.item(),
+                       'train_foreground_loss': train_foreground_loss.item(),
+                       'val_contrast_loss': valid_contrast_loss.item(),
+                       'val_kld_loss': valid_kld_loss.item(),
+                       'val_background_loss': valid_background_loss.item(),
+                       'val_foreground_loss': valid_foreground_loss.item(),
                        'benchmark_cse_loss': cse_loss.item(),
                        'train_acc': (train_acc[1:].sum() / train_acc.shape[0]).item(),
                        'valid_acc': (valid_acc[1:].sum() / valid_acc.shape[0]).item()}

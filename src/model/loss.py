@@ -21,7 +21,12 @@ class ContrastiveLoss(nn.Module):
         heatmap_log_probs = heatmap_probs.log()
         heatmap_log_probs[heatmap != 0] == 0
 
-        return const.LAMBDAS[2] * (heatmap_probs * (heatmap_log_probs - cc_log_probs)).sum() / cc.size(0) + const.LAMBDAS[3] * cc[heatmap == 0].pow(2).mean() - const.LAMBDAS[4] * cc.mean()
+        kld = (heatmap_probs * (heatmap_log_probs - cc_log_probs)).sum() / cc.size(0)
+        background = cc[heatmap == 0].pow(2).mean()
+        foreground = cc.mean()
+
+        self.prev = (kld, background, foreground)
+        return const.LAMBDAS[2] * kld + const.LAMBDAS[3] * background - const.LAMBDAS[4] * foreground
 
 
 class BCELoss(nn.Module):
