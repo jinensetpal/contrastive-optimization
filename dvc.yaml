@@ -1,6 +1,6 @@
 stages:
   default-train:
-    cmd: python -m src.model.train default
+    cmd: python -m src.model.train default no-checkpoint
     deps:
     - data/oxford-iiit-pet
     - src/const.py
@@ -11,7 +11,7 @@ stages:
     outs:
     - models/default.pt
   contrastive-train:
-    cmd: python -m src.model.train contrastive
+    cmd: python -m src.model.train contrastive no-checkpoint
     deps:
     - data/oxford-iiit-pet
     - src/const.py
@@ -22,7 +22,7 @@ stages:
     outs:
     - models/contrastive.pt
   default-evaluate:
-    cmd: python -m src.model.evaluate default
+    cmd: python -m src.model.evaluate default visualize
     deps:
     - data/oxford-iiit-pet
     - models/default.pt
@@ -34,7 +34,7 @@ stages:
     outs:
     - data/evals/default_cam.png
   contrastive-evaluate:
-    cmd: python -m src.model.evaluate contrastive
+    cmd: python -m src.model.evaluate contrastive visualize
     deps:
     - data/oxford-iiit-pet
     - models/contrastive.pt

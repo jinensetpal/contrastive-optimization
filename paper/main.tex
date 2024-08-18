@@ -180,7 +180,7 @@ Segmentations maps describe the region over which the object is present. We can 
 	\end{cases} \\
 	D_{KL}(P || Q) := \frac{1}{|c|-1}\sum^{|c|-1}_c P \cdot \log \frac{P'}{Q_c} \text{ where } 
 	P'_{i,j} := \begin{cases}
-		1 & P_{i,j} \neq 0 \\
+		1 & h_{i,j} \neq 0 \\
 		P_{i,j} & \text{otherwise}
 	\end{cases} \label{d_kl} \\
 	\begin{split}
