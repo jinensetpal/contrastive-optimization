@@ -6,7 +6,7 @@ from torch import nn
 import torch
 
 
-class SoftmaxKLDLoss(nn.Module):
+class ContrastiveLoss(nn.Module):
     def __init__(self, get_contrastive_cam_fn):
         super().__init__()
         self.get_contrastive_cam = get_contrastive_cam_fn
@@ -24,7 +24,7 @@ class SoftmaxKLDLoss(nn.Module):
         return const.LAMBDAS[2] * (heatmap_probs * (heatmap_log_probs - cc_log_probs)).sum() / cc.size(0) + const.LAMBDAS[3] * cc[heatmap == 0].pow(2).mean() - const.LAMBDAS[4] * cc.mean()
 
 
-class ContrastiveLoss(nn.Module):
+class BCELoss(nn.Module):
     def __init__(self, get_contrastive_cam_fn):
         super().__init__()
         self.get_contrastive_cam = get_contrastive_cam_fn

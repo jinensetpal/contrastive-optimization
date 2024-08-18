@@ -149,7 +149,7 @@ This is equivalent to the original ERM optimization objective, with the differen
 
 For the multiclass case, our setup now considers a set of classes $c$; $c_t$ is our target class, and $c_{t'}$ consists of a sampled non-target class. The definition for multiclass contrastive activation maps now results in a set of activation maps, defined as follows:
 \begin{gather}
-	\mathcal{\bm{A}}^{\text{contrastive}} := \{\tilde{\mathcal{\bm{A}}}_{c_t}^{\text{HiResCAM}} - \tilde{\mathcal{\bm{A}}}_{c'}^{\text{HiResCAM}}\}^{|c|-1}_{c_{t'} \in c - c_t}
+	\mathcal{\bm{A}}^{\text{contrastive}} := \{\tilde{\mathcal{\bm{A}}}_{c_t}^{\text{HiResCAM}} - \tilde{\mathcal{\bm{A}}}_{c_t'}^{\text{HiResCAM}}\}^{|c|-1}_{c_{t'} \in c - c_t}
 \end{gather}
 This is a generalization of the binary case, as the same formula applied to a binary classification challenge returns a set of contrastive maps containing a single element.
 
@@ -185,7 +185,7 @@ Segmentations maps describe the region over which the object is present. We can 
 	\end{cases} \label{d_kl} \\
 	\begin{split}
 		\mathcal{\bm{J}}(\theta, \mathcal{D}) := &D_{KL}(\sigma_{\text{softmax}}(\lambda_1 \mathcal{\bm{A}}^{\text{contrastive}})\ ||\ \sigma_{\text{softmax}}(\lambda_2 h)) \\
-		&+ \frac{\lambda_3}{D_1 D_2} ||\mathcal{\bm{A}}^{\text{background}}||^2_2 \\
+		&+ \frac{\lambda_3}{D_1 D_2} ||\mathcal{\bm{A}}^{\text{background}}||^2_F \\
 		&- \frac{1}{D_1 D_2} \sum^{|c|-1,D_1,D_2}_{c,i,j} \mathcal{\bm{A}}^{\text{foreground}}_{c,i,j}
 	\end{split}
 \end{gather}
