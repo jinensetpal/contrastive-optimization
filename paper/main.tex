@@ -34,9 +34,12 @@
 \usepackage{xcolor}         % colors
 \usepackage{graphicx}
 \usepackage{amsmath}
+\usepackage{amsthm}
 \usepackage{float}
 \usepackage{bm}
 
+\newtheorem{theorem}{Proposition}
+\newtheorem{corollary}{Corollary}[theorem]
 
 \title{Interpretable Risk Minimization -- Preliminaries}
 
@@ -129,9 +132,44 @@ Therefore, we can recreate the entire input-dependent part of the score using Hi
 
 The standard interpretation of this result uses the obtained activation maps as explanations for the prediction. Popular practice is to follow this up by ReLU and normalization \citep{draelos2020use}. However, since softmax is computed over the logit vector, this interpretation is flawed.
 
-We can consider the backbone as a kernel \citep{jacot2018neural} that fundamentally attempts to linearly separate the correct class, and the softmax-activated final layer being logistic regression.
+We can consider the backbone as a kernel that attempts to linearly separate the correct class, with the softmax-activated final layer just being logistic regression over the final feature map.
 
-In this setup, each class has it's own set of weights that feedforwards independently, but trains collaboratively. It assigns a score for it's specific value, which is independent since one set of weights does not affect the other over a forward pass. If we take as example logits $[1,2]$ and $[-2,-1]$, we see that $\sigma([1,2]) = \sigma([-2,1]) = [0.2689, 0.7311]$. The prediction probabilities remain the same, despite different values for the same score $s_c$. Therefore, comparing \textit{absolute score} is a misrepresentation of the internal model state. Instead, the objective is to maximize the \textbf{difference between class logits}.
+In this setup, each class has it's own set of weights that feedforwards independently, but trains collaboratively. It assigns a score for it's specific value, which is independent since one set of weights does not affect the other over a forward pass. A consequence of performing softmax over the final logits is that the normalization steps renders only the difference between each score $s_c$ relevant for the final prediction probability.
+
+\begin{theorem}
+	Individual class probabilites $\sigma_c(\bm{s})$ depend on the difference(s) between class logits.
+\end{theorem}
+\begin{proof} Individual class probabilities for logit vector $\bm{s}$ are defined as:
+	\begin{gather}
+		\sigma_c(\bm{s}) = \frac{e^{s_c}}{\sum_i e^{s_i}}
+	\end{gather}
+	We define our logit vector in terms of the elementwise difference to a target class $c$:
+	\begin{gather}
+		d = [s_i - s_c]_i \\
+		\bm{s} = [s_c + d_i]_i
+	\end{gather}
+	Based on this definition, class probabilities can now be computed as:
+	\begin{align}
+		\sigma_c(\bm{s}) &= \frac{e^{s_c}}{\sum_i e^{s_c+d_i}} \\
+				 &= \frac{e^{s_c}}{e^{s_c} \sum_i e^{d_i}} = \frac{1}{\sum_i e^{d_i}}
+	\end{align}
+	This recontextualizes softmax as a direct function of the differences of class logits.
+\end{proof}
+\begin{corollary} Since class probabilities depend on logit differences, the class probabilities are identitical for any two pairs of logit vectors with identical logit differences.
+	\begin{gather}
+		\frac{e^{s_c}}{\sum_i e^{s_i}} = \frac{e^{s_c+r}}{\sum_i e^{s_i+r}} \forall r \in \mathbb{R}
+	\end{gather}
+\end{corollary}
+\begin{proof} Recontextualizing $\bm{s}$ per the previous proposition, we get:
+	\begin{align}
+		\frac{e^{s_c}}{\sum_i e^{s_c + d_i}} &= \frac{e^{s_c+r}}{\sum_i e^{s_c+d_i+r}} \\
+		\frac{e^{s_c}}{e^{s_c}\sum_i e^{d_i}} &= \frac{e^{s_c+r}}{e^{s_c + r} \sum_i e^{d_i}} \\
+		\frac{1}{\sum_i e^{d_i}} &= \frac{1}{\sum_i e^{d_i}}
+	\end{align}
+	Therefore, the absolute scale of a logit does not influence the final class probability.
+\end{proof}
+
+As an example, for logits $[1,2]$ and $[-2,-1]$, $\sigma([1,2]) = \sigma([-2,1]) = [0.2689, 0.7311]$. The prediction probabilities remain the same, despite different values for the same score $s_c$. Therefore, making inferences based on \textit{absolute score} results in a misrepresentation of the internal model state. Instead, the objective is to maximize the \textbf{difference between class logits}.
 
 \subsection{Defining the Contrastive Optimization Objective}
 
