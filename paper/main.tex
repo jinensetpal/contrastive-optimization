@@ -41,7 +41,7 @@
 \newtheorem{theorem}{Proposition}
 \newtheorem{corollary}{Corollary}[theorem]
 
-\title{Interpretable Risk Minimization -- Preliminaries}
+\title{Contrastive Optimization -- Preliminaries}
 
 
 % The \author macro works with any number of authors. There are two commands
@@ -125,8 +125,8 @@ Per \cite{draelos2020use}, a HiResCAM is defined as follows:
 
 Where $s_c$ denotes the logit for a single class. $\tilde{\mathcal{\bm{A}}}_c^{\text{HiResCAM}}$ generates a class-specific CAM. For the CAM architecture, \cite{draelos2020use} (section 3.6.2) shows that:
 \begin{gather}
-	\sum^{D_1,D_1}_{i,j} \tilde{\mathcal{\bm{A}}}_{c,i,j}^{\text{HiResCAM}} = \frac{\bm{w}_c \bm{A}_F}{D_1 D_2} \\
-	s_c = \frac{\bm{w}_c \bm{A}_F}{D_1 D_2} + b_c = \sum^{D_1,D_1}_{i,j} \tilde{\mathcal{\bm{A}}}_{c,i,j}^{\text{HiResCAM}} + b_c
+	\sum^{D_1,D_2}_{i,j} \tilde{\mathcal{\bm{A}}}_{c,i,j}^{\text{HiResCAM}} = \frac{\bm{w}_c \bm{A}_F}{D_1 D_2} \\
+	s_c = \frac{\bm{w}_c \bm{A}_F}{D_1 D_2} + b_c = \sum^{D_1,D_2}_{i,j} \tilde{\mathcal{\bm{A}}}_{c,i,j}^{\text{HiResCAM}} + b_c
 \end{gather}
 Therefore, we can recreate the entire input-dependent part of the score using HiResCAMs. Doing this for each class $c$, we obtain the bias-removed logit vector $\in \mathbb{R}^{c}$.
 
@@ -177,23 +177,23 @@ We start by \textbf{comparing the contrast} of the activation maps with respect 
 
 We therefore derive an optimization objective that attempts to maximize the contrast between the two activations maps. For the binary classification case, $(c, c')$ reflects that correct and incorrect class respectively.
 \begin{gather}
-	\max_{\theta} s_c + b_c - s_{c'} - b_{c'} \equiv \max_{\theta} \tilde{\mathcal{\bm{A}}}_{c}^{\text{HiResCAM}} + b_c - \tilde{\mathcal{\bm{A}}}_{c'}^{\text{HiResCAM}} - b_{c'}
+	\max_{\theta} s_c - s_{c'} \equiv \max_{\theta} \sum^{D_1,D_2}_{i,j} \tilde{\mathcal{\bm{A}}}_{c,i,j}^{\text{HiResCAM}} + b_c - \sum^{D_1,D_2}_{i,j} \tilde{\mathcal{\bm{A}}}_{c',i,j}^{\text{HiResCAM}} - b_{c'}
 \end{gather}
 Ignoring the bias terms, our new optimization objective is:
 \begin{gather}
-	\max_{\theta} \mathcal{\bm{A}}^{\text{contrastive}} := \tilde{\mathcal{\bm{A}}}_{c}^{\text{HiResCAM}} - \tilde{\mathcal{\bm{A}}}_{c'}^{\text{HiResCAM}}
+	\max_{\theta} \tilde{\mathcal{\bm{A}}}^{\text{contrastive}} := \sum^{D_1,D_2}_{i,j} \tilde{\mathcal{\bm{A}}}_{c,i,j}^{\text{HiResCAM}} - \sum^{D_1,D_2}_{i,j} \tilde{\mathcal{\bm{A}}}_{c',i,j}^{\text{HiResCAM}}
 \end{gather}
 This is equivalent to the original ERM optimization objective, with the difference being the resultant values preserving spatial information as an activation map instead of flattening the feature map. If $\tilde{\mathcal{\bm{A}}}_{c}^{\text{HiResCAM}} - \tilde{\mathcal{\bm{A}}}_{c'}^{\text{HiResCAM}} > 0$, the classification is correct -- if not, the classification is incorrect. 
 
 For the multiclass case, our setup now considers a set of classes $c$; $c_t$ is our target class, and $c_{t'}$ consists of a sampled non-target class. The definition for multiclass contrastive activation maps now results in a set of activation maps, defined as follows:
 \begin{gather}
-	\mathcal{\bm{A}}^{\text{contrastive}} := \{\tilde{\mathcal{\bm{A}}}_{c_t}^{\text{HiResCAM}} - \tilde{\mathcal{\bm{A}}}_{c_t'}^{\text{HiResCAM}}\}^{|c|-1}_{c_{t'} \in c - c_t}
+	\tilde{\mathcal{\bm{A}}}^{\text{contrastive}} := \{\tilde{\mathcal{\bm{A}}}_{c_t}^{\text{HiResCAM}} - \tilde{\mathcal{\bm{A}}}_{c_t'}^{\text{HiResCAM}}\}^{|c|-1}_{c_{t'} \in c - c_t}
 \end{gather}
 This is a generalization of the binary case, as the same formula applied to a binary classification challenge returns a set of contrastive maps containing a single element.
 
 To ensure that the model accurately predicts the target class, each contrastive comparison should yield a positive result. Therefore, the multiclass optimization objective under this paradigm is as follows:
 \begin{gather}
-	\max_{\theta} \tilde{\mathcal{\bm{A}}}_{i}^{\text{contrastive}}\ \forall i \in \mathbb{N}(|c| - 1)
+	\max_{\theta} \sum^{D_1,D_2}_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{contrastive}}\ \forall i \in \mathbb{N}(|c| - 1)
 \end{gather}
 
 \subsection{Constraining Optimization to an Interpretable Basis}
@@ -209,12 +209,12 @@ Segmentations maps describe the region over which the object is present. We can 
 		0 & \text{otherwise}
 	\end{cases} \\
 	\mathcal{\bm{A}}^{\text{background}}_{c,i,j} := \begin{cases}
-		\mathcal{\bm{A}}^{\text{contrastive}}_{c,i,j} & h_{i,j} = 0 \\
+		\tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{c,i,j} & h_{i,j} = 0 \\
 		0 & \text{otherwise}
 	\end{cases} \\
 	\mathcal{\bm{A}}^{\text{foreground}}_{c,i,j} := \begin{cases}
 		0 & h_{i,j} = 0 \\
-		\mathcal{\bm{A}}^{\text{contrastive}}_{c,i,j} & \text{otherwise}
+		\tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{c,i,j} & \text{otherwise}
 	\end{cases} \\
 	D_{KL}(P || Q) := \frac{1}{|c|-1}\sum^{|c|-1}_c P \cdot \log \frac{P'}{Q_c} \text{ where } 
 	P'_{i,j} := \begin{cases}

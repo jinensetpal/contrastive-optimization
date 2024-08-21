@@ -5,6 +5,7 @@ from .loss import ContrastiveLoss
 import torch.nn.functional as F
 from .arch import Model
 from src import const
+import numpy as np
 import mlflow
 import torch
 import json
@@ -26,67 +27,36 @@ def fit(model, optimizer, loss, train, val, best=None, init_epoch=1, mlflow_run_
         interval = max(1, (const.EPOCHS // 10))
         for epoch in range(init_epoch, const.EPOCHS + init_epoch):
             if not (epoch) % interval: print('-' * 10)
-            train_contrast_loss = torch.empty(1, device='cpu')
-            train_kld_loss = torch.empty(1, device='cpu')
-            train_background_loss = torch.empty(1, device='cpu')
-            train_foreground_loss = torch.empty(1, device='cpu')
-            valid_contrast_loss = torch.empty(1, device='cpu')
-            valid_kld_loss = torch.empty(1, device='cpu')
-            valid_background_loss = torch.empty(1, device='cpu')
-            valid_foreground_loss = torch.empty(1, device='cpu')
-            train_acc = torch.empty(1, device='cpu')
-            valid_acc = torch.empty(1, device='cpu')
-            cse_loss = torch.empty(1, device='cpu')
+            metrics = {metric: [] for metric in ['train_contrast_loss', 'train_kld_loss', 'train_background_loss', 'train_foreground_loss', 'train_acc', 'cse_loss',
+                                                 'valid_contrast_loss', 'valid_kld_loss', 'valid_background_loss', 'valid_foreground_loss', 'valid_acc']}
 
             for batch_idx, ((X_train, y_train), (X_valid, y_valid)) in enumerate(zip(train, val)):
                 y_pred_train = model(X_train)
                 y_pred_valid = model(X_valid)
 
-                train_acc = torch.vstack([train_acc, (torch.argmax(y_train[1], dim=1) == torch.argmax(y_pred_train[0], dim=1)).unsqueeze(1).to('cpu')])
-                valid_acc = torch.vstack([valid_acc, (torch.argmax(y_valid[1], dim=1) == torch.argmax(y_pred_valid[0], dim=1)).unsqueeze(1).to('cpu')])
+                metrics['train_acc'].extend((torch.argmax(y_train[1], dim=1) == torch.argmax(y_pred_train[0], dim=1)).unsqueeze(1).tolist())
+                metrics['valid_acc'].extend((torch.argmax(y_valid[1], dim=1) == torch.argmax(y_pred_valid[0], dim=1)).unsqueeze(1).tolist())
 
                 train_batch_loss = loss(y_pred_train, y_train) if loss._get_name() != 'CrossEntropyLoss' else loss(y_pred_train[0], y_train[1])
-                train_contrast_loss = torch.vstack([train_contrast_loss, train_batch_loss.to('cpu')])
-                cse_loss = torch.vstack([cse_loss, F.cross_entropy(y_pred_train[0], y_train[1]).to('cpu')])
+                metrics['train_contrast_loss'].append(train_batch_loss.item())
+                metrics['cse_loss'].append(F.cross_entropy(y_pred_train[0], y_train[1]).item())
                 if loss._get_name() != 'CrossEntropyLoss':
-                    train_kld_loss = torch.vstack([train_kld_loss, loss.prev[0].to('cpu')])
-                    train_background_loss = torch.vstack([train_background_loss, loss.prev[1].to('cpu')])
-                    train_foreground_loss = torch.vstack([train_foreground_loss, loss.prev[2].to('cpu')])
+                    metrics['train_kld_loss'].append(loss.prev[0])
+                    metrics['train_background_loss'].append(loss.prev[1])
+                    metrics['train_foreground_loss'].append(loss.prev[2])
 
-                valid_batch_loss = loss(y_pred_valid, y_valid) if loss._get_name() != 'CrossEntropyLoss' else loss(y_pred_valid[0], y_valid[1])
-                valid_contrast_loss = torch.vstack([valid_contrast_loss, valid_batch_loss.to('cpu')])
+                metrics['valid_contrast_loss'].append((loss(y_pred_valid, y_valid) if loss._get_name() != 'CrossEntropyLoss' else loss(y_pred_valid[0], y_valid[1])).item())
                 if loss._get_name() != 'CrossEntropyLoss':
-                    valid_kld_loss = torch.vstack([valid_kld_loss, loss.prev[0].to('cpu')])
-                    valid_background_loss = torch.vstack([valid_background_loss, loss.prev[1].to('cpu')])
-                    valid_foreground_loss = torch.vstack([valid_foreground_loss, loss.prev[2].to('cpu')])
+                    metrics['valid_kld_loss'].append(loss.prev[0])
+                    metrics['valid_background_loss'].append(loss.prev[1])
+                    metrics['valid_foreground_loss'].append(loss.prev[2])
 
                 train_batch_loss.backward()
                 if not (batch_idx+1) % const.GRAD_ACCUMULATION_STEPS:
                     optimizer.step()
                     optimizer.zero_grad()
 
-            train_acc = train_acc[1:]
-            valid_acc = valid_acc[1:]
-            train_contrast_loss = train_contrast_loss[1:].mean()
-            train_kld_loss = train_kld_loss[1:].mean()
-            train_background_loss = train_background_loss[1:].mean()
-            train_foreground_loss = train_foreground_loss[1:].mean()
-            valid_contrast_loss = valid_contrast_loss[1:].mean()
-            valid_kld_loss = valid_kld_loss[1:].mean()
-            valid_background_loss = valid_background_loss[1:].mean()
-            valid_foreground_loss = valid_foreground_loss[1:].mean()
-            cse_loss = cse_loss[1:].mean()
-            metrics = {'train_contrast_loss': train_contrast_loss.item(),
-                       'train_kld_loss': train_kld_loss.item(),
-                       'train_background_loss': train_background_loss.item(),
-                       'train_foreground_loss': train_foreground_loss.item(),
-                       'val_contrast_loss': valid_contrast_loss.item(),
-                       'val_kld_loss': valid_kld_loss.item(),
-                       'val_background_loss': valid_background_loss.item(),
-                       'val_foreground_loss': valid_foreground_loss.item(),
-                       'benchmark_cse_loss': cse_loss.item(),
-                       'train_acc': (train_acc[1:].sum() / train_acc.shape[0]).item(),
-                       'valid_acc': (valid_acc[1:].sum() / valid_acc.shape[0]).item()}
+            metrics = {metric: np.mean(metrics[metric]) for metric in metrics}
             mlflow.log_metrics(metrics, step=epoch)
 
             if metrics['valid_acc'] > best['acc']:
