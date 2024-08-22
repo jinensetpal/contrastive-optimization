@@ -22,7 +22,7 @@ def fit(model, optimizer, loss, train, val, best=None, init_epoch=1, mlflow_run_
     with mlflow.start_run(mlflow_run_id):
         # log hyperparameters
         mlflow.log_params({k: v for k, v in const.__dict__.items() if k == k.upper() and all(s not in k for s in ['DIR', 'PATH'])})
-        mlflow.log_param('optimizer_fn', 'Adam')
+        mlflow.log_param('optimizer_fn', 'SGD')
 
         interval = max(1, (const.EPOCHS // 10))
         for epoch in range(init_epoch, const.EPOCHS + init_epoch):
@@ -83,8 +83,9 @@ if __name__ == '__main__':
 
     model = Model(const.IMAGE_SHAPE, is_contrastive=const.MODEL_NAME != 'default')  # initialize before loss functions to ensure accurate cam size configuration
     train, val, test = get_generators()
-    optimizer = torch.optim.Adam(model.parameters(),
-                                 lr=const.LEARNING_RATE)
+    optimizer = torch.optim.SGD(model.parameters(),
+                                lr=const.LEARNING_RATE,
+                                momentum=const.MOMENTUM)
     loss = ContrastiveLoss(model.get_contrastive_cams) if const.MODEL_NAME != 'default' else torch.nn.CrossEntropyLoss()
 
     checkpoint_args = {'init_epoch': 1,

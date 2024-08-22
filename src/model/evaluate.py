@@ -2,6 +2,7 @@
 
 from ..data.oxford_iiit_pet import Dataset as oxford_iiit_pets
 from ..data.pet_image import Dataset as pet_image
+from matplotlib.colors import Normalize
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 from .arch import Model
@@ -17,7 +18,7 @@ def kernel_diff(model):
     plt.show()
 
 
-def visualize(model, gen):
+def visualize(model, gen, norm=None):
     fig = plt.figure(figsize=(14, 14),
                      facecolor='white')
 
@@ -28,7 +29,7 @@ def visualize(model, gen):
         fig.add_subplot(4, 4, idx + 1)
         plt.xlabel(f'Pred: {str(y_pred[0].argmax().item())}, Actual: {str(y.argmax().item())}')
         plt.imshow(X.permute(1, 2, 0).cpu().detach(), alpha=0.5)
-        plt.imshow(F.interpolate(cam, const.IMAGE_SIZE, mode='bilinear')[0, 0].cpu(), cmap='jet', alpha=0.5)
+        plt.imshow(F.interpolate(cam, const.IMAGE_SIZE, mode='bilinear')[0, 0].cpu(), cmap='jet', alpha=0.5, norm=norm)
 
     plt.tight_layout()
     fig.savefig(const.DATA_DIR / 'evals' / f'{model.name}_cam.png')
@@ -56,4 +57,5 @@ if __name__ == '__main__':
     model.eval()
 
     if sys.argv[2] == 'visualize': visualize(model, oxford_iiit_pets('test'))
+    elif sys.argv[2] == 'visualize-normed': visualize(model, oxford_iiit_pets('test'), Normalize(vmin=-.5, vmax=.5) )
     else: print(accuracy(model, pet_image()))

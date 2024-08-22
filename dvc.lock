@@ -67,7 +67,7 @@ stages:
       md5: 79b6832b4d37448727769821bb5e22fe
       size: 85948406
   default-evaluate:
-    cmd: python -m src.model.evaluate default
+    cmd: python -m src.model.evaluate default visualize
     deps:
     - path: data/oxford-iiit-pet
       hash: md5
@@ -80,31 +80,31 @@ stages:
       size: 85981426
     - path: src/const.py
       hash: md5
-      md5: 488f2d10f51029276bc93142fb00b628
-      size: 775
+      md5: 5c9a420dd75914d72c4251226893b2de
+      size: 796
     - path: src/data/oxford_iiit_pet.py
       hash: md5
       md5: 00e2ff83ea5e7711993cb4d471da521a
       size: 1822
     - path: src/model/arch.py
       hash: md5
-      md5: 286da07b98afaa7608406014c15101d3
-      size: 2653
+      md5: b169e5d7fa932d64e1e6904794090bc3
+      size: 2593
     - path: src/model/evaluate.py
       hash: md5
-      md5: 2928167b79fbee32fa203177d7ba3cc9
-      size: 1964
+      md5: 2e12bc0436fd172a9222cf256d3d6ac4
+      size: 2144
     - path: src/model/train.py
       hash: md5
-      md5: b9e394ac2f7f67527031185f68a3da3e
-      size: 5757
+      md5: 9fb4a93cc12cb9a4f59922227c0cd6bc
+      size: 5704
     outs:
     - path: data/evals/default_cam.png
       hash: md5
-      md5: ef8d79b702158d2fff62a3dc8c4ccb3f
-      size: 1883590
+      md5: 101a49ffca1b70ee46b067f5d41c19bc
+      size: 1883856
   contrastive-evaluate:
-    cmd: python -m src.model.evaluate contrastive
+    cmd: python -m src.model.evaluate contrastive visualize
     deps:
     - path: data/oxford-iiit-pet
       hash: md5
@@ -117,26 +117,26 @@ stages:
       size: 85948406
     - path: src/const.py
       hash: md5
-      md5: 488f2d10f51029276bc93142fb00b628
-      size: 775
+      md5: 5c9a420dd75914d72c4251226893b2de
+      size: 796
     - path: src/data/oxford_iiit_pet.py
       hash: md5
       md5: 00e2ff83ea5e7711993cb4d471da521a
       size: 1822
     - path: src/model/arch.py
       hash: md5
-      md5: 286da07b98afaa7608406014c15101d3
-      size: 2653
+      md5: b169e5d7fa932d64e1e6904794090bc3
+      size: 2593
     - path: src/model/evaluate.py
       hash: md5
-      md5: 2928167b79fbee32fa203177d7ba3cc9
-      size: 1964
+      md5: 2e12bc0436fd172a9222cf256d3d6ac4
+      size: 2144
     - path: src/model/train.py
       hash: md5
-      md5: b9e394ac2f7f67527031185f68a3da3e
-      size: 5757
+      md5: 9fb4a93cc12cb9a4f59922227c0cd6bc
+      size: 5704
     outs:
     - path: data/evals/contrastive_cam.png
       hash: md5
-      md5: b5551c03727a8e5b6f3446c0e916aa6f
-      size: 1714059
+      md5: bda7369ca2c05e4a164a7d0ac6baed34
+      size: 1713239
