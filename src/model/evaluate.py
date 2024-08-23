@@ -57,5 +57,5 @@ if __name__ == '__main__':
     model.eval()
 
     if sys.argv[2] == 'visualize': visualize(model, oxford_iiit_pets('test'))
-    elif sys.argv[2] == 'visualize-normed': visualize(model, oxford_iiit_pets('test'), Normalize(vmin=-.5, vmax=.5) )
+    elif sys.argv[2] == 'visualize-normed': visualize(model, oxford_iiit_pets('test'), Normalize(vmin=-.5, vmax=.5))
     else: print(accuracy(model, pet_image()))
