@@ -31,7 +31,6 @@ def fit(model, optimizer, loss, train, val, best=None, init_epoch=1, mlflow_run_
 
             for split, dataloader in zip(const.SPLITS[:2], (train, val)):
                 for batch_idx, (X, y) in enumerate(dataloader):
-                    print(epoch, len(dataloader), batch_idx)
                     y_pred = model(X)
 
                     metrics[f'{split}_acc'].extend((torch.argmax(y[1], dim=1) == torch.argmax(y_pred[0], dim=1)).unsqueeze(1).tolist())
@@ -39,6 +38,9 @@ def fit(model, optimizer, loss, train, val, best=None, init_epoch=1, mlflow_run_
                     batch_loss = loss(y_pred, y) if loss._get_name() != 'CrossEntropyLoss' else loss(y_pred[0], y[1])
                     metrics[f'{split}_contrast_loss'].append(batch_loss.item())
                     metrics[f'{split}_cse_loss'].append(F.cross_entropy(y_pred[0], y[1]).item())
+
+                    del y_pred, X, y
+                    torch.cuda.empty_cache()
 
                     if loss._get_name() != 'CrossEntropyLoss':
                         metrics[f'{split}_kld_loss'].append(loss.prev[0])
@@ -49,9 +51,9 @@ def fit(model, optimizer, loss, train, val, best=None, init_epoch=1, mlflow_run_
                         batch_loss.backward()
                         mlflow.log_metric(f'{split}_batchwise_loss', batch_loss.item(), step=(epoch-1) * len(dataloader) + batch_idx)
 
-                    if not (batch_idx+1) % const.GRAD_ACCUMULATION_STEPS:
-                        optimizer.step()
-                        optimizer.zero_grad()
+                        if not (batch_idx+1) % const.GRAD_ACCUMULATION_STEPS:
+                            optimizer.step()
+                            optimizer.zero_grad()
 
             metrics = {metric: np.mean(metrics[metric]) for metric in metrics}
             mlflow.log_metrics(metrics, step=epoch-1)

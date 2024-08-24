@@ -40,7 +40,7 @@ class Dataset(torch.utils.data.Dataset):
 
 
 def get_generators():
-    return [torch.utils.data.DataLoader(Dataset(split=split), batch_size=const.BATCH_SIZE, shuffle=True) for split in const.SPLITS]
+    return [torch.utils.data.DataLoader(Dataset(split=split), batch_size=const.BATCH_SIZE if split == 'train' else const.EVAL_BATCH_SIZE, shuffle=True) for split in const.SPLITS]
 
 
 if __name__ == '__main__':
