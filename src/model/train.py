@@ -32,10 +32,9 @@ def fit(model, optimizer, loss, train, val, best=None, init_epoch=1, mlflow_run_
             for split, dataloader in zip(const.SPLITS[:2], (train, val)):
                 for batch_idx, (X, y) in enumerate(dataloader):
                     y_pred = model(X)
-
-                    metrics[f'{split}_acc'].extend((torch.argmax(y[1], dim=1) == torch.argmax(y_pred[0], dim=1)).unsqueeze(1).tolist())
-
                     batch_loss = loss(y_pred, y) if loss._get_name() != 'CrossEntropyLoss' else loss(y_pred[0], y[1])
+
+                    metrics[f'{split}_acc'].extend(y[1].argmax(1).eq(y_pred[0].argmax(1)).unsqueeze(1).tolist())
                     metrics[f'{split}_contrast_loss'].append(batch_loss.item())
                     metrics[f'{split}_cse_loss'].append(F.cross_entropy(y_pred[0], y[1]).item())
 

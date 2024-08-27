@@ -36,6 +36,7 @@
 \usepackage{amsmath}
 \usepackage{amsthm}
 \usepackage{float}
+\usepackage{bbm}
 \usepackage{bm}
 
 \newtheorem{theorem}{Proposition}
@@ -193,7 +194,7 @@ This is a generalization of the binary case, as the same formula applied to a bi
 
 To ensure that the model accurately predicts the target class, each contrastive comparison should yield a positive result. Therefore, the multiclass optimization objective under this paradigm is as follows:
 \begin{gather}
-	\max_{\theta} \sum^{D_1,D_2}_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{contrastive}}\ \forall i \in \mathbb{N}(|c| - 1)
+	\max_{\theta} \sum^{D_1,D_2}_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{contrastive}}\ \forall i \in \mathbb{Z}_{+}(|c| - 1)
 \end{gather}
 
 \subsection{Constraining Optimization to an Interpretable Basis}
@@ -222,9 +223,9 @@ Segmentations maps describe the region over which the object is present. We can 
 		P_{i,j} & \text{otherwise}
 	\end{cases} \label{d_kl} \\
 	\begin{split}
-		\mathcal{\bm{J}}(\theta, \mathcal{D}) := &D_{KL}(\sigma_{\text{softmax}}(\lambda_1 \mathcal{\bm{A}}^{\text{contrastive}})\ ||\ \sigma_{\text{softmax}}(\lambda_2 h)) \\
-		&+ \frac{\lambda_3}{D_1 D_2} ||\mathcal{\bm{A}}^{\text{background}}||^2_F \\
-		&- \frac{1}{D_1 D_2} \sum^{|c|-1,D_1,D_2}_{c,i,j} \mathcal{\bm{A}}^{\text{foreground}}_{c,i,j}
+		\mathcal{\bm{J}}(\theta, \mathcal{D}) := &\ \lambda_1 D_{KL}(\sigma_{\text{softmax}}(\lambda_2 \mathcal{\bm{A}}^{\text{contrastive}})\ ||\ \sigma_{\text{softmax}}(\lambda_3 h)) \\
+		&+ \frac{\lambda_4}{\sum^{D_1,D_2}_{i,j}\mathbbm{1}(h_{i,j} = 0)} ||\mathcal{\bm{A}}^{\text{background}}||^2_F \\
+		&- \frac{\lambda_5}{\sum^{D_1,D_2}_{i,j}\mathbbm{1}(h_{i,j} = 1)} \sum^{|c|-1,D_1,D_2}_{c,i,j} \mathcal{\bm{A}}^{\text{foreground}}_{c,i,j}
 	\end{split}
 \end{gather}
 
@@ -237,7 +238,7 @@ The cost function has a threefold purpose:
 
 $D_{KL}$ is modified per (10), such that the likelihood comparator sets point probability to 1 if it is part of the foreground. While this violates the probability distribution under which KL Divergence is defined, it motivates the optimizer to maximize the foreground activation, which is especially crucial for cases where the image contains large sections of foreground. During training, observing pointwise divergence revealed that the model was penalized for `over-activating' the foreground, which this modification corrects. In addition, it also averages the divergence from the target segmentation map to each contrastive activation map.
 
-$\lambda_1$ \& $\lambda_2$ are hyperparameters that scale the activation maps, since softmax computer over highly similar values close to zero produces uniform probability distributions. $\lambda_3$ weights the importance of the background not affecting the final prediction. For our experiments, $\lambda_1 = 10, \lambda_2 = 50, \lambda_3 = 100$ were set empirically, without rigorous optimization.
+$\lambda_2$ \& $\lambda_3$ are hyperparameters that scale the activation maps, since softmax computed over values with small differences produce largely uniform probability distributions. $\lambda_1$ weighs the importance of the divergence, $\lambda_4$ weights the importance of the background not affecting the final prediction \& $\lambda_5$ weighs the importance of the foreground being positive. For our experiments, $\bm{\lambda} = \{1, 50, 1, 50, 1\}$ were set for $i = \{1, \ldots, 5\}$ respectively. These were identified empirically, without rigorous optimization.
 
 In addition to classifying the input image, the model returns a provably accurate attention map used to distinguish between the two classes. This can be obtained by simply computing the absolute values of the contrastive map compared against any two classes, and subsequently performing normalization.
 
