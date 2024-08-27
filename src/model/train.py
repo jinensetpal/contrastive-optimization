@@ -31,6 +31,8 @@ def fit(model, optimizer, loss, train, val, best=None, init_epoch=1, mlflow_run_
 
             for split, dataloader in zip(const.SPLITS[:2], (train, val)):
                 for batch_idx, (X, y) in enumerate(dataloader):
+                    if not (batch_idx+1) % const.GRAD_ACCUMULATION_STEPS: optimizer.zero_grad()
+
                     y_pred = model(X)
                     batch_loss = loss(y_pred, y) if loss._get_name() != 'CrossEntropyLoss' else loss(y_pred[0], y[1])
 
@@ -50,9 +52,7 @@ def fit(model, optimizer, loss, train, val, best=None, init_epoch=1, mlflow_run_
                         batch_loss.backward()
                         mlflow.log_metric(f'{split}_batchwise_loss', batch_loss.item(), step=(epoch-1) * len(dataloader) + batch_idx)
 
-                        if not (batch_idx+1) % const.GRAD_ACCUMULATION_STEPS:
-                            optimizer.step()
-                            optimizer.zero_grad()
+                        if not (batch_idx+1) % const.GRAD_ACCUMULATION_STEPS: optimizer.step()
 
             metrics = {metric: np.mean(metrics[metric]) for metric in metrics}
             mlflow.log_metrics(metrics, step=epoch-1)
