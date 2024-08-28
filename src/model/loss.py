@@ -23,7 +23,7 @@ class ContrastiveLoss(nn.Module):
 
         kld = (heatmap_probs * (heatmap_log_probs - cc_log_probs)).sum() / cc.size(0)
         background = cc[heatmap == 0].pow(2).mean()
-        foreground = cc[heatmap == 1].mean()
+        foreground = cc[heatmap != 1].mean()
 
         self.prev = (kld.item(), background.item(), foreground.item())
         return const.LAMBDAS[2] * kld + const.LAMBDAS[3] * background - const.LAMBDAS[4] * foreground
