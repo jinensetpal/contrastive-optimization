@@ -9,7 +9,8 @@ stages:
     - src/model/loss.py
     - src/model/train.py
     outs:
-    - models/default.pt
+    - models/default_last.pt
+    - models/default_best.pt
   contrastive-train:
     cmd: python -m src.model.train contrastive no-checkpoint
     deps:
@@ -20,12 +21,13 @@ stages:
     - src/model/loss.py
     - src/model/train.py
     outs:
-    - models/contrastive.pt
+    - models/contrastive_last.pt
+    - models/contrastive_best.pt
   default-evaluate:
-    cmd: python -m src.model.evaluate default visualize
+    cmd: python -m src.model.evaluate default_best visualize
     deps:
     - data/oxford-iiit-pet
-    - models/default.pt
+    - models/default_best.pt
     - src/const.py
     - src/data/oxford_iiit_pet.py
     - src/model/arch.py
@@ -34,10 +36,10 @@ stages:
     outs:
     - data/evals/default_cam.png
   contrastive-evaluate:
-    cmd: python -m src.model.evaluate contrastive visualize
+    cmd: python -m src.model.evaluate contrastive_best visualize
     deps:
     - data/oxford-iiit-pet
-    - models/contrastive.pt
+    - models/contrastive_best.pt
     - src/const.py
     - src/data/oxford_iiit_pet.py
     - src/model/arch.py

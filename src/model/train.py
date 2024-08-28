@@ -13,15 +13,15 @@ import time
 import sys
 
 
-def fit(model, optimizer, loss, train, val, best=None, init_epoch=1, mlflow_run_id=None):
+def fit(model, optimizer, loss, train, val, selected=None, init_epoch=1, mlflow_run_id=None):
     start_time = time.time()
-    best = best or {'param': model.state_dict(),
-                    'epoch': init_epoch,
-                    'acc': 0.0}
+    selected = selected or {'last': model.state_dict(),
+                            'epoch': init_epoch,
+                            'acc': 0.0}
 
     with mlflow.start_run(mlflow_run_id):
         # log hyperparameters
-        mlflow.log_params({k: v for k, v in const.__dict__.items() if k == k.upper() and all(s not in k for s in ['DIR', 'PATH'])})
+        mlflow.log_params({k: v for k, v in const.__dict__.items() if k == k.upper() and all(s not in k for s in ['DIR', 'PATH', 'SELECT_BEST'])})
         mlflow.log_param('optimizer_fn', 'SGD')
 
         interval = max(1, (const.EPOCHS // 10))
@@ -57,29 +57,35 @@ def fit(model, optimizer, loss, train, val, best=None, init_epoch=1, mlflow_run_
             metrics = {metric: np.mean(metrics[metric]) for metric in metrics}
             mlflow.log_metrics(metrics, step=epoch-1)
 
-            if metrics['valid_acc'] > best['acc']:
-                best['param'] = model.state_dict()
-                best['epoch'] = epoch
-                best['acc'] = metrics['valid_acc']
+            if const.SELECT_BEST and metrics['valid_acc'] > selected['acc']:
+                selected['best'] = model.state_dict()
+                selected['epoch'] = epoch
+                selected['acc'] = metrics['valid_acc']
 
             if not (epoch) % interval:
                 print(f'epoch\t\t\t: {epoch}')
                 for key in metrics: print(f'{key}\t\t: {metrics[key]}')
 
             if const.TRAIN_CUTOFF is not None and time.time() - start_time >= const.TRAIN_CUTOFF: break
+
+        selected['last'] = model.state_dict()
         if const.SELECT_BEST:
-            mlflow.log_metrics({'selected_epoch': best['epoch'],
-                                'selected_valid_acc': best['acc']}, step=epoch-1)
-            model.load_state_dict(best['param'])
+            mlflow.log_metrics({'selected_epoch': selected['epoch'],
+                                'selected_valid_acc': selected['acc']}, step=epoch)
+            model.load_state_dict(selected['best'])
+        else:
+            selected['epoch'] = epoch
+            selected['acc'] = metrics['valid_acc']
         print('-' * 10)
-        return epoch, best
+        return epoch, selected
 
 
 if __name__ == '__main__':
+    # Usage: $ python -m path.to.script model_name ignorecheckpoint
     const.MODEL_NAME = sys.argv[1]
     if const.LOG_REMOTE: mlflow.set_tracking_uri(const.MLFLOW_TRACKING_URI)
 
-    model = Model(const.IMAGE_SHAPE, is_contrastive=const.MODEL_NAME != 'default')  # initialize before loss functions to ensure accurate cam size configuration
+    model = Model(const.IMAGE_SHAPE, is_contrastive=const.MODEL_NAME != 'default')
     train, val, test = get_generators()
     optimizer = torch.optim.SGD(model.parameters(),
                                 lr=const.LEARNING_RATE,
@@ -88,18 +94,21 @@ if __name__ == '__main__':
 
     checkpoint_args = {'init_epoch': 1,
                        'mlflow_run_id': None}
-    best = None
+    selected = None
     if const.CHECKPOINTING and len(sys.argv) == 2:  # add extra sys.argv to signify first checkpointing run
-        model.load_state_dict(torch.load(const.MODELS_DIR / f'{const.MODEL_NAME}.pt', map_location=const.DEVICE))
+        model.load_state_dict(torch.load(const.MODELS_DIR / f'{const.MODEL_NAME}_last.pt', map_location=const.DEVICE))
         optimizer.load_state_dict(torch.load(const.MODELS_DIR / f'{const.MODEL_NAME}_optim.pt', map_location=const.DEVICE))
         checkpoint_args = json.load(open(const.MODELS_DIR / f'{const.MODEL_NAME}_checkpoint_metadata.json'))
         prev_metrics = mlflow.get_run(checkpoint_args['mlflow_run_id']).data.metrics
-        best = {'param': model.state_dict(),
-                'epoch': prev_metrics['selected_epoch'],
-                'acc': prev_metrics['selected_valid_acc']}
 
-    completed_epochs, best = fit(model, optimizer, loss, train, val, best=best, **checkpoint_args)
-    torch.save(model.state_dict(), const.MODELS_DIR / f'{const.MODEL_NAME}.pt')
+        selected = {'best': torch.load(const.MODELS_DIR / f'{const.MODEL_NAME}_best.pt', map_location='cpu'),
+                    'last': model.state_dict(),
+                    'epoch': prev_metrics['selected_epoch'],
+                    'acc': prev_metrics['selected_valid_acc']}
+
+    completed_epochs, selected = fit(model, optimizer, loss, train, val, selected=selected, **checkpoint_args)
+    torch.save(selected['last'], const.MODELS_DIR / f'{const.MODEL_NAME}_last.pt')
+    if const.SELECT_BEST: torch.save(selected['best'], const.MODELS_DIR / f'{const.MODEL_NAME}_best.pt')
 
     if const.CHECKPOINTING:
         torch.save(optimizer.state_dict(), const.MODELS_DIR / f'{const.MODEL_NAME}_optim.pt')
