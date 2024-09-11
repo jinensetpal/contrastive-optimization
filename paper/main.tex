@@ -182,19 +182,19 @@ We therefore derive an optimization objective that attempts to maximize the cont
 \end{gather}
 Ignoring the bias terms, our new optimization objective is:
 \begin{gather}
-	\max_{\theta} \tilde{\mathcal{\bm{A}}}^{\text{contrastive}} := \sum^{D_1,D_2}_{i,j} \tilde{\mathcal{\bm{A}}}_{c,i,j}^{\text{HiResCAM}} - \sum^{D_1,D_2}_{i,j} \tilde{\mathcal{\bm{A}}}_{c',i,j}^{\text{HiResCAM}}
+	\max_{\theta} \sum^{D_1,D_2}_{i,j} \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, c'), i, j} := \tilde{\mathcal{\bm{A}}}_{c}^{\text{HiResCAM}} - \tilde{\mathcal{\bm{A}}}_{c'}^{\text{HiResCAM}}
 \end{gather}
 This is equivalent to the original ERM optimization objective, with the difference being the resultant values preserving spatial information as an activation map instead of flattening the feature map. If $\tilde{\mathcal{\bm{A}}}_{c}^{\text{HiResCAM}} - \tilde{\mathcal{\bm{A}}}_{c'}^{\text{HiResCAM}} > 0$, the classification is correct -- if not, the classification is incorrect. 
 
 For the multiclass case, our setup now considers a set of classes $c$; $c_t$ is our target class, and $c_{t'}$ consists of a sampled non-target class. The definition for multiclass contrastive activation maps now results in a set of activation maps, defined as follows:
 \begin{gather}
-	\tilde{\mathcal{\bm{A}}}^{\text{contrastive}} := \{\tilde{\mathcal{\bm{A}}}_{c_t}^{\text{HiResCAM}} - \tilde{\mathcal{\bm{A}}}_{c_t'}^{\text{HiResCAM}}\}^{|c|-1}_{c_{t'} \in c - c_t}
+	\tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c_t, c_{t'})} := \{\tilde{\mathcal{\bm{A}}}_{c_t}^{\text{HiResCAM}} - \tilde{\mathcal{\bm{A}}}_{c_{t'}}^{\text{HiResCAM}}\}^{|c|-1}_{c_{t'} \in c - c_t}
 \end{gather}
 This is a generalization of the binary case, as the same formula applied to a binary classification challenge returns a set of contrastive maps containing a single element.
 
 To ensure that the model accurately predicts the target class, each contrastive comparison should yield a positive result. Therefore, the multiclass optimization objective under this paradigm is as follows:
 \begin{gather}
-	\max_{\theta} \sum^{D_1,D_2}_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{contrastive}}\ \forall i \in \mathbb{Z}_{+}(|c| - 1)
+	\max_{\theta} \sum^{D_1,D_2}_{j,k}\tilde{\mathcal{\bm{A}}}_{(c, c'),j,k}^{\text{contrastive}}\ \forall c' \in \mathbb{Z}_{+}(|c| - 1)
 \end{gather}
 
 \subsection{Constraining Optimization to an Interpretable Basis}
@@ -223,7 +223,7 @@ Segmentations maps describe the region over which the object is present. We can 
 		P_{i,j} & \text{otherwise}
 	\end{cases} \label{d_kl} \\
 	\begin{split}
-		\mathcal{\bm{J}}(\theta, \mathcal{D}) := &\ \lambda_1 D_{KL}(\sigma_{\text{softmax}}(\lambda_2 \mathcal{\bm{A}}^{\text{contrastive}})\ ||\ \sigma_{\text{softmax}}(\lambda_3 h)) \\
+		\mathcal{\bm{J}}(\theta, \mathcal{D}) := &\ \lambda_1 D_{KL}(\sigma_{\text{softmax}}(\lambda_3 h)\ ||\ \sigma_{\text{softmax}}(\lambda_2 \mathcal{\bm{A}}^{\text{contrastive}})) \\
 		&+ \frac{\lambda_4}{\sum^{D_1,D_2}_{i,j}\mathbbm{1}(h_{i,j} = 0)} ||\mathcal{\bm{A}}^{\text{background}}||^2_F \\
 		&- \frac{\lambda_5}{\sum^{D_1,D_2}_{i,j}\mathbbm{1}(h_{i,j} = 1)} \sum^{|c|-1,D_1,D_2}_{c,i,j} \mathcal{\bm{A}}^{\text{foreground}}_{c,i,j}
 	\end{split}
