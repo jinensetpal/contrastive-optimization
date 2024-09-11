@@ -13,7 +13,9 @@ import time
 import sys
 
 
-def fit(model, optimizer, loss, train, val, selected=None, init_epoch=1, mlflow_run_id=None):
+def fit(model, optimizer, scheduler, criterion, train, val,
+        selected=None, init_epoch=1, mlflow_run_id=None):
+    model.train()
     start_time = time.time()
     selected = selected or {'last': model.state_dict(),
                             'epoch': init_epoch,
@@ -34,7 +36,7 @@ def fit(model, optimizer, loss, train, val, selected=None, init_epoch=1, mlflow_
                     if not (batch_idx+1) % const.GRAD_ACCUMULATION_STEPS: optimizer.zero_grad()
 
                     y_pred = model(X)
-                    batch_loss = loss(y_pred, y) if loss._get_name() != 'CrossEntropyLoss' else loss(y_pred[0], y[1])
+                    batch_loss = criterion(y_pred, y) if criterion._get_name() != 'CrossEntropyLoss' else criterion(y_pred[0], y[1])
 
                     metrics[f'{split}_acc'].extend(y[1].argmax(1).eq(y_pred[0].argmax(1)).unsqueeze(1).tolist())
                     metrics[f'{split}_contrast_loss'].append(batch_loss.item())
@@ -43,16 +45,17 @@ def fit(model, optimizer, loss, train, val, selected=None, init_epoch=1, mlflow_
                     del y_pred, X, y
                     torch.cuda.empty_cache()
 
-                    if loss._get_name() != 'CrossEntropyLoss':
-                        metrics[f'{split}_kld_loss'].append(loss.prev[0])
-                        metrics[f'{split}_background_loss'].append(loss.prev[1])
-                        metrics[f'{split}_foreground_loss'].append(loss.prev[2])
+                    if criterion._get_name() != 'CrossEntropyLoss':
+                        metrics[f'{split}_kld_loss'].append(criterion.prev[0])
+                        metrics[f'{split}_background_loss'].append(criterion.prev[1])
+                        metrics[f'{split}_foreground_loss'].append(criterion.prev[2])
 
                     if split == 'train':
                         batch_loss.backward()
                         mlflow.log_metric(f'{split}_batchwise_loss', batch_loss.item(), step=(epoch-1) * len(dataloader) + batch_idx)
 
                         if not (batch_idx+1) % const.GRAD_ACCUMULATION_STEPS: optimizer.step()
+            scheduler.step()
 
             metrics = {metric: np.mean(metrics[metric]) for metric in metrics}
             mlflow.log_metrics(metrics, step=epoch-1)
@@ -86,11 +89,15 @@ if __name__ == '__main__':
     if const.LOG_REMOTE: mlflow.set_tracking_uri(const.MLFLOW_TRACKING_URI)
 
     model = Model(const.IMAGE_SHAPE, is_contrastive=const.MODEL_NAME != 'default')
+    if const.DEVICE == 'cuda': model = torch.nn.DataParallel(model)
+
     train, val, test = get_generators()
     optimizer = torch.optim.SGD(model.parameters(),
                                 lr=const.LEARNING_RATE,
-                                momentum=const.MOMENTUM)
-    loss = ContrastiveLoss(model.get_contrastive_cams) if const.MODEL_NAME != 'default' else torch.nn.CrossEntropyLoss()
+                                momentum=const.MOMENTUM,
+                                weight_decay=const.WEIGHT_DECAY)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
+    criterion = ContrastiveLoss(model.get_contrastive_cams) if const.MODEL_NAME != 'default' else torch.nn.CrossEntropyLoss()
 
     checkpoint_args = {'init_epoch': 1,
                        'mlflow_run_id': None}
@@ -106,7 +113,7 @@ if __name__ == '__main__':
                     'epoch': prev_metrics['selected_epoch'],
                     'acc': prev_metrics['selected_valid_acc']}
 
-    completed_epochs, selected = fit(model, optimizer, loss, train, val, selected=selected, **checkpoint_args)
+    completed_epochs, selected = fit(model, optimizer, scheduler, criterion, train, val, selected=selected, **checkpoint_args)
     torch.save(selected['last'], const.MODELS_DIR / f'{const.MODEL_NAME}_last.pt')
     if const.SELECT_BEST: torch.save(selected['best'], const.MODELS_DIR / f'{const.MODEL_NAME}_best.pt')
 
