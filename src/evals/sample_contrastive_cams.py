@@ -1,21 +1,15 @@
 #!/usr/bin/env python3
 
-from ..data.oxford_iiit_pet import Dataset as oxford_iiit_pets
-from ..data.pet_image import Dataset as pet_image
+
+from ..data.oxford_iiit_pet import Dataset
 from matplotlib.colors import Normalize
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
-from .arch import Model
+from ..model.arch import Model
 from src import const
 import random
 import torch
 import sys
-
-
-def kernel_diff(model):
-    plt.plot((model.linear.weight[0] - model.linear.weight[1]).sort(descending=True).values.pow(2).detach())
-    plt.savefig(const.DATA_DIR / 'evals' / f'kerneldiff_{model.name}.png')
-    plt.show()
 
 
 def visualize(model, gen, norm=None):
@@ -36,17 +30,6 @@ def visualize(model, gen, norm=None):
     plt.show()
 
 
-def accuracy(model, gen, samples=1000):
-    score = 0
-
-    for sample in random.sample(range(len(gen)), samples):
-        X, y = gen[sample]
-        y_pred, cam = model(X.unsqueeze(0))
-        score += (y.argmax(dim=0) == y_pred.argmax(dim=1)).sum()
-
-    return score / samples
-
-
 if __name__ == '__main__':
     name = sys.argv[1]
     random.seed(const.SEED)
@@ -56,6 +39,5 @@ if __name__ == '__main__':
     model.name = name
     model.eval()
 
-    if sys.argv[2] == 'visualize': visualize(model, oxford_iiit_pets('test'))
-    elif sys.argv[2] == 'visualize-normed': visualize(model, oxford_iiit_pets('test'), Normalize(vmin=-.5, vmax=.5))
-    else: print(accuracy(model, pet_image()))
+    if len(sys.argv) == 3 and sys.argv[2] == 'normed': visualize(model, Dataset('test'), Normalize(vmin=-.5, vmax=.5))
+    else: visualize(model, Dataset('test'))
