@@ -1,0 +1,6 @@
+outs:
+- md5: 87c3abb1b0b1f722a3094a2d2747bf2d.dir
+  size: 39250053
+  nfiles: 397
+  hash: md5
+  path: evals
