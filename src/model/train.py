@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from ..data.oxford_iiit_pet import get_generators
-from .loss import ContrastiveLoss
+from .loss import PieceWiseLoss
 import torch.nn.functional as F
 from .arch import Model
 from src import const
@@ -29,7 +29,7 @@ def fit(model, optimizer, scheduler, criterion, train, val,
         interval = max(1, (const.EPOCHS // 10))
         for epoch in range(init_epoch, const.EPOCHS + init_epoch):
             if not (epoch) % interval: print('-' * 10)
-            metrics = {metric: [] for metric in [f'{split}_{report}' for report in ['contrast_loss', 'kld_loss', 'background_loss', 'foreground_loss', 'acc', 'cse_loss'] for split in const.SPLITS[:2]]}
+            metrics = {metric: [] for metric in [f'{split}_{report}' for report in ['contrast_loss', 'background_loss', 'foreground_loss', 'acc', 'cse_loss'] for split in const.SPLITS[:2]]}
 
             for split, dataloader in zip(const.SPLITS[:2], (train, val)):
                 for batch_idx, (X, y) in enumerate(dataloader):
@@ -46,9 +46,8 @@ def fit(model, optimizer, scheduler, criterion, train, val,
                     torch.cuda.empty_cache()
 
                     if criterion._get_name() != 'CrossEntropyLoss':
-                        metrics[f'{split}_kld_loss'].append(criterion.prev[0])
+                        metrics[f'{split}_foreground_loss'].append(criterion.prev[0])
                         metrics[f'{split}_background_loss'].append(criterion.prev[1])
-                        metrics[f'{split}_foreground_loss'].append(criterion.prev[2])
 
                     if split == 'train':
                         batch_loss.backward()
@@ -89,7 +88,9 @@ if __name__ == '__main__':
     if const.LOG_REMOTE: mlflow.set_tracking_uri(const.MLFLOW_TRACKING_URI)
 
     model = Model(const.IMAGE_SHAPE, is_contrastive=const.MODEL_NAME != 'default')
-    if const.DEVICE == 'cuda': model = torch.nn.DataParallel(model)
+    if const.DEVICE == 'cuda':
+        model = torch.nn.DataParallel(model)
+        model.get_contrastive_cams = model.module.get_contrastive_cams
 
     train, val, test = get_generators()
     optimizer = torch.optim.SGD(model.parameters(),
@@ -97,7 +98,7 @@ if __name__ == '__main__':
                                 momentum=const.MOMENTUM,
                                 weight_decay=const.WEIGHT_DECAY)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
-    criterion = ContrastiveLoss(model.get_contrastive_cams) if const.MODEL_NAME != 'default' else torch.nn.CrossEntropyLoss()
+    criterion = PieceWiseLoss(model.get_contrastive_cams) if const.MODEL_NAME != 'default' else torch.nn.CrossEntropyLoss()
 
     checkpoint_args = {'init_epoch': 1,
                        'mlflow_run_id': None}
