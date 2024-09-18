@@ -21,6 +21,7 @@ def evaluate_influence(model, gen, misclassified_only=False):
 
         if misclassified_only:
             mask = y[1].argmax(1) != y_pred[0].argmax(1)
+            X = X[mask]
             cc = cc[mask]
             heatmap = heatmap[mask]
 
@@ -53,4 +54,4 @@ if __name__ == '__main__':
     model.name = name
     model.eval()
 
-    evaluate_influence(model, DataLoader(Dataset('train'), batch_size=10, shuffle=False), misclassified_only=len(sys.argv) == 3)
+    evaluate_influence(model, DataLoader(Dataset('valid'), batch_size=10, shuffle=False), misclassified_only=len(sys.argv) == 3)
