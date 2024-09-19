@@ -10,6 +10,7 @@ class Model(torch.nn.Module):
     def __init__(self, input_shape, is_contrastive=True):
         super().__init__()
 
+        self.is_contrastive = is_contrastive
         self.backbone = torchvision.models.resnet50(weights=None)
         self.backbone.layer4[0].conv2 = torch.nn.Conv2d(512, 512, kernel_size=(1, 1), stride=(1, 1), bias=False)
         self.backbone.layer4[0].downsample[0] = torch.nn.Conv2d(1024, 2048, kernel_size=(1, 1), stride=(1, 1), bias=False)
@@ -40,10 +41,9 @@ class Model(torch.nn.Module):
 
     @staticmethod
     def get_contrastive_cams(y, cams):
-        contrastive_cams = torch.empty((y.shape[0], cams.shape[-3] - 1, *cams.shape[-2:]), device=const.DEVICE)
+        contrastive_cams = torch.empty((y.shape[0], cams.shape[-3], *cams.shape[-2:]), device=const.DEVICE)
         for idx, (cam, y_idx) in enumerate(zip(cams, y.argmax(dim=1))):
-            cam = cam[y_idx] - cam  # objective: maximize this difference, constraining contrast to segmentation target region only
-            contrastive_cams[idx] = torch.cat([cam[:y_idx], cam[y_idx+1:]])
+            contrastive_cams[idx] = cam[y_idx] - cam
         return contrastive_cams
 
     def _compute_hi_res_cam(self, logits):

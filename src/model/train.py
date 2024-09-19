@@ -36,18 +36,19 @@ def fit(model, optimizer, scheduler, criterion, train, val,
                     if not (batch_idx+1) % const.GRAD_ACCUMULATION_STEPS: optimizer.zero_grad()
 
                     y_pred = model(X)
-                    batch_loss = criterion(y_pred, y) if criterion._get_name() != 'CrossEntropyLoss' else criterion(y_pred[0], y[1])
+                    if model.is_contrastive:
+                        cc = model.get_contrastive_cams(y[1], y_pred[1])
+                        fg_masks = y[0].repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
+                        out = (-cc * fg_masks + cc.abs() * (1 - fg_masks)).sum(dim=[2, 3])
+                    else: out = y_pred[0]
+                    batch_loss = criterion(out, y[1])
 
                     metrics[f'{split}_acc'].extend(y[1].argmax(1).eq(y_pred[0].argmax(1)).unsqueeze(1).tolist())
                     metrics[f'{split}_contrast_loss'].append(batch_loss.item())
-                    metrics[f'{split}_cse_loss'].append(F.cross_entropy(y_pred[0], y[1]).item())
+                    metrics[f'{split}_cse_loss'].append(criterion(y_pred[0], y[1]).item())
 
                     del y_pred, X, y
                     torch.cuda.empty_cache()
-
-                    if criterion._get_name() != 'CrossEntropyLoss':
-                        metrics[f'{split}_foreground_loss'].append(criterion.prev[0])
-                        metrics[f'{split}_background_loss'].append(criterion.prev[1])
 
                     if split == 'train':
                         batch_loss.backward()
@@ -90,6 +91,7 @@ if __name__ == '__main__':
     model = Model(const.IMAGE_SHAPE, is_contrastive=const.MODEL_NAME != 'default')
     if const.DEVICE == 'cuda':
         model = torch.nn.DataParallel(model)
+        model.is_contrastive = model.module.is_contrastive
         model.get_contrastive_cams = model.module.get_contrastive_cams
 
     train, val, test = get_generators()
@@ -98,7 +100,7 @@ if __name__ == '__main__':
                                 momentum=const.MOMENTUM,
                                 weight_decay=const.WEIGHT_DECAY)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
-    criterion = PieceWiseLoss(model.get_contrastive_cams) if const.MODEL_NAME != 'default' else torch.nn.CrossEntropyLoss()
+    criterion = torch.nn.CrossEntropyLoss()
 
     checkpoint_args = {'init_epoch': 1,
                        'mlflow_run_id': None}

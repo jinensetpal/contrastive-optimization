@@ -12,27 +12,27 @@ class ContrastiveLoss(nn.Module):
         self.get_contrastive_cam = get_contrastive_cam_fn
         self.debug = debug
 
-    def kld(self, cc, heatmap, reverse=False):
-        heatmap[heatmap > .5] = 1
+    def kld(self, cc, fg_mask, reverse=False):
+        fg_mask[fg_mask > .5] = 1
 
         cc_log_probs = F.sigmoid(cc)
-        heatmap_probs = F.softmax((heatmap * const.LAMBDAS[1]).flatten(start_dim=1), dim=1).reshape(cc.shape[0], *cc.shape[-2:]).repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
-        heatmap[heatmap <= .5] = .5
-        heatmap_log_probs = heatmap.log()
-        # heatmap_log_probs[heatmap > .5] = 0
+        fg_mask_probs = F.softmax((fg_mask * const.LAMBDAS[1]).flatten(start_dim=1), dim=1).reshape(cc.shape[0], *cc.shape[-2:]).repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
+        fg_mask[fg_mask <= .5] = .5
+        fg_mask_log_probs = fg_mask.log()
+        # fg_mask_log_probs[fg_mask > .5] = 0
 
-        # heatmap_probs[heatmap == 1] = .8 / (heatmap == 1).sum()
-        # heatmap_probs[heatmap != 1] = .2 / (heatmap != 1).sum()
+        # fg_mask_probs[fg_mask == 1] = .8 / (fg_mask == 1).sum()
+        # fg_mask_probs[fg_mask != 1] = .2 / (fg_mask != 1).sum()
 
-        return heatmap_probs * (heatmap_log_probs - cc_log_probs)
+        return fg_mask_probs * (fg_mask_log_probs - cc_log_probs)
 
     def forward(self, y_pred, y):
         cc = self.get_contrastive_cam(y[1], y_pred[1])
-        heatmap = y[0].repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
+        fg_mask = y[0].repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
 
-        kld = self.kld(cc.abs(), heatmap.clone())
-        kld_prime = self.kld((-cc).abs(), -heatmap.clone() + 1, reverse=True)
-        foreground = cc[heatmap != 0].mean()
+        kld = self.kld(cc.abs(), fg_mask.clone())
+        kld_prime = self.kld((-cc).abs(), -fg_mask.clone() + 1, reverse=True)
+        foreground = cc[fg_mask != 0].mean()
 
         self.prev = ((kld.sum() / cc.size(0)).item(), (kld_prime.sum() / cc.size(0)).item(), foreground.item())
         if self.debug: return const.LAMBDAS[2] * kld.sum() / cc.size(0) + const.LAMBDAS[3] * kld_prime.sum() / cc.size(0) - const.LAMBDAS[4] * foreground, kld, kld_prime
@@ -45,22 +45,22 @@ class DoubleKLDLoss(nn.Module):
         self.get_contrastive_cam = get_contrastive_cam_fn
         self.debug = debug
 
-    def kld(self, cc, heatmap, reverse=False):
-        heatmap[heatmap > .5] = 1
+    def kld(self, cc, fg_mask, reverse=False):
+        fg_mask[fg_mask > .5] = 1
 
         cc_log_probs = F.sigmoid(cc)
-        heatmap_probs = F.softmax((heatmap * const.LAMBDAS[1]).flatten(start_dim=1), dim=1).reshape(cc.shape[0], *cc.shape[-2:]).repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
-        heatmap[heatmap <= .5] = .5
-        heatmap_log_probs = heatmap.log()
+        fg_mask_probs = F.softmax((fg_mask * const.LAMBDAS[1]).flatten(start_dim=1), dim=1).reshape(cc.shape[0], *cc.shape[-2:]).repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
+        fg_mask[fg_mask <= .5] = .5
+        fg_mask_log_probs = fg_mask.log()
 
-        return heatmap_probs * (heatmap_log_probs - cc_log_probs)
+        return fg_mask_probs * (fg_mask_log_probs - cc_log_probs)
 
     def forward(self, y_pred, y):
         cc = self.get_contrastive_cam(y[1], y_pred[1])
-        heatmap = y[0].repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
+        fg_mask = y[0].repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
 
-        kld = self.kld(cc.abs(), heatmap.clone())
-        kld_prime = self.kld((-cc).abs(), -heatmap + 1, reverse=True)
+        kld = self.kld(cc.abs(), fg_mask.clone())
+        kld_prime = self.kld((-cc).abs(), -fg_mask + 1, reverse=True)
 
         self.prev = ((kld.sum() / cc.size(0)).item(), (kld_prime.sum() / cc.size(0)).item())
         if self.debug: return const.LAMBDAS[2] * kld.sum() / cc.size(0) + const.LAMBDAS[3] * kld_prime.sum() / cc.size(0), kld, kld_prime
@@ -75,21 +75,21 @@ class KLDPenaltyLoss(nn.Module):
 
     def forward(self, y_pred, y):
         cc = self.get_contrastive_cam(y[1], y_pred[1])
-        heatmap = y[0].repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
+        fg_mask = y[0].repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
 
         cc_log_probs = F.softmax((cc * const.LAMBDAS[0]).flatten(start_dim=2), dim=2).reshape(*cc.shape).log()
-        heatmap_probs = F.softmax(((y[0]) * const.LAMBDAS[1]).flatten(start_dim=1), dim=1).reshape(cc.shape[0], *cc.shape[-2:]).repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
-        heatmap_log_probs = heatmap_probs.log()
-        heatmap_log_probs[heatmap != 0] = 0
+        fg_mask_probs = F.softmax(((y[0]) * const.LAMBDAS[1]).flatten(start_dim=1), dim=1).reshape(cc.shape[0], *cc.shape[-2:]).repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
+        fg_mask_log_probs = fg_mask_probs.log()
+        fg_mask_log_probs[fg_mask != 0] = 0
 
         # rids antialiasing
-        # heatmap_probs[heatmap == 0] = 0.2 / (heatmap == 0).sum()
-        # heatmap_probs[heatmap != 0] = 0.8 / (heatmap != 0).sum()
-        # heatmap_probs[heatmap == 0] *= 1E20
+        # fg_mask_probs[fg_mask == 0] = 0.2 / (fg_mask == 0).sum()
+        # fg_mask_probs[fg_mask != 0] = 0.8 / (fg_mask != 0).sum()
+        # fg_mask_probs[fg_mask == 0] *= 1E20
 
-        kld = heatmap_probs * (heatmap_log_probs - cc_log_probs)
-        background = cc[heatmap == 0].pow(2).mean()
-        foreground = cc[heatmap != 0].mean()
+        kld = fg_mask_probs * (fg_mask_log_probs - cc_log_probs)
+        background = cc[fg_mask == 0].pow(2).mean()
+        foreground = cc[fg_mask != 0].mean()
 
         self.prev = ((kld.sum() / cc.size(0)).item(), background.item(), foreground.item())
         if self.debug: return const.LAMBDAS[2] * kld.sum() / cc.size(0) + const.LAMBDAS[3] * background - const.LAMBDAS[4] * foreground, kld
@@ -103,15 +103,15 @@ class BCELoss(nn.Module):
 
     def forward(self, y_pred, y):
         cc = self.get_contrastive_cam(y[1], y_pred[1])
-        heatmap = y[0].repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
-        heatmap[heatmap < .5] = .5
-        heatmap[heatmap >= 1] = 1.  # glitching torch, my theory -> some values are 1.0000 and extra 0's are counted as extending the [0,1] range
+        fg_mask = y[0].repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
+        fg_mask[fg_mask < .5] = .5
+        fg_mask[fg_mask >= 1] = 1.  # glitching torch, my theory -> some values are 1.0000 and extra 0's are counted as extending the [0,1] range
 
         loss_weights = torch.empty(cc.shape, device=const.DEVICE)
-        loss_weights[heatmap < .9] = .5 / (heatmap < .9).sum()
-        loss_weights[heatmap >= .9] = .5 / (heatmap >= .9).sum()
+        loss_weights[fg_mask < .9] = .5 / (fg_mask < .9).sum()
+        loss_weights[fg_mask >= .9] = .5 / (fg_mask >= .9).sum()
 
-        bce = F.binary_cross_entropy(F.sigmoid(cc), heatmap, reduction='none')
+        bce = F.binary_cross_entropy(F.sigmoid(cc), fg_mask, reduction='none')
         return (loss_weights * bce).mean(), bce
 
 
@@ -122,10 +122,10 @@ class PieceWiseLoss(nn.Module):
 
     def forward(self, y_pred, y):
         cc = self.get_contrastive_cam(y[1], y_pred[1])
-        heatmap = y[0].repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
+        fg_mask = y[0].repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
 
-        foreground = torch.exp(-cc[heatmap == 1]).mean()
-        background = torch.exp(cc[heatmap != 1].abs()).mean()
+        foreground = torch.exp(-cc[fg_mask == 1]).mean()
+        background = torch.exp(cc[fg_mask != 1].abs()).mean()
 
         self.prev = (foreground.item(), background.item())
         return torch.log(foreground + background)
@@ -156,6 +156,6 @@ class NonPositiveLoss(nn.Module):
 
     def forward(self, y_pred, y):
         cc = self.get_contrastive_cam(y[1], y_pred[1])
-        heatmap = y[0].repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
+        fg_mask = y[0].repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
 
-        return (cc[heatmap <= .5]).pow(2).mean() - torch.nan_to_num(cc[(heatmap > .5) & (cc < 0)]).mean()
+        return (cc[fg_mask <= .5]).pow(2).mean() - torch.nan_to_num(cc[(fg_mask > .5) & (cc < 0)]).mean()
