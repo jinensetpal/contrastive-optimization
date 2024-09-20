@@ -19,11 +19,11 @@ def visualize(model, gen, norm=None):
     for idx, sample in enumerate(random.sample(range(len(gen)), 16)):
         X, (heatmap, y) = gen[sample]
         y_pred, cam = model(X.unsqueeze(0))
-        cam = model.get_contrastive_cams(y.unsqueeze(0), cam).detach()
+        cam = model.get_contrastive_cams(y.unsqueeze(0), cam).detach()[0, y.argmin(0)]
         fig.add_subplot(4, 4, idx + 1)
         plt.xlabel(f'Pred: {str(y_pred[0].argmax().item())}, Actual: {str(y.argmax().item())}')
         plt.imshow(X.permute(1, 2, 0).cpu().detach(), alpha=0.5)
-        plt.imshow(F.interpolate(cam, const.IMAGE_SIZE, mode='bilinear')[0, 0].cpu(), cmap='jet', alpha=0.5, norm=norm)
+        plt.imshow(F.interpolate(cam[None, None, :], const.IMAGE_SIZE, mode='bilinear')[0, 0].cpu(), cmap='jet', alpha=0.5, norm=norm)
 
     plt.tight_layout()
     fig.savefig(const.DATA_DIR / 'evals' / f'{model.name}_cam.png')
@@ -35,6 +35,10 @@ if __name__ == '__main__':
     random.seed(const.SEED)
 
     model = Model(input_shape=const.IMAGE_SHAPE, is_contrastive='default' not in name)
+    if const.DEVICE == 'cuda':
+        model = torch.nn.DataParallel(model)
+        model.is_contrastive = model.module.is_contrastive
+        model.get_contrastive_cams = model.module.get_contrastive_cams
     model.load_state_dict(torch.load(const.MODELS_DIR / f'{name}.pt', map_location=const.DEVICE))
     model.name = name
     model.eval()

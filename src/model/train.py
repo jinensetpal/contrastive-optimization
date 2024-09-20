@@ -84,7 +84,7 @@ def fit(model, optimizer, scheduler, criterion, train, val,
 
 
 if __name__ == '__main__':
-    # Usage: $ python -m path.to.script model_name ignorecheckpoint
+    # Usage: $ python -m path.to.script model_name --nocheckpoint
     const.MODEL_NAME = sys.argv[1]
     if const.LOG_REMOTE: mlflow.set_tracking_uri(const.MLFLOW_TRACKING_URI)
 
