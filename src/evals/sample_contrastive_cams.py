@@ -35,10 +35,6 @@ if __name__ == '__main__':
     random.seed(const.SEED)
 
     model = Model(input_shape=const.IMAGE_SHAPE, is_contrastive='default' not in name)
-    if const.DEVICE == 'cuda':
-        model = torch.nn.DataParallel(model)
-        model.is_contrastive = model.module.is_contrastive
-        model.get_contrastive_cams = model.module.get_contrastive_cams
     model.load_state_dict(torch.load(const.MODELS_DIR / f'{name}.pt', map_location=const.DEVICE))
     model.name = name
     model.eval()

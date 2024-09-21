@@ -13,11 +13,13 @@ import sys
 
 
 def evaluate_influence(model, gen, misclassified_only=False):
+    (const.DATA_DIR / 'evals' / 'influence_plots' / gen.dataset.split / model.name).mkdir(exist_ok=True, parents=True)
+
     const.CAM_SIZE = const.IMAGE_SIZE
     for batch_idx, (X, y) in enumerate(gen):
         y_pred = model(X)
         cc = model.get_contrastive_cams(y[1], y_pred[1]).detach().abs()
-        heatmap = y[0].repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
+        heatmap = y[0].repeat((cc.shape[1] - 1, 1, 1, 1)).permute(1, 0, 2, 3)
 
         if misclassified_only:
             mask = y[1].argmax(1) != y_pred[0].argmax(1)
@@ -25,7 +27,7 @@ def evaluate_influence(model, gen, misclassified_only=False):
             cc = cc[mask]
             heatmap = heatmap[mask]
 
-        for idx, (X_i, cc_i, heatmap_i) in enumerate(zip(X, cc, heatmap)):
+        for idx, (X_i, cc_i, heatmap_i, y_i) in enumerate(zip(X, cc, heatmap, y[1].argmin(1))):
             fig = plt.figure()
 
             fig.add_subplot(2, 2, 1)
@@ -35,13 +37,13 @@ def evaluate_influence(model, gen, misclassified_only=False):
 
             heatmap_i = torchvision.transforms.functional.resize(heatmap_i, (14, 14), antialias=False).squeeze(0)
             fig.add_subplot(2, 2, 3)
-            plt.imshow((cc_i * heatmap_i)[0].cpu())
+            plt.imshow((cc_i[y_i] * heatmap_i).cpu())
             fig.add_subplot(2, 2, 4)
-            plt.imshow((cc_i * (1 - heatmap_i))[0].cpu())
+            plt.imshow((cc_i[y_i] * (1 - heatmap_i)).cpu())
 
             fig.suptitle(f'Net Influence: {cc_i.sum()}\nForeground Influence: {cc_i[0][heatmap_i == 1].sum()}\nBackground Influence: {cc_i[0][heatmap_i != 1].sum()}')
             plt.tight_layout()
-            fig.savefig(const.DATA_DIR / 'evals' / 'influence_plots' / f'{gen.dataset.split}_{batch_idx * gen.batch_size + idx}_{model.name}.png')
+            fig.savefig(const.DATA_DIR / 'evals' / 'influence_plots' / gen.dataset.split / model.name / f'{batch_idx * gen.batch_size + idx}.png')
             plt.close()
 
 

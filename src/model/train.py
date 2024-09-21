@@ -89,10 +89,6 @@ if __name__ == '__main__':
     if const.LOG_REMOTE: mlflow.set_tracking_uri(const.MLFLOW_TRACKING_URI)
 
     model = Model(const.IMAGE_SHAPE, is_contrastive=const.MODEL_NAME != 'default')
-    if const.DEVICE == 'cuda':
-        model = torch.nn.DataParallel(model)
-        model.is_contrastive = model.module.is_contrastive
-        model.get_contrastive_cams = model.module.get_contrastive_cams
 
     train, val, test = get_generators()
     optimizer = torch.optim.SGD(model.parameters(),
