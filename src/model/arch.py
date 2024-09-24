@@ -42,12 +42,12 @@ class Model(torch.nn.Module):
     @staticmethod
     def get_contrastive_cams(y, cams):
         contrastive_cams = torch.empty((y.shape[0], cams.shape[-3], *cams.shape[-2:]), device=const.DEVICE)
-        for idx, (cam, y_idx) in enumerate(zip(cams, y.argmax(dim=1))):
-            contrastive_cams[idx] = cam[y_idx] - cam
+        for idx, (cam, y_idx) in enumerate(zip(cams, y.argmax(dim=1))): contrastive_cams[idx] = cam[y_idx] - cam
+
         return contrastive_cams
 
     def _compute_hi_res_cam(self, logits):
-        cams = torch.zeros(*logits.shape, *self.feature_rect.shape[2:])
+        cams = torch.zeros(*logits.shape, *self.feature_rect.shape[2:], device=const.DEVICE)
         for img_idx in range(logits.shape[0]):
             for class_idx in range(logits.shape[1]):
                 logits[img_idx, class_idx].backward(retain_graph=True, inputs=self.backbone.layer4[-1].conv3.weight)
