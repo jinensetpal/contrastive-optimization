@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-
 from ..data.pet_image import Dataset
 from ..model.arch import Model
 from src import const

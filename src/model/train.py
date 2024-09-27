@@ -29,7 +29,7 @@ def fit(model, optimizer, scheduler, criterion, train, val,
         interval = max(1, (const.EPOCHS // 10))
         for epoch in range(init_epoch, const.EPOCHS + init_epoch):
             if not (epoch) % interval: print('-' * 10)
-            metrics = {metric: [] for metric in [f'{split}_{report}' for report in ['contrast_loss', 'background_loss', 'foreground_loss', 'acc', 'cse_loss'] for split in const.SPLITS[:2]]}
+            metrics = {metric: [] for metric in [f'{split}_{report}' for report in ['contrast_loss', 'acc', 'cse_loss'] for split in const.SPLITS[:2]]}
 
             for split, dataloader in zip(const.SPLITS[:2], (train, val)):
                 for batch_idx, (X, y) in enumerate(dataloader):

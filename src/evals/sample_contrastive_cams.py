@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-
 from ..data.oxford_iiit_pet import Dataset
 from matplotlib.colors import Normalize
 import torch.nn.functional as F

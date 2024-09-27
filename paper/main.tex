@@ -137,7 +137,7 @@ We can consider the backbone as a kernel that attempts to linearly separate the 
 
 In this setup, each class has it's own set of weights that feedforwards independently, but trains collaboratively. It assigns a score for it's specific value, which is independent since one set of weights does not affect the other over a forward pass. A consequence of performing softmax over the final logits is that the normalization steps renders only the difference between each score $s_c$ relevant for the final prediction probability.
 
-\begin{theorem}
+\begin{theorem}\label{classprobdiff}
 	Individual class probabilites $\sigma_c(\bm{s})$ depend on the difference(s) between class logits.
 \end{theorem}
 \begin{proof} Individual class probabilities for logit vector $\bm{s}$ are defined as:
@@ -203,6 +203,7 @@ As discussed in the previous section, the distinctive feature of the contrastive
 
 We can use this to constrain the way optimization occurs -- namely, we only want the model to increase the likelihood of an object belonging to a certain class by actually looking at the features of the class, and not features of spurious correlation like the environment in which the object is present. The model through the process of training should learn to distinguish and subsequently ignore the background in determining the final prediction.
 
+\subsubsection{Divergence Formulation}
 Segmentations maps describe the region over which the object is present. We can leverage this information to define a constrastive cost function as follows:
 \begin{gather}
 	\{(x, (h, y))\}^N \in \mathcal{D} \text{ where } h_{i,j} := \begin{cases}
@@ -223,22 +224,49 @@ Segmentations maps describe the region over which the object is present. We can 
 		P_{i,j} & \text{otherwise}
 	\end{cases} \label{d_kl} \\
 	\begin{split}
-		\mathcal{\bm{J}}(\theta, \mathcal{D}) := &\ \lambda_1 D_{KL}(\sigma_{\text{softmax}}(\lambda_3 h)\ ||\ \sigma_{\text{softmax}}(\lambda_2 \mathcal{\bm{A}}^{\text{contrastive}})) \\
-		&+ \frac{\lambda_4}{\sum^{D_1,D_2}_{i,j}\mathbbm{1}(h_{i,j} = 0)} ||\mathcal{\bm{A}}^{\text{background}}||^2_F \\
-		&- \frac{\lambda_5}{\sum^{D_1,D_2}_{i,j}\mathbbm{1}(h_{i,j} = 1)} \sum^{|c|-1,D_1,D_2}_{c,i,j} \mathcal{\bm{A}}^{\text{foreground}}_{c,i,j}
+		\mathcal{\bm{J}}(\theta, \mathcal{D}) := &\ \underbrace{\lambda_1 D_{KL}(\sigma_{\text{softmax}}(\lambda_3 h)\ ||\ \sigma_{\text{softmax}}(\lambda_2 \mathcal{\bm{A}}^{\text{contrastive}}))}_{\text{minimize divergence from target shape}} \\
+		&+ \underbrace{\frac{\lambda_4}{\sum^{D_1,D_2}_{i,j}\mathbbm{1}(h_{i,j} = 0)} ||\mathcal{\bm{A}}^{\text{background}}||^2_F}_{\text{minimize background influence}} \\
+		&- \underbrace{\frac{\lambda_5}{\sum^{D_1,D_2}_{i,j}\mathbbm{1}(h_{i,j} = 1)} \sum^{|c|-1,D_1,D_2}_{c,i,j} \mathcal{\bm{A}}^{\text{foreground}}_{c,i,j}}_{\text{maximize foreground influence}}
 	\end{split}
 \end{gather}
-
-The cost function has a threefold purpose:
-\begin{enumerate}
-	\item Minimize the divergence of the contrastive activation map to the segmentation map.
-	\item Minimize the absolute value of the contrastive map where the segmentation map is the background.
-	\item Maximize the value of the contrastive map where the segmentation map is the foreground.
-\end{enumerate}
 
 $D_{KL}$ is modified per (10), such that the likelihood comparator sets point probability to 1 if it is part of the foreground. While this violates the probability distribution under which KL Divergence is defined, it motivates the optimizer to maximize the foreground activation, which is especially crucial for cases where the image contains large sections of foreground. During training, observing pointwise divergence revealed that the model was penalized for `over-activating' the foreground, which this modification corrects. In addition, it also averages the divergence from the target segmentation map to each contrastive activation map.
 
 $\lambda_2$ \& $\lambda_3$ are hyperparameters that scale the activation maps, since softmax computed over values with small differences produce largely uniform probability distributions. $\lambda_1$ weighs the importance of the divergence, $\lambda_4$ weights the importance of the background not affecting the final prediction \& $\lambda_5$ weighs the importance of the foreground being positive. For our experiments, $\bm{\lambda} = \{1, 50, 1, 50, 1\}$ were set for $i = \{1, \ldots, 5\}$ respectively. These were identified empirically, without rigorous optimization.
+
+\subsubsection{Ablated Cross-Entropy}
+
+A more mathematically rigorous approach involves performing an ablation over class logits to penalize background influence.
+
+\begin{theorem} We can integrate background invariance to the definition of cross-entropy using the following formulation:
+	\begin{gather}
+		\mathcal{J}(\theta, \mathcal{D}) = -\log \left( \frac{1}{\sum_i \text{exp}\left({-\sum^{}h \odot \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)} + \sum |(1-h) \odot \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)}}|\right)} \right)
+	\end{gather}
+\end{theorem}
+\begin{proof} Using the definition of HiResCAMs, ContrastiveCAMs and the elementwise difference setup from \ref{classprobdiff}, we have:
+	\begin{align}
+		d &= [s_i - s_c]_i \\
+		&= \left[\sum^{D_1,D_2}_{i,j,k} \tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}} - \sum^{D_1,D_2}_{c,j,k} \tilde{\mathcal{\bm{A}}}_{c,j,k}^{\text{HiResCAM}}\right] \\
+		&= \left[ -\sum^{}\tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)} \right]_i
+	\end{align}
+	Using our result from \ref{classprobdiff}, we have:
+	\begin{gather}
+		\sigma_c(\bm{s}) = \frac{1}{\sum_i e^{d_i}} = \frac{1}{\sum_i \text{exp}({-\sum^{}\tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)}})}
+	\end{gather}
+	For a target class $c$, cross-entropy loss is defined as:
+	\begin{gather}
+		H(\theta, \mathcal{D}) = -\log \left( \sigma_c(\bm{s}) \right) = -\log \left( \frac{1}{\sum_i \text{exp}({-\sum^{}\tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)}})} \right)
+	\end{gather}
+	We can break down each contrastive map to foreground and background components:
+	\begin{gather}
+		H(\theta, \mathcal{D}) = -\log \left( \frac{1}{\sum_i \text{exp}\left({-\sum^{}h \odot \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)} - \sum (1-h) \odot \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)}}\right)} \right)
+	\end{gather}
+	The current loss formulation motivates improving contrast using either the foreground or the background. We penalize contrast on the background, motivating learning invariance to noise in the form of the background.
+	\begin{gather}
+		H(\theta, \mathcal{D}) = -\log \left( \frac{1}{\sum_i \text{exp}\left({-\sum^{}h \odot \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)} + \sum |(1-h) \odot \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)}}|\right)} \right)
+	\end{gather}
+	This gives us our ablated cross-entropy formulation.
+\end{proof}
 
 In addition to classifying the input image, the model returns a provably accurate attention map used to distinguish between the two classes. This can be obtained by simply computing the absolute values of the contrastive map compared against any two classes, and subsequently performing normalization.
 
@@ -254,7 +282,7 @@ The Oxford-IIIT Pets dataset is an image dataset with a classification objective
 
 \paragraph{Reproducibility.} The source code, dataset, experiments, evals, and model weights can be found at \url{https://dagshub.com/jinensetpal/contrastive-optimization}.
 
-\section{Results}
+\section{Results [OUTDATED, IGNORE FOR NOW]}
 
 \subsection{Binary Classification}
 
@@ -278,7 +306,6 @@ Our approach's performance on the Oxford-IIIT Pets Dataset to the default is as 
 
 This dataset contains a class imbalance (4978 dogs to 2371 cats), however no training modification was made to correct the class imbalance.
 
-\vspace{-2em}
 \begin{figure}[H]
 	\centering
 	\includegraphics[width=.4\textwidth]{img/accuracy.png}

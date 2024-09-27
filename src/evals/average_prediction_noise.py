@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-
 from ..data.oxford_iiit_pet import Dataset
 from torch.utils.data import DataLoader
 from ..model.arch import Model

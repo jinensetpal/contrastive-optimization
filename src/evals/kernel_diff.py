@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-
 import matplotlib.pyplot as plt
 from ..model.arch import Model
 from src import const
