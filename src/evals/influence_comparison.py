@@ -57,4 +57,4 @@ if __name__ == '__main__':
     model.name = name
     model.eval()
 
-    evaluate_influence(model, DataLoader(Dataset('train'), batch_size=10, shuffle=False), misclassified_only=len(sys.argv) == 3)
+    evaluate_influence(model, DataLoader(Dataset('valid'), batch_size=10, shuffle=False), misclassified_only=len(sys.argv) == 3)

@@ -2,7 +2,7 @@
 
 from src.data.oxford_iiit_pet import Dataset
 import matplotlib.animation as animation
-from .loss import PieceWiseLoss
+from .loss import ContrastiveLoss
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 from .arch import Model
@@ -15,7 +15,7 @@ if __name__ == '__main__':
     data = Dataset('train')
     model = Model(const.IMAGE_SHAPE)
     optim = torch.optim.Adam(model.parameters(), lr=1E-3)
-    criterion = torch.nn.CrossEntropyLoss()
+    criterion = ContrastiveLoss(model.get_contrastive_cams)
 
     idx = random.randint(0, len(data) - 1)
     print(idx)
@@ -31,12 +31,7 @@ if __name__ == '__main__':
         y_pred = model(X)
         cc = model.get_contrastive_cams(y[1], y_pred[1])
 
-        if model.is_contrastive:
-            bg_masks = 1 - y[0].repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
-            out = (-cc * (1 - bg_masks) + cc.abs() * bg_masks).sum(dim=[2, 3])
-        else: out = y_pred[0]
-
-        loss = criterion(out, y[1])
+        loss = criterion(y_pred, y)
         loss.backward()
 
         frames.append([plt.imshow(F.interpolate(y[0][None], const.IMAGE_SIZE, mode='bilinear')[0][0].cpu(), cmap='jet', alpha=0.5, animated=True),

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from ..data.oxford_iiit_pet import get_generators
-from .loss import PieceWiseLoss
+from .loss import ContrastiveLoss
 import torch.nn.functional as F
 from .arch import Model
 from src import const
@@ -29,26 +29,25 @@ def fit(model, optimizer, scheduler, criterion, train, val,
         interval = max(1, (const.EPOCHS // 10))
         for epoch in range(init_epoch, const.EPOCHS + init_epoch):
             if not (epoch) % interval: print('-' * 10)
-            metrics = {metric: [] for metric in [f'{split}_{report}' for report in ['contrast_loss', 'acc', 'cse_loss'] for split in const.SPLITS[:2]]}
+            metrics = {metric: [] for metric in [f'{split}_{report}' for report in ['contrast_loss', 'acc', 'divergence_loss', 'ablated_ce_loss', 'cse_loss'] for split in const.SPLITS[:2]]}
 
             for split, dataloader in zip(const.SPLITS[:2], (train, val)):
                 for batch_idx, (X, y) in enumerate(dataloader):
                     if not (batch_idx+1) % const.GRAD_ACCUMULATION_STEPS: optimizer.zero_grad()
 
                     y_pred = model(X)
-                    if model.is_contrastive:
-                        cc = model.get_contrastive_cams(y[1], y_pred[1])
-                        fg_masks = y[0].repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
-                        out = (-cc * fg_masks + cc.abs() * (1 - fg_masks)).sum(dim=[2, 3])
-                    else: out = y_pred[0]
-                    batch_loss = criterion(out, y[1])
+                    batch_loss = criterion(y_pred, y) if criterion._get_name() != 'CrossEntropyLoss' else criterion(y_pred[0], y[1])
 
                     metrics[f'{split}_acc'].extend(y[1].argmax(1).eq(y_pred[0].argmax(1)).unsqueeze(1).tolist())
                     metrics[f'{split}_contrast_loss'].append(batch_loss.item())
-                    metrics[f'{split}_cse_loss'].append(criterion(y_pred[0], y[1]).item())
+                    metrics[f'{split}_cse_loss'].append(F.cross_entropy(y_pred[0], y[1]).item())
 
                     del y_pred, X, y
                     torch.cuda.empty_cache()
+
+                    if criterion._get_name() != 'CrossEntropyLoss':
+                        metrics[f'{split}_ablated_ce_loss'].append(criterion.prev[0])
+                        metrics[f'{split}_divergence_loss'].append(criterion.prev[1])
 
                     if split == 'train':
                         batch_loss.backward()
@@ -96,7 +95,7 @@ if __name__ == '__main__':
                                 momentum=const.MOMENTUM,
                                 weight_decay=const.WEIGHT_DECAY)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
-    criterion = torch.nn.CrossEntropyLoss()
+    criterion = ContrastiveLoss(model.get_contrastive_cams) if 'default' not in const.MODEL_NAME else torch.nn.CrossEntropyLoss()
 
     checkpoint_args = {'init_epoch': 1,
                        'mlflow_run_id': None}

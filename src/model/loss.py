@@ -10,33 +10,22 @@ class ContrastiveLoss(nn.Module):
     def __init__(self, get_contrastive_cam_fn, debug=False):
         super().__init__()
         self.get_contrastive_cam = get_contrastive_cam_fn
-        self.debug = debug
-
-    def kld(self, cc, fg_mask, reverse=False):
-        fg_mask[fg_mask > .5] = 1
-
-        cc_log_probs = F.sigmoid(cc)
-        fg_mask_probs = F.softmax((fg_mask * const.LAMBDAS[1]).flatten(start_dim=1), dim=1).reshape(cc.shape[0], *cc.shape[-2:]).repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
-        fg_mask[fg_mask <= .5] = .5
-        fg_mask_log_probs = fg_mask.log()
-        # fg_mask_log_probs[fg_mask > .5] = 0
-
-        # fg_mask_probs[fg_mask == 1] = .8 / (fg_mask == 1).sum()
-        # fg_mask_probs[fg_mask != 1] = .2 / (fg_mask != 1).sum()
-
-        return fg_mask_probs * (fg_mask_log_probs - cc_log_probs)
 
     def forward(self, y_pred, y):
         cc = self.get_contrastive_cam(y[1], y_pred[1])
         fg_mask = y[0].repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
+        ablation = (-cc * fg_mask + cc.abs() * (1 - fg_mask)).sum(dim=[2, 3])
 
-        kld = self.kld(cc.abs(), fg_mask.clone())
-        kld_prime = self.kld((-cc).abs(), -fg_mask.clone() + 1, reverse=True)
-        foreground = cc[fg_mask != 0].mean()
+        cc_log_probs = F.softmax((cc * const.LAMBDAS[0]).flatten(start_dim=2), dim=2).reshape(*cc.shape).log()
+        fg_mask_probs = F.softmax(((y[0]) * const.LAMBDAS[1]).flatten(start_dim=1), dim=1).reshape(cc.shape[0], *cc.shape[-2:]).repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
+        fg_mask_log_probs = fg_mask_probs.log()
+        fg_mask_log_probs[fg_mask != 0] = 0
 
-        self.prev = ((kld.sum() / cc.size(0)).item(), (kld_prime.sum() / cc.size(0)).item(), foreground.item())
-        if self.debug: return const.LAMBDAS[2] * kld.sum() / cc.size(0) + const.LAMBDAS[3] * kld_prime.sum() / cc.size(0) - const.LAMBDAS[4] * foreground, kld, kld_prime
-        return const.LAMBDAS[2] * kld.sum() / cc.size(0) + const.LAMBDAS[3] * kld_prime.sum() / cc.size(0)
+        kld = fg_mask_probs * (fg_mask_log_probs - cc_log_probs)
+        ce = F.cross_entropy(ablation, y[1])
+
+        self.prev = (ce.item(), (kld.sum() / cc.size(0)).item())
+        return const.LAMBDAS[2] * ce + const.LAMBDAS[3] * kld.sum() / cc.size(0)
 
 
 class DoubleKLDLoss(nn.Module):
@@ -45,7 +34,7 @@ class DoubleKLDLoss(nn.Module):
         self.get_contrastive_cam = get_contrastive_cam_fn
         self.debug = debug
 
-    def kld(self, cc, fg_mask, reverse=False):
+    def kld(self, cc, fg_mask):
         fg_mask[fg_mask > .5] = 1
 
         cc_log_probs = F.sigmoid(cc)
@@ -60,7 +49,7 @@ class DoubleKLDLoss(nn.Module):
         fg_mask = y[0].repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
 
         kld = self.kld(cc.abs(), fg_mask.clone())
-        kld_prime = self.kld((-cc).abs(), -fg_mask + 1, reverse=True)
+        kld_prime = self.kld((-cc).abs(), -fg_mask + 1)
 
         self.prev = ((kld.sum() / cc.size(0)).item(), (kld_prime.sum() / cc.size(0)).item())
         if self.debug: return const.LAMBDAS[2] * kld.sum() / cc.size(0) + const.LAMBDAS[3] * kld_prime.sum() / cc.size(0), kld, kld_prime
