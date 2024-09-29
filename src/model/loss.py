@@ -21,7 +21,7 @@ class ContrastiveLoss(nn.Module):
         fg_mask_log_probs = fg_mask_probs.log()
         fg_mask_log_probs[fg_mask != 0] = 0
 
-        kld = fg_mask_probs * (fg_mask_log_probs - cc_log_probs)
+        kld = fg_mask_probs * (fg_mask_log_probs - cc_log_probs) * fg_mask
         ce = F.cross_entropy(ablation, y[1])
 
         self.prev = (ce.item(), (kld.sum() / cc.size(0)).item())
