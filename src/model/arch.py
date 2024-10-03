@@ -6,14 +6,26 @@ import torchvision
 import torch
 
 
-class Model(torch.nn.Module):
-    def __init__(self, input_shape, is_contrastive=True):
+class Model(nn.Module):
+    def __init__(self, input_shape, is_contrastive=True, no_downsampling=False):
         super().__init__()
 
         self.is_contrastive = is_contrastive
         self.backbone = torchvision.models.resnet50(weights=None)
-        self.backbone.layer4[0].conv2 = torch.nn.Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1,1), bias=False)
-        self.backbone.layer4[0].downsample[0] = torch.nn.Conv2d(1024, 2048, kernel_size=(1, 1), stride=(1, 1), bias=False)
+
+        if no_downsampling:
+            self.backbone.conv1 = nn.Conv2d(3, 64, kernel_size=(7, 7), stride=(1, 1), padding=(3, 3), bias=False)
+            self.backbone.maxpool = nn.MaxPool2d(kernel_size=3, stride=1, padding=1, dilation=1, ceil_mode=False)
+
+            self.backbone.layer2[0].conv2 = nn.Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1,1), bias=False)
+            self.backbone.layer2[0].downsample[0] = nn.Conv2d(256, 512, kernel_size=(1, 1), stride=(1, 1), bias=False)
+
+            self.backbone.layer3[0].conv2 = nn.Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1,1), bias=False)
+            self.backbone.layer3[0].downsample[0] = nn.Conv2d(512, 1024, kernel_size=(1, 1), stride=(1, 1), bias=False)
+
+        # one ablated downsampling is required for (224, 224) input
+        self.backbone.layer4[0].conv2 = nn.Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1,1), bias=False)
+        self.backbone.layer4[0].downsample[0] = nn.Conv2d(1024, 2048, kernel_size=(1, 1), stride=(1, 1), bias=False)
 
         if is_contrastive:
             self.backbone.layer4[-1].bn3 = nn.Identity()
