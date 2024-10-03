@@ -37,12 +37,15 @@ def evaluate_influence(model, gen, misclassified_only=False):
 
             heatmap_i = torchvision.transforms.functional.resize(heatmap_i, (14, 14), antialias=False).squeeze(0)
             norm = Normalize(vmin=heatmap_i.min(), vmax=heatmap_i.max())
-            fig.add_subplot(2, 2, 3)
-            plt.imshow((cc_i[y_i] * heatmap_i).cpu(), norm=norm)
-            fig.add_subplot(2, 2, 4)
-            plt.imshow((cc_i[y_i] * (1 - heatmap_i)).cpu(), norm=norm)
+            foreground = cc_i[y_i] * heatmap_i
+            background = cc_i[y_i] * (1 - heatmap_i)
 
-            fig.suptitle(f'Net Influence: {cc_i.sum()}\nForeground Influence: {cc_i[0][heatmap_i == 1].sum()}\nBackground Influence: {cc_i[0][heatmap_i != 1].sum()}')
+            fig.add_subplot(2, 2, 3)
+            plt.imshow(foreground.cpu(), norm=norm)
+            fig.add_subplot(2, 2, 4)
+            plt.imshow(background.cpu(), norm=norm)
+
+            fig.suptitle(f'Net Influence: {cc_i.sum()}\nForeground Influence: {foreground.sum()}\nBackground Influence: {background.sum()}')
             plt.tight_layout()
             fig.savefig(const.DATA_DIR / 'evals' / 'influence_plots' / gen.dataset.split / model.name / f'{batch_idx * gen.batch_size + idx}.png')
             plt.close()
@@ -57,4 +60,4 @@ if __name__ == '__main__':
     model.name = name
     model.eval()
 
-    evaluate_influence(model, DataLoader(Dataset('valid'), batch_size=10, shuffle=False), misclassified_only=len(sys.argv) == 3)
+    evaluate_influence(model, DataLoader(Dataset(sys.argv[2]), batch_size=10, shuffle=False), misclassified_only=len(sys.argv) == 4)

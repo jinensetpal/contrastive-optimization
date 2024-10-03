@@ -12,7 +12,7 @@ class Model(torch.nn.Module):
 
         self.is_contrastive = is_contrastive
         self.backbone = torchvision.models.resnet50(weights=None)
-        self.backbone.layer4[0].conv2 = torch.nn.Conv2d(512, 512, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        self.backbone.layer4[0].conv2 = torch.nn.Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1,1), bias=False)
         self.backbone.layer4[0].downsample[0] = torch.nn.Conv2d(1024, 2048, kernel_size=(1, 1), stride=(1, 1), bias=False)
 
         if is_contrastive:
