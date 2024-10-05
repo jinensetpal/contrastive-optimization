@@ -26,8 +26,9 @@ def evaluate_influence(model, gen, misclassified_only=False):
             X = X[mask]
             cc = cc[mask]
             heatmap = heatmap[mask]
+            y_pred = [y_pred_i[mask] for y_pred_i in y_pred]
 
-        for idx, (X_i, cc_i, heatmap_i, y_i) in enumerate(zip(X, cc, heatmap, y[1].argmin(1))):
+        for idx, (X_i, cc_i, heatmap_i, y_pred_i) in enumerate(zip(X, cc, heatmap, y_pred[0].argmax(1))):
             fig = plt.figure()
 
             fig.add_subplot(2, 2, 1)
@@ -36,9 +37,9 @@ def evaluate_influence(model, gen, misclassified_only=False):
             plt.imshow((X_i * heatmap_i).cpu().permute(1, 2, 0))
 
             heatmap_i = torchvision.transforms.functional.resize(heatmap_i, (14, 14), antialias=False).squeeze(0)
-            norm = Normalize(vmin=heatmap_i.min(), vmax=heatmap_i.max())
-            foreground = cc_i[y_i] * heatmap_i
-            background = cc_i[y_i] * (1 - heatmap_i)
+            norm = Normalize(vmin=cc_i.min(), vmax=cc_i.max())
+            foreground = cc_i[y_pred_i] * heatmap_i
+            background = cc_i[y_pred_i] * (1 - heatmap_i)
 
             fig.add_subplot(2, 2, 3)
             plt.imshow(foreground.cpu(), norm=norm)
