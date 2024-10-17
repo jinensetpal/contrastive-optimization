@@ -16,9 +16,10 @@ def visualize(model, gen, norm=None):
                      facecolor='white')
 
     for idx, sample in enumerate(random.sample(range(len(gen)), 16)):
+        print(sample)
         X, (heatmap, y) = gen[sample]
         y_pred, cam = model(X.unsqueeze(0))
-        cam = model.get_contrastive_cams(y.unsqueeze(0), cam).detach()[0, y.argmin(0)]
+        cam = model.get_contrastive_cams(y.unsqueeze(0), cam).detach()[0, y.argmin(0)].abs()
         fig.add_subplot(4, 4, idx + 1)
         plt.xlabel(f'Pred: {str(y_pred[0].argmax().item())}, Actual: {str(y.argmax().item())}')
         plt.imshow(X.permute(1, 2, 0).cpu().detach(), alpha=0.5)
@@ -38,5 +39,5 @@ if __name__ == '__main__':
     model.name = name
     model.eval()
 
-    if len(sys.argv) == 3 and sys.argv[2] == 'normed': visualize(model, Dataset('test'), Normalize(vmin=-.5, vmax=.5))
-    else: visualize(model, Dataset('test'))
+    if len(sys.argv) == 3 and sys.argv[2] == 'normed': visualize(model, Dataset('train'), Normalize(vmin=-.5, vmax=.5))
+    else: visualize(model, Dataset('train'))

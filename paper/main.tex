@@ -1,6 +1,7 @@
 \documentclass{article}
 
 
+
 % if you need to pass options to natbib, use, e.g.:
 %     \PassOptionsToPackage{numbers, compress}{natbib}
 % before loading neurips_2024
@@ -238,7 +239,8 @@ $\lambda_2$ \& $\lambda_3$ are hyperparameters that scale the activation maps, s
 
 A more mathematically rigorous approach involves performing an ablation over class logits to penalize background influence.
 
-\begin{theorem} We can integrate background invariance to the definition of cross-entropy using the following formulation:
+\begin{theorem}\label{ablatedce}
+	We can integrate background invariance to the definition of cross-entropy using the following formulation:
 	\begin{gather}
 		\mathcal{J}(\theta, \mathcal{D}) = -\log \left( \frac{1}{\sum_i \text{exp}\left({-\sum^{}h \odot \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)} + \sum |(1-h) \odot \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)}}|\right)} \right)
 	\end{gather}
@@ -282,11 +284,25 @@ The Oxford-IIIT Pets dataset is an image dataset with a classification objective
 
 \paragraph{Reproducibility.} The source code, dataset, experiments, evals, and model weights can be found at \url{https://dagshub.com/jinensetpal/contrastive-optimization}.
 
-\section{Results [OUTDATED, IGNORE FOR NOW]}
+\section{Results}
 
-\subsection{Binary Classification}
+\subsection{Training Invariance to Spurious Correlation}
 
-For binary classification, the model was trained for $150$ epochs with the Adam optimizer with a learning rate of $10^{-3}$, a batch size of $44$ on a 32GB V100 on a randomly shuffled dataset using the original data splits. The total time for training was $\approx$1hr.
+One significant concern uncovered both theoretically from \ref{ablatedce} and empirically from \ref{contr-cam} was that the standard classification pipeline motivates learning spurious correlations between the model, provided the spurious information is able to improve accuracy. This motivates learning distribution-specific correlations, which worsens it's ability to generalize. As an example
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=.3\textwidth]{img/default_cam.png}
+	\hspace{1em}
+	\includegraphics[width=.3\textwidth]{img/contrastive_cam.png}
+	\hspace{1em}
+	\includegraphics[width=.3\textwidth]{img/contrastive_ace_cam.png}
+	\caption{Left: contrastive activation maps from the default training run. Middle: contrastive activations maps from the Abalted CE+KLD training run. Right: contrastive activation maps from the Abalted CE training run.}
+\end{figure}
+
+\subsection{Benchmark: Binary Classification}
+
+For binary classification, the model was trained for $100$ epochs with the Adam optimizer with a learning rate of $10^{-3}$, a batch size of $80$ on a 32GB V100 on a randomly shuffled dataset using the original data splits. The total time for training was $\approx$4hr.
 
 An encouraging result from this experiment is that the model trained on the contrastive objective outperforms the exact same model architecture (with the final bias, batchnorm and ReLU re-added in) on cross entropy loss, even though the control case was trained explicitly to reduce cross entropy.
 
@@ -296,10 +312,11 @@ Our approach's performance on the Oxford-IIIT Pets Dataset to the default is as 
 	\centering
 	\begin{tabular}{c|ccc}
 		\toprule
-		\textbf{Method}  & \textbf{Cross Entropy Loss}  & \textbf{Training Accuracy}   & \textbf{Validation Accuracy} \\
+		\textbf{Method}  & \textbf{Training CE Loss}  & \textbf{Training Accuracy}   & \textbf{Validation Accuracy} \\
 		\midrule
-		Cross-Entropy & 0.646 & 66.1\% & 64.5\% \\
-		Interpretable (Ours) & \bf 0.326 & \bf 98.6\% & \bf 92.3\% \\
+		Cross-Entropy & 0.361 & 95.0\% & 82.8\% \\
+		Ablated CE (Ours) & 0.333 & 98.4\% & 88.2\% \\
+		Ablated CE + KLD (Ours) & \bf 0.322 & \bf 99.2\% & \bf 91.5\% \\
 		\bottomrule
 	\end{tabular}
 \end{table}
@@ -311,20 +328,22 @@ This dataset contains a class imbalance (4978 dogs to 2371 cats), however no tra
 	\includegraphics[width=.4\textwidth]{img/accuracy.png}
 	\hspace{4em}
 	\includegraphics[width=.4\textwidth]{img/loss.png}
-	\caption{Plots comparing benchmark cross-entropy loss, training and validation accuracy. The web version of this comparison can be found \href{https://dagshub.com/jinensetpal/contrastive-optimization/experiments\#/compare?experiments=[\%22m_f4f7dea52fa74739be788e5f47da1195\%22,\%22m_1301bf1ba9bf4db48e09e7497c8cd214\%22]}{here}. The blue line represents cross-entropy loss, while the orange line represents the contrastive approach.}
+	\caption{Plots comparing benchmark cross-entropy loss, training and validation accuracy. The web version of this comparison can be found \href{https://dagshub.com/jinensetpal/contrastive-optimization/experiments\#/compare?experiments=[\%22m_cea5cf4fcbbb4c3f984b2396927cf80c\%22,\%22m_101287828f604122a092a2501ec3facb\%22]}{here}. The orange line represents cross-entropy loss, while the blue line represents the contrastive approach.}
 \end{figure}
 
 Crucially, on comparing contrastive activation maps, we can see that each of the cases of the random sample, the model uses the target region for prediction and not spurious features. In the case of the standard training procedure, this is not the case, and the model does not focus on the target in making it's prediction.
 
 \begin{figure}[H]
 	\centering
-	\includegraphics[width=.4\textwidth]{img/default_cam.png}
-	\hspace{3em}
-	\includegraphics[width=.4\textwidth]{img/contrastive_cam.png}
-	\caption{Left: contrastive activation maps from the default training run. Right: contrastive activation maps from the contrastive training run.}
+	\includegraphics[width=.3\textwidth]{img/default_cam.png}
+	\hspace{1em}
+	\includegraphics[width=.3\textwidth]{img/contrastive_cam.png}
+	\hspace{1em}
+	\includegraphics[width=.3\textwidth]{img/contrastive_ace_cam.png}
+	\caption{Left: contrastive activation maps from the default training run. Middle: contrastive activations maps from the Abalted CE+KLD training run. Right: contrastive activation maps from the Abalted CE training run.}
 \end{figure}
 
-\subsection{Multiclass Classification}
+\subsection{Benchmark: Multiclass Classification}
 
 For multiclass classification, the objective is to distinguish between the features of species within the cat and dog families. There are a total of 37 classes, with a success of rate of $\approx 2.7\%$ with random guessing. There is virtually no class imbalance in this case.
 
@@ -336,17 +355,18 @@ Our approach's performance on the Oxford-IIIT Pets Dataset to the default is as 
 		\toprule
 		\textbf{Method}  & \textbf{Cross Entropy Loss}  & \textbf{Training Accuracy}   & \textbf{Validation Accuracy} \\
 		\midrule
-		Cross-Entropy & 3.627 & 2.8\% & 3.1\% \\
-		Interpretable (Ours) & \bf 2.743 & \bf 93.0\% & \bf 51.5\% \\
+		Cross-Entropy & 3.605 & 3.7\% & 5.2\% \\
+		Abltated CE (Ours) & 3.610 & 3.1\% & 4.9\% \\
+		Abltated CE + KLD (Ours) & \bf 2.743 & \bf 93.0\% & \bf 51.5\% \\
 		\bottomrule
 	\end{tabular}
 \end{table}
 
 We can observe that the default model is unable to learn any valuable information, the contrastive model is able to learn a significant portion of the information, although with a substantial generalization gap.
 
-The model was trained for 731 epochs with the Adam optimizer with a learning rate of $10^{-3}$ with a batch size of 12, with 5 gradient accumulation steps (effective batch size of 60) on a 32GB V100 on a randomly shuffled dataset using the original splits. The default model was only trained for 30 epochs, by which point it had already converged. For posterity, we will run the default setup for 731 epochs as well before publication.
+The contrastive model was trained for 227 epochs with the Adam optimizer with a learning rate of $10^{-3}$ with a batch size of 20, with 4 gradient accumulation steps (effective batch size of 80) on a 32GB V100 on a randomly shuffled dataset using the original splits. The default model was only trained for 33 epochs, while the ablated cross-entropy loss was only trained for 98 epochs by which point both had converged. For posterity, we will run each setup for 227 epochs as well before publication.
 
-\subsection{Out-of-Distribution Generalization}
+\subsection{Benchmark: Out-of-Distribution Generalization}
 
 To test how well the approach generalizes out of the training distribution, we evaluate the performance of the binary classification contrastive model on random samples ($n=1000$) from the \href{https://www.microsoft.com/en-us/download/details.aspx?id=54765}{Kaggle Cats and Dogs Dataset}:
 \begin{table}[h]
@@ -355,8 +375,9 @@ To test how well the approach generalizes out of the training distribution, we e
 		\toprule
 		\textbf{Method} & \textbf{Accuracy} \\
 		\midrule
-		Cross-Entropy & 49.5\% \\
-		Interpretable (Ours) & \bf 78.5\% \\
+		Cross-Entropy & 77.0\% \\
+		Abltated CE (Ours) & 75.7\% \\
+		Abltated CE + KLD (Ours) & \bf 83.4\% \\
 		\bottomrule
 	\end{tabular}
 \end{table}
