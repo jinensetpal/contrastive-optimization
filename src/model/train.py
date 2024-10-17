@@ -14,7 +14,7 @@ import sys
 
 
 def fit(model, optimizer, scheduler, criterion, train, val,
-        selected=None, init_epoch=1, mlflow_run_id=None):
+        selected=None, init_epoch=0, mlflow_run_id=None):
     model.train()
     start_time = time.time()
     selected = selected or {'last': model.state_dict(),
@@ -49,9 +49,9 @@ def fit(model, optimizer, scheduler, criterion, train, val,
                         metrics[f'{split}_ablated_ce_loss'].append(criterion.prev[0])
                         metrics[f'{split}_divergence_loss'].append(criterion.prev[1])
 
-                    if split == 'train':
+                    if split == 'train' and epoch > 0:  # epoch 0 is for evaluating performance on initalization
                         batch_loss.backward()
-                        mlflow.log_metric(f'{split}_batchwise_loss', batch_loss.item(), step=(epoch-1) * len(dataloader) + batch_idx)
+                        mlflow.log_metric(f'{split}_batchwise_loss', batch_loss.item(), step=epoch * len(dataloader) + batch_idx)
 
                         if not (batch_idx+1) % const.GRAD_ACCUMULATION_STEPS: optimizer.step()
             scheduler.step()
@@ -71,6 +71,11 @@ def fit(model, optimizer, scheduler, criterion, train, val,
             if const.TRAIN_CUTOFF is not None and time.time() - start_time >= const.TRAIN_CUTOFF: break
 
         selected['last'] = model.state_dict()
+        if const.SELECT_BEST and 'best' not in selected:
+            selected['best'] = model.state_dict()
+            selected['epoch'] = epoch
+            selected['acc'] = metrics['valid_acc']
+
         if const.SELECT_BEST:
             mlflow.log_metrics({'selected_epoch': selected['epoch'],
                                 'selected_valid_acc': selected['acc']}, step=epoch)
@@ -87,7 +92,7 @@ if __name__ == '__main__':
     const.MODEL_NAME = sys.argv[1]
     if const.LOG_REMOTE: mlflow.set_tracking_uri(const.MLFLOW_TRACKING_URI)
 
-    model = Model(const.IMAGE_SHAPE, is_contrastive=const.MODEL_NAME != 'default')
+    model = Model(const.IMAGE_SHAPE, is_contrastive='default' not in const.MODEL_NAME, pretrained='pretrained' in const.MODEL_NAME)
 
     train, val, test = get_generators()
     optimizer = torch.optim.SGD(model.parameters(),
@@ -97,7 +102,7 @@ if __name__ == '__main__':
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
     criterion = ContrastiveLoss(model.get_contrastive_cams) if 'default' not in const.MODEL_NAME else torch.nn.CrossEntropyLoss()
 
-    checkpoint_args = {'init_epoch': 1,
+    checkpoint_args = {'init_epoch': 0,
                        'mlflow_run_id': None}
     selected = None
     if const.CHECKPOINTING and len(sys.argv) == 2:  # add extra sys.argv to signify first checkpointing run
