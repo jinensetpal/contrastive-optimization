@@ -189,13 +189,13 @@ This is equivalent to the original ERM optimization objective, with the differen
 
 For the multiclass case, our setup now considers a set of classes $c$; $c_t$ is our target class, and $c_{t'}$ consists of a sampled non-target class. The definition for multiclass contrastive activation maps now results in a set of activation maps, defined as follows:
 \begin{gather}
-	\tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c_t, c_{t'})} := \{\tilde{\mathcal{\bm{A}}}_{c_t}^{\text{HiResCAM}} - \tilde{\mathcal{\bm{A}}}_{c_{t'}}^{\text{HiResCAM}}\}^{|c|-1}_{c_{t'} \in c - c_t}
+	\tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c_t, c_{t'})} := \{\tilde{\mathcal{\bm{A}}}_{c_t}^{\text{HiResCAM}} - \tilde{\mathcal{\bm{A}}}_{c_{t'}}^{\text{HiResCAM}}\}^{|C|-1}_{c_{t'} \in c - c_t}
 \end{gather}
 This is a generalization of the binary case, as the same formula applied to a binary classification challenge returns a set of contrastive maps containing a single element.
 
 To ensure that the model accurately predicts the target class, each contrastive comparison should yield a positive result. Therefore, the multiclass optimization objective under this paradigm is as follows:
 \begin{gather}
-	\max_{\theta} \sum^{D_1,D_2}_{j,k}\tilde{\mathcal{\bm{A}}}_{(c, c'),j,k}^{\text{contrastive}}\ \forall c' \in \mathbb{Z}_{+}(|c| - 1)
+	\max_{\theta} \sum^{D_1,D_2}_{j,k}\tilde{\mathcal{\bm{A}}}_{(c, c'),j,k}^{\text{contrastive}}\ \forall c' \in \mathbb{Z}_{+}(|C| - 1)
 \end{gather}
 
 \subsection{Constraining Optimization to an Interpretable Basis}
@@ -204,30 +204,22 @@ As discussed in the previous section, the distinctive feature of the contrastive
 
 We can use this to constrain the way optimization occurs -- namely, we only want the model to increase the likelihood of an object belonging to a certain class by actually looking at the features of the class, and not features of spurious correlation like the environment in which the object is present. The model through the process of training should learn to distinguish and subsequently ignore the background in determining the final prediction.
 
-\subsubsection{Divergence Formulation}
-Segmentations maps describe the region over which the object is present. We can leverage this information to define a constrastive cost function as follows:
+\subsubsection{Divergence Minimization}
+Segmentation maps describe the region over which the classification target is present. We can leverage this information to define a constrastive cost function as follows:
 \begin{gather}
 	\{(x, (h, y))\}^N \in \mathcal{D} \text{ where } h_{i,j} := \begin{cases}
 		1 & \text{pixel contains subject} \\
 		0 & \text{otherwise}
 	\end{cases} \\
-	\mathcal{\bm{A}}^{\text{background}}_{c,i,j} := \begin{cases}
-		\tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{c,i,j} & h_{i,j} = 0 \\
-		0 & \text{otherwise}
-	\end{cases} \\
-	\mathcal{\bm{A}}^{\text{foreground}}_{c,i,j} := \begin{cases}
-		0 & h_{i,j} = 0 \\
-		\tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{c,i,j} & \text{otherwise}
-	\end{cases} \\
-	D_{KL}(P || Q) := \frac{1}{|c|-1}\sum^{|c|-1}_c P \cdot \log \frac{P'}{Q_c} \text{ where } 
+	D_{KL}(P || Q) := \sum_{i,j} P \cdot \log \frac{P'}{Q} \text{ where } 
 	P'_{i,j} := \begin{cases}
 		1 & h_{i,j} \neq 0 \\
 		P_{i,j} & \text{otherwise}
 	\end{cases} \label{d_kl} \\
 	\begin{split}
-		\mathcal{\bm{J}}(\theta, \mathcal{D}) := &\ \underbrace{\lambda_1 D_{KL}(\sigma_{\text{softmax}}(\lambda_3 h)\ ||\ \sigma_{\text{softmax}}(\lambda_2 \mathcal{\bm{A}}^{\text{contrastive}}))}_{\text{minimize divergence from target shape}} \\
-		&+ \underbrace{\frac{\lambda_4}{\sum^{D_1,D_2}_{i,j}\mathbbm{1}(h_{i,j} = 0)} ||\mathcal{\bm{A}}^{\text{background}}||^2_F}_{\text{minimize background influence}} \\
-		&- \underbrace{\frac{\lambda_5}{\sum^{D_1,D_2}_{i,j}\mathbbm{1}(h_{i,j} = 1)} \sum^{|c|-1,D_1,D_2}_{c,i,j} \mathcal{\bm{A}}^{\text{foreground}}_{c,i,j}}_{\text{maximize foreground influence}}
+		\mathcal{\bm{J}}(\theta, \mathcal{D}) := &\ \frac{1}{|C|} \sum^{|C|}_{i} \underbrace{\lambda_1 D_{KL}(\sigma_{\text{softmax}}(\lambda_3 h)\ ||\ \sigma_{\text{softmax}}(\lambda_2 \tilde{\mathcal{\bm{A}}}^{\textit{contrastive}}_{(c, i)}))}_{\text{minimize divergence from target shape}} \\
+		&+ \underbrace{\frac{\lambda_4}{(|C| - 1) \left(D_1 D_2 - \sum^{D_1,D_2}_{i,j}h_{i,j}\right)} || (1 - h) \odot \tilde{\mathcal{\bm{A}}}^{\textit{contrastive}}_{(c, i)}||^2_F}_{\text{minimize background influence}} \\
+		&- \underbrace{\frac{\lambda_5}{(|C| - 1) \sum^{D_1,D_2}_{i,j}h_{i,j}} \sum^{|C|-1,D_1,D_2}_{i,j,k} \left(\tilde{\mathcal{\bm{A}}}^{\textit{contrastive}}_{(c,i)} \odot h\right)_{j,k} }_{\text{maximize foreground influence}}
 	\end{split}
 \end{gather}
 
@@ -251,7 +243,7 @@ A more mathematically rigorous approach involves performing an ablation over cla
 		&= \left[\sum^{D_1,D_2}_{i,j,k} \tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}} - \sum^{D_1,D_2}_{c,j,k} \tilde{\mathcal{\bm{A}}}_{c,j,k}^{\text{HiResCAM}}\right] \\
 		&= \left[ -\sum^{}\tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)} \right]_i
 	\end{align}
-	Using our result from \ref{classprobdiff}, we have:
+	As an aside: we note that when $i = c$, the contrastive map is the zero matrix $\in \mathbb{R}^{D_1 \times D_2}$, and instead of $|C| - 1$ contrastive maps we now obtain $|C|$ contrastive maps. Using our result from \ref{classprobdiff}, we have:
 	\begin{gather}
 		\sigma_c(\bm{s}) = \frac{1}{\sum_i e^{d_i}} = \frac{1}{\sum_i \text{exp}({-\sum^{}\tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)}})}
 	\end{gather}
@@ -297,7 +289,7 @@ One significant concern uncovered both theoretically from \ref{ablatedce} and em
 	\includegraphics[width=.3\textwidth]{img/contrastive_cam.png}
 	\hspace{1em}
 	\includegraphics[width=.3\textwidth]{img/contrastive_ace_cam.png}
-	\caption{Left: contrastive activation maps from the default training run. Middle: contrastive activations maps from the Abalted CE+KLD training run. Right: contrastive activation maps from the Abalted CE training run.}
+	\caption{Left: contrastive activation maps from the default training run. Middle: contrastive activations maps from the Ablated CE+KLD training run. Right: contrastive activation maps from the Ablated CE training run.}
 \end{figure}
 
 \subsection{Benchmark: Binary Classification}
@@ -340,7 +332,7 @@ Crucially, on comparing contrastive activation maps, we can see that each of the
 	\includegraphics[width=.3\textwidth]{img/contrastive_cam.png}
 	\hspace{1em}
 	\includegraphics[width=.3\textwidth]{img/contrastive_ace_cam.png}
-	\caption{Left: contrastive activation maps from the default training run. Middle: contrastive activations maps from the Abalted CE+KLD training run. Right: contrastive activation maps from the Abalted CE training run.}
+	\caption{Left: contrastive activation maps from the default training run. Middle: contrastive activations maps from the Ablated CE+KLD training run. Right: contrastive activation maps from the Ablated CE training run.}
 \end{figure}
 
 \subsection{Benchmark: Multiclass Classification}
@@ -356,8 +348,8 @@ Our approach's performance on the Oxford-IIIT Pets Dataset to the default is as 
 		\textbf{Method}  & \textbf{Cross Entropy Loss}  & \textbf{Training Accuracy}   & \textbf{Validation Accuracy} \\
 		\midrule
 		Cross-Entropy & 3.605 & 3.7\% & 5.2\% \\
-		Abltated CE (Ours) & 3.610 & 3.1\% & 4.9\% \\
-		Abltated CE + KLD (Ours) & \bf 2.743 & \bf 93.0\% & \bf 51.5\% \\
+		Ablated CE (Ours) & 3.610 & 3.1\% & 4.9\% \\
+		Ablated CE + KLD (Ours) & \bf 2.743 & \bf 93.0\% & \bf 51.5\% \\
 		\bottomrule
 	\end{tabular}
 \end{table}
@@ -376,8 +368,8 @@ To test how well the approach generalizes out of the training distribution, we e
 		\textbf{Method} & \textbf{Accuracy} \\
 		\midrule
 		Cross-Entropy & 77.0\% \\
-		Abltated CE (Ours) & 75.7\% \\
-		Abltated CE + KLD (Ours) & \bf 83.4\% \\
+		Ablated CE (Ours) & 75.7\% \\
+		Ablated CE + KLD (Ours) & \bf 83.4\% \\
 		\bottomrule
 	\end{tabular}
 \end{table}
