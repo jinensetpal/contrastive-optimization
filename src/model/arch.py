@@ -7,11 +7,11 @@ import torch
 
 
 class Model(nn.Module):
-    def __init__(self, input_shape, is_contrastive=True, no_downsampling=False, pretrained=False):
+    def __init__(self, input_shape, is_contrastive=True, no_downsampling=False):
         super().__init__()
 
         self.is_contrastive = is_contrastive
-        self.backbone = torchvision.models.resnet50(weights=torchvision.models.ResNet50_Weights.IMAGENET1K_V2 if pretrained else None)
+        self.backbone = torchvision.models.resnet50(weights=torchvision.models.ResNet50_Weights.IMAGENET1K_V2 if const.PRETRAINED_BACKBONE else None)
 
         if no_downsampling:
             self.backbone.conv1.stride = (1, 1)

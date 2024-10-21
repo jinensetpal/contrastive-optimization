@@ -27,7 +27,7 @@ def fit(model, optimizer, scheduler, criterion, train, val,
         mlflow.log_param('optimizer_fn', 'SGD')
 
         interval = max(1, (const.EPOCHS // 10))
-        for epoch in range(init_epoch, const.EPOCHS + init_epoch):
+        for epoch in range(init_epoch, const.EPOCHS + init_epoch + int(init_epoch == 0)):
             if not (epoch) % interval: print('-' * 10)
             metrics = {metric: [] for metric in [f'{split}_{report}' for report in ['contrast_loss', 'acc', 'divergence_loss', 'ablated_ce_loss', 'cse_loss'] for split in const.SPLITS[:2]]}
 
@@ -90,12 +90,15 @@ def fit(model, optimizer, scheduler, criterion, train, val,
 if __name__ == '__main__':
     # Usage: $ python -m path.to.script model_name --nocheckpoint
     const.MODEL_NAME = sys.argv[1]
+    const.PRETRAINED_BACKBONE = 'pretrained' in const.MODEL_NAME
     if const.LOG_REMOTE: mlflow.set_tracking_uri(const.MLFLOW_TRACKING_URI)
 
-    model = Model(const.IMAGE_SHAPE, is_contrastive='default' not in const.MODEL_NAME, pretrained='pretrained' in const.MODEL_NAME)
+    model = Model(const.IMAGE_SHAPE, is_contrastive='default' not in const.MODEL_NAME)
 
     train, val, test = get_generators()
-    optimizer = torch.optim.SGD(model.parameters(),
+    optimizer = torch.optim.SGD([*model.linear.parameters(),
+                                 *model.backbone.layer4[0].conv2.parameters(),
+                                 *model.backbone.layer4[0].downsample[0].parameters()] if const.FINETUNING else model.parameters(),
                                 lr=const.LEARNING_RATE,
                                 momentum=const.MOMENTUM,
                                 weight_decay=const.WEIGHT_DECAY)
