@@ -49,7 +49,8 @@ class Model(nn.Module):
         x = self.backbone(x)
         logits = self.linear(x)
 
-        return self.softmax(logits), self._compute_hi_res_cam(logits)
+        if self.training: return logits, self._compute_hi_res_cam(logits)
+        else: return self.softmax(logits), self._compute_hi_res_cam(logits)
 
     @staticmethod
     def get_contrastive_cams(y, cams):

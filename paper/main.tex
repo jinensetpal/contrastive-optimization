@@ -240,10 +240,11 @@ A more mathematically rigorous approach involves performing an ablation over cla
 \begin{proof} Using the definition of HiResCAMs, ContrastiveCAMs and the elementwise difference setup from \ref{classprobdiff}, we have:
 	\begin{align}
 		d &= [s_i - s_c]_i \\
-		&= \left[\sum^{D_1,D_2}_{i,j,k} \tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}} - \sum^{D_1,D_2}_{c,j,k} \tilde{\mathcal{\bm{A}}}_{c,j,k}^{\text{HiResCAM}}\right] \\
+		&= \left[\sum^{D_1,D_2}_{j,k} \tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}} - \sum^{D_1,D_2}_{j,k} \tilde{\mathcal{\bm{A}}}_{c,j,k}^{\text{HiResCAM}}\right]_i \\
 		&= \left[ -\sum^{}\tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)} \right]_i
 	\end{align}
-	As an aside: we note that when $i = c$, the contrastive map is the zero matrix $\in \mathbb{R}^{D_1 \times D_2}$, and instead of $|C| - 1$ contrastive maps we now obtain $|C|$ contrastive maps. Using our result from \ref{classprobdiff}, we have:
+	As an aside: we note that when $i = c$, the contrastive map is $\bm{0} \in \mathbb{R}^{D_1 \times D_2}$, and instead of $|C| - 1$ contrastive maps we now obtain $|C|$ contrastive maps. \newline \\
+	Using our result from \ref{classprobdiff}, we have:
 	\begin{gather}
 		\sigma_c(\bm{s}) = \frac{1}{\sum_i e^{d_i}} = \frac{1}{\sum_i \text{exp}({-\sum^{}\tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)}})}
 	\end{gather}
