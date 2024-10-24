@@ -24,7 +24,7 @@ def fit(model, optimizer, scheduler, criterion, train, val,
     with mlflow.start_run(mlflow_run_id):
         # log hyperparameters
         mlflow.log_params({k: v for k, v in const.__dict__.items() if k == k.upper() and all(s not in k for s in ['DIR', 'PATH', 'SELECT_BEST'])})
-        mlflow.log_param('optimizer_fn', 'SGD')
+        mlflow.log_param('optimizer_fn', const.OPTIMIZER)
 
         interval = max(1, (const.EPOCHS // 10))
         for epoch in range(init_epoch, const.EPOCHS + init_epoch + int(init_epoch == 0)):
@@ -90,18 +90,21 @@ def fit(model, optimizer, scheduler, criterion, train, val,
 if __name__ == '__main__':
     # Usage: $ python -m path.to.script model_name --nocheckpoint
     const.MODEL_NAME = sys.argv[1]
+    const.FINETUNING = 'finetuned' in const.MODEL_NAME
+    const.OPTIMIZER = 'Adam' if 'adam' in const.MODEL_NAME else 'SGD'
     const.PRETRAINED_BACKBONE = 'pretrained' in const.MODEL_NAME
+
     if const.LOG_REMOTE: mlflow.set_tracking_uri(const.MLFLOW_TRACKING_URI)
 
     model = Model(const.IMAGE_SHAPE, is_contrastive='default' not in const.MODEL_NAME)
-
     train, val, test = get_generators()
-    optimizer = torch.optim.SGD([*model.linear.parameters(),
-                                 *model.backbone.layer4[0].conv2.parameters(),
-                                 *model.backbone.layer4[0].downsample[0].parameters()] if const.FINETUNING else model.parameters(),
-                                lr=const.LEARNING_RATE,
-                                momentum=const.MOMENTUM,
-                                weight_decay=const.WEIGHT_DECAY)
+
+    params = [*model.linear.parameters(),
+              *model.backbone.layer4[0].conv2.parameters(),
+              *model.backbone.layer4[0].downsample[0].parameters()] if const.FINETUNING else model.parameters()
+    if const.OPTIMIZER == 'SGD': optimizer = torch.optim.SGD(params, lr=const.LEARNING_RATE, momentum=const.MOMENTUM, weight_decay=const.WEIGHT_DECAY)
+    else: optimizer = torch.optim.Adam(params, lr=const.LEARNING_RATE, weight_decay=const.WEIGHT_DECAY)
+
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
     criterion = ContrastiveLoss(model.get_contrastive_cams) if 'default' not in const.MODEL_NAME else torch.nn.CrossEntropyLoss()
 
