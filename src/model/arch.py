@@ -49,8 +49,8 @@ class Model(nn.Module):
         x = self.backbone(x)
         logits = self.linear(x)
 
-        if self.training: return logits, self._compute_hi_res_cam(logits)
-        else: return self.softmax(logits), self._compute_hi_res_cam(logits)
+        if self.training: return logits, self._bp_free_hi_res_cams(logits)
+        else: return self.softmax(logits), self._hi_res_cams(logits)
 
     @staticmethod
     def get_contrastive_cams(y, cams):
@@ -59,7 +59,18 @@ class Model(nn.Module):
 
         return contrastive_cams
 
-    def _compute_hi_res_cam(self, logits):
+    def _bp_free_hi_res_cams(self, logits):  # required to obtain gradients on self.linear.weight
+        cams = torch.zeros(*logits.shape, *self.feature_rect.shape[2:], device=const.DEVICE)
+        for img_idx in range(logits.shape[0]):
+            for class_idx, weight in enumerate(self.linear.weight):
+                cams[img_idx, class_idx] = (weight[None, None].repeat(14, 14, 1).permute(2, 0, 1) * self.feature_rect[img_idx]).sum(dim=0)
+        cams /= 14**2
+
+        self.feature_rect = None
+
+        return cams
+
+    def _hi_res_cams(self, logits):
         cams = torch.zeros(*logits.shape, *self.feature_rect.shape[2:], device=const.DEVICE)
         for img_idx in range(logits.shape[0]):
             for class_idx in range(logits.shape[1]):

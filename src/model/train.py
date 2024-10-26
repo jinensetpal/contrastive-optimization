@@ -50,7 +50,7 @@ def fit(model, optimizer, scheduler, criterion, train, val,
                         metrics[f'{split}_divergence_loss'].append(criterion.prev[1])
 
                     if split == 'train' and epoch > 0:  # epoch 0 is for evaluating performance on initalization
-                        batch_loss.backward()
+                        batch_loss.backward(inputs=optimizer.param_groups[0]['params'])
                         mlflow.log_metric(f'{split}_batchwise_loss', batch_loss.item(), step=epoch * len(dataloader) + batch_idx)
 
                         if not (batch_idx+1) % const.GRAD_ACCUMULATION_STEPS: optimizer.step()
@@ -93,6 +93,7 @@ if __name__ == '__main__':
     const.FINETUNING = 'finetuned' in const.MODEL_NAME
     const.OPTIMIZER = 'Adam' if 'adam' in const.MODEL_NAME else 'SGD'
     const.PRETRAINED_BACKBONE = 'pretrained' in const.MODEL_NAME
+    if 'ablated_only' in const.MODEL_NAME: const.LAMBDAS[-1] = 0
 
     if const.LOG_REMOTE: mlflow.set_tracking_uri(const.MLFLOW_TRACKING_URI)
 

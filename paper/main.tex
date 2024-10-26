@@ -265,6 +265,10 @@ A more mathematically rigorous approach involves performing an ablation over cla
 
 In addition to classifying the input image, the model returns a provably accurate attention map used to distinguish between the two classes. This can be obtained by simply computing the absolute values of the contrastive map compared against any two classes, and subsequently performing normalization.
 
+\subsubsection{ACE-Divergence Fomulation}
+
+It was observed that
+
 \subsection{Training Detail}
 
 The Oxford-IIIT Pets dataset is an image dataset with a classification objective alongside high-quality segmentation maps. We train the model on the binary classification case (image containing a dog or cat) as well as the fine-grained, breed specific 37 class split. The architecture used for training was ResNet-50, initialized with random parameters and three key modifications:
