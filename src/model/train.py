@@ -90,6 +90,8 @@ def fit(model, optimizer, scheduler, criterion, train, val,
 if __name__ == '__main__':
     # Usage: $ python -m path.to.script model_name --nocheckpoint
     const.MODEL_NAME = sys.argv[1]
+    const.BINARY_CLS = 'multiclass' in const.MODEL_NAME
+    const.N_CLASSES = 2 if const.BINARY_CLS else 37
     const.FINETUNING = 'finetuned' in const.MODEL_NAME
     const.OPTIMIZER = 'Adam' if 'adam' in const.MODEL_NAME else 'SGD'
     const.PRETRAINED_BACKBONE = 'pretrained' in const.MODEL_NAME
