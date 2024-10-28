@@ -21,7 +21,7 @@ def visualize(model, gen, norm=None):
         y_pred, cam = model(X.unsqueeze(0))
         cam = model.get_contrastive_cams(y.unsqueeze(0), cam).detach()[0, y.argmin(0)].abs()
         fig.add_subplot(4, 4, idx + 1)
-        plt.xlabel(f'Pred: {str(y_pred[0].argmax().item())}, Actual: {str(y.argmax().item())}')
+        plt.xlabel(f'Pred: {str(y_pred[0].argmax().item())}, Label: {str(y.argmax().item())}')
         plt.imshow(X.permute(1, 2, 0).cpu().detach(), alpha=0.5)
         plt.imshow(F.interpolate(cam[None, None, :], const.IMAGE_SIZE, mode='bilinear')[0, 0].cpu(), cmap='jet', alpha=0.5, norm=norm)
 

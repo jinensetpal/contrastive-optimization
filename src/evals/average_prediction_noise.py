@@ -35,7 +35,7 @@ def average_prediction_noise(model, gen, misclassified_only=False):
     print('\n'.join([f'{feature} Average Influence: {metric}' for (feature, metric) in zip(('Net', 'Foreground', 'Background'), avgs.tolist())]))
 
     plt.imshow(pixelwise_influence.detach().cpu())
-    plt.savefig(const.DATA_DIR / 'evals' / f'{model.name}_influence.png')
+    plt.savefig(const.DATA_DIR / 'evals' / f'{model.name}_{gen.dataset.split}_influence.png')
     plt.show()
 
 
@@ -48,4 +48,4 @@ if __name__ == '__main__':
     model.name = name
     model.eval()
 
-    average_prediction_noise(model, DataLoader(Dataset('valid'), batch_size=10, shuffle=False), misclassified_only=len(sys.argv) == 3)
+    average_prediction_noise(model, DataLoader(Dataset(sys.argv[2]), batch_size=10, shuffle=False), misclassified_only=len(sys.argv) == 4)

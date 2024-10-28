@@ -63,8 +63,8 @@ class Model(nn.Module):
         cams = torch.zeros(*logits.shape, *self.feature_rect.shape[2:], device=const.DEVICE)
         for img_idx in range(logits.shape[0]):
             for class_idx, weight in enumerate(self.linear.weight):
-                cams[img_idx, class_idx] = (weight[None, None].repeat(*self.CAM_SIZE, 1).permute(2, 0, 1) * self.feature_rect[img_idx]).sum(dim=0)
-        cams /= self.CAM_SIZE[0]**2
+                cams[img_idx, class_idx] = (weight[None, None].repeat(*const.CAM_SIZE, 1).permute(2, 0, 1) * self.feature_rect[img_idx]).sum(dim=0)
+        cams /= const.CAM_SIZE[0]**2
 
         self.feature_rect = None
 

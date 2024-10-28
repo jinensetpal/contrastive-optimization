@@ -31,7 +31,7 @@ SPLITS = ['train', 'valid', 'test']
 IMAGE_SIZE = (224, 224)
 CAM_SIZE = (14, 14)
 N_CHANNELS = 3
-BINARY_CLS = False
+BINARY_CLS = True
 N_CLASSES = 2 if BINARY_CLS else 37
 IMAGE_SHAPE = (N_CHANNELS,) + IMAGE_SIZE
 
