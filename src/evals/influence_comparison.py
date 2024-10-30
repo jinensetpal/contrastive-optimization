@@ -12,8 +12,9 @@ import torch
 import sys
 
 
-def evaluate_influence(model, gen, misclassified_only=False):
-    (const.DATA_DIR / 'evals' / 'influence_plots' / gen.dataset.split / model.name).mkdir(exist_ok=True, parents=True)
+def evaluate_influence(model, gen, misclassified_low_confidence_only=False):
+    path = const.DATA_DIR / 'evals' / f'influence_plots{"_mscls" if misclassified_low_confidence_only else ""}' / gen.dataset.split / model.name
+    (path).mkdir(exist_ok=True, parents=True)
 
     const.CAM_SIZE = const.IMAGE_SIZE
     for batch_idx, (X, y) in enumerate(gen):
@@ -21,8 +22,8 @@ def evaluate_influence(model, gen, misclassified_only=False):
         cc = model.get_contrastive_cams(y[1], y_pred[1]).detach().abs()
         heatmap = y[0].repeat((cc.shape[1] - 1, 1, 1, 1)).permute(1, 0, 2, 3)
 
-        if misclassified_only:
-            mask = y[1].argmax(1) != y_pred[0].argmax(1)
+        if misclassified_low_confidence_only:
+            mask = (y[1].argmax(1) != y_pred[0].argmax(1)) | (y_pred[0].max(dim=1).values < const.CONFIDENCE_THRESHOLD)
             X = X[mask]
             cc = cc[mask]
             heatmap = heatmap[mask]
@@ -48,7 +49,8 @@ def evaluate_influence(model, gen, misclassified_only=False):
 
             fig.suptitle(f'Net Influence: {cc_i.sum()}\nForeground Influence: {foreground.sum()}\nBackground Influence: {background.sum()}')
             plt.tight_layout()
-            fig.savefig(const.DATA_DIR / 'evals' / 'influence_plots' / gen.dataset.split / model.name / f'{batch_idx * gen.batch_size + idx}.png')
+            fig.savefig(path / f'{batch_idx * gen.batch_size + idx}.png')
+            if background.sum() / foreground.sum() > 1: fig.savefig(path / f'{batch_idx * gen.batch_size + idx}_high_background.png')
             plt.close()
 
 
@@ -61,4 +63,4 @@ if __name__ == '__main__':
     model.name = name
     model.eval()
 
-    evaluate_influence(model, DataLoader(Dataset(sys.argv[2]), batch_size=10, shuffle=False), misclassified_only=len(sys.argv) == 4)
+    evaluate_influence(model, DataLoader(Dataset(sys.argv[2]), batch_size=10, shuffle=False), misclassified_low_confidence_only=len(sys.argv) == 4)

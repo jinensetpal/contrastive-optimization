@@ -41,8 +41,16 @@
 \usepackage{bbm}
 \usepackage{bm}
 
-\newtheorem{theorem}{Proposition}
-\newtheorem{corollary}{Corollary}[theorem]
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{assumption}[theorem]{Assumption}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
 
 \title{Contrastive Optimization -- Preliminaries}
 
@@ -188,11 +196,16 @@ Ignoring the bias terms, our new optimization objective is:
 \end{gather}
 This is equivalent to the original ERM optimization objective, with the difference being the resultant values preserving spatial information in the form of the activation map instead of flattening the feature map. If $\tilde{\mathcal{\bm{A}}}_{c}^{\text{HiResCAM}} - \tilde{\mathcal{\bm{A}}}_{c'}^{\text{HiResCAM}} > 0$, the classification is correct -- if not, the classification is incorrect. 
 
-For the multiclass case, our setup now considers a set of classes $c$; $c_t$ is our target class, and $c_{t'}$ consists of a sampled non-target class. The definition for multiclass contrastive activation maps now results in a set of activation maps, defined as follows:
-\begin{gather}
-	\tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c_t, c_{t'})} := \left\{\tilde{\mathcal{\bm{A}}}_{c_t}^{\text{HiResCAM}} - \tilde{\mathcal{\bm{A}}}_{c_{t'}}^{\text{HiResCAM}}\right\}^{|C|-1}_{c_{t'} \in c - c_t}
-\end{gather}
-This is a generalization of the binary case, as the same formula applied to a binary classification challenge returns a set of contrastive maps containing a single element.
+We can define ContrastiveCAMs as a generalization of the binary case.
+
+\begin{definition}
+	Given a set of classes $C$ with $c_t$ being the target class and $c_{t'}$ being a sampled non-target class, we define ContrastiveCAMs as follows:
+	\begin{gather}
+		\tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c_t, c_{t'})} := \left\{\tilde{\mathcal{\bm{A}}}_{c_t}^{\text{HiResCAM}} - \tilde{\mathcal{\bm{A}}}_{c_{t'}}^{\text{HiResCAM}}\right\}^{|C|-1}_{c_{t'} \in c \setminus c_t}
+	\end{gather}
+\end{definition}
+
+This enables us to evaluate ContrastiveCAMs in the multiclass setting. This is trivially a generalization of the previous case, as the same formulation applied to a binary classification task returns a set of contrastive maps containing a single element.
 
 To ensure that the model accurately predicts the target class, each contrastive comparison should yield a positive result. Therefore, the multiclass optimization objective under this paradigm is as follows:
 \begin{gather}

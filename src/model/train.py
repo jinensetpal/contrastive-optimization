@@ -24,7 +24,6 @@ def fit(model, optimizer, scheduler, criterion, train, val,
     with mlflow.start_run(mlflow_run_id):
         # log hyperparameters
         mlflow.log_params({k: v for k, v in const.__dict__.items() if k == k.upper() and all(s not in k for s in ['DIR', 'PATH', 'SELECT_BEST'])})
-        mlflow.log_param('optimizer_fn', const.OPTIMIZER)
 
         interval = max(1, (const.EPOCHS // 10))
         for epoch in range(init_epoch, const.EPOCHS + init_epoch + int(init_epoch == 0)):

@@ -10,7 +10,7 @@ import torch
 import sys
 
 
-def average_prediction_noise(model, gen, misclassified_only=False):
+def average_prediction_noise(model, gen, misclassified_low_confidence_only=False):
     pixelwise_influence = torch.zeros(const.CAM_SIZE, device=const.DEVICE)
     avgs = torch.tensor([0., 0., 0.], device=const.DEVICE)
     n_miscls = torch.tensor([0.], device=const.DEVICE)
@@ -20,8 +20,8 @@ def average_prediction_noise(model, gen, misclassified_only=False):
         cc = model.get_contrastive_cams(y[1], y_pred[1]).detach().abs()
         heatmap = y[0].repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
 
-        if misclassified_only:
-            mask = y[1].argmax(1) != y_pred[0].argmax(1)
+        if misclassified_low_confidence_only:
+            mask = (y[1].argmax(1) != y_pred[0].argmax(1)) | (y_pred[0].max(dim=1).values < const.CONFIDENCE_THRESHOLD)
             cc = cc[mask]
             heatmap = heatmap[mask]
             n_miscls += mask.sum()
@@ -31,7 +31,7 @@ def average_prediction_noise(model, gen, misclassified_only=False):
         avgs[1] += cc[heatmap == 1].sum()
         avgs[2] += cc[heatmap != 1].sum()
 
-    avgs /= n_miscls if misclassified_only else len(gen.dataset)
+    avgs /= n_miscls if misclassified_low_confidence_only else len(gen.dataset)
     print('\n'.join([f'{feature} Average Influence: {metric}' for (feature, metric) in zip(('Net', 'Foreground', 'Background'), avgs.tolist())]))
 
     plt.imshow(pixelwise_influence.detach().cpu())
@@ -48,4 +48,4 @@ if __name__ == '__main__':
     model.name = name
     model.eval()
 
-    average_prediction_noise(model, DataLoader(Dataset(sys.argv[2]), batch_size=10, shuffle=False), misclassified_only=len(sys.argv) == 4)
+    average_prediction_noise(model, DataLoader(Dataset(sys.argv[2]), batch_size=10, shuffle=False), misclassified_low_confidence_only=len(sys.argv) == 4)
