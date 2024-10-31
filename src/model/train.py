@@ -3,6 +3,7 @@
 from ..data.oxford_iiit_pet import get_generators
 from .loss import ContrastiveLoss
 import torch.nn.functional as F
+from copy import deepcopy
 from .arch import Model
 from src import const
 import numpy as np
@@ -59,7 +60,7 @@ def fit(model, optimizer, scheduler, criterion, train, val,
             mlflow.log_metrics(metrics, step=epoch-1)
 
             if const.SELECT_BEST and metrics['valid_acc'] > selected['acc']:
-                selected['best'] = model.state_dict()
+                selected['best'] = deepcopy(model.state_dict())
                 selected['epoch'] = epoch
                 selected['acc'] = metrics['valid_acc']
 
@@ -69,9 +70,9 @@ def fit(model, optimizer, scheduler, criterion, train, val,
 
             if const.TRAIN_CUTOFF is not None and time.time() - start_time >= const.TRAIN_CUTOFF: break
 
-        selected['last'] = model.state_dict()
+        selected['last'] = deepcopy(model.state_dict())
         if const.SELECT_BEST and 'best' not in selected:
-            selected['best'] = model.state_dict()
+            selected['best'] = deepcopy(model.state_dict())
             selected['epoch'] = epoch
             selected['acc'] = metrics['valid_acc']
 
@@ -98,12 +99,16 @@ if __name__ == '__main__':
 
     if const.LOG_REMOTE: mlflow.set_tracking_uri(const.MLFLOW_TRACKING_URI)
 
-    model = Model(const.IMAGE_SHAPE, is_contrastive='default' not in const.MODEL_NAME)
+    is_contrastive = 'default' not in const.MODEL_NAME
+    model = Model(const.IMAGE_SHAPE, is_contrastive=is_contrastive)
     train, val, test = get_generators()
 
-    params = [*model.linear.parameters(),
-              *model.backbone.layer4[0].conv2.parameters(),
-              *model.backbone.layer4[0].downsample[0].parameters()] if const.FINETUNING else model.parameters()
+    if const.FINETUNING:
+        params = [*model.linear.parameters(),] if is_contrastive else [*model.linear.parameters(),
+                                                                       *model.backbone.layer4[0].conv2.parameters(),
+                                                                       *model.backbone.layer4[0].downsample[0].parameters()]
+    else: params = model.parameters()
+
     if const.OPTIMIZER == 'SGD': optimizer = torch.optim.SGD(params, lr=const.LEARNING_RATE, momentum=const.MOMENTUM, weight_decay=const.WEIGHT_DECAY)
     else: optimizer = torch.optim.Adam(params, lr=const.LEARNING_RATE, weight_decay=const.WEIGHT_DECAY)
 
