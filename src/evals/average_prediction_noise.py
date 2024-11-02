@@ -12,17 +12,19 @@ import sys
 
 def average_prediction_noise(model, gen, misclassified_low_confidence_only=False):
     pixelwise_influence = torch.zeros(const.CAM_SIZE, device=const.DEVICE)
-    avgs = torch.tensor([0., 0., 0.], device=const.DEVICE)
-    n_miscls = torch.tensor([0.], device=const.DEVICE)
+    avgs = torch.zeros(4, device=const.DEVICE)
+    n_miscls = torch.zeros(1, device=const.DEVICE)
 
     for X, y in gen:
         y_pred = model(X)
+        conf = y_pred[0].max(1).values.detach()
         cc = model.get_contrastive_cams(y[1], y_pred[1]).detach().abs()
         heatmap = y[0].repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
 
         if misclassified_low_confidence_only:
             mask = (y[1].argmax(1) != y_pred[0].argmax(1)) | (y_pred[0].max(dim=1).values < const.CONFIDENCE_THRESHOLD)
             cc = cc[mask]
+            conf = conf[mask]
             heatmap = heatmap[mask]
             n_miscls += mask.sum()
 
@@ -30,9 +32,12 @@ def average_prediction_noise(model, gen, misclassified_low_confidence_only=False
         avgs[0] += cc.sum()
         avgs[1] += cc[heatmap == 1].sum()
         avgs[2] += cc[heatmap != 1].sum()
+        avgs[3] += conf.sum()
 
-    avgs /= n_miscls if misclassified_low_confidence_only else len(gen.dataset)
-    print('\n'.join([f'{feature} Average Influence: {metric}' for (feature, metric) in zip(('Net', 'Foreground', 'Background'), avgs.tolist())]))
+    tot = n_miscls if misclassified_low_confidence_only else len(gen.dataset)
+    avgs /= tot
+    print('\n'.join([f'{feature} Average Influence: {metric}' for (feature, metric) in zip(('Net', 'Foreground', 'Background'), avgs.tolist()[:-1])]))
+    print(f'#images: {tot}\nAverage Confidence: {avgs[-1].item()}')
 
     plt.imshow(pixelwise_influence.detach().cpu())
     plt.savefig(const.DATA_DIR / 'evals' / f'{model.name}_{gen.dataset.split}_influence.png')
@@ -48,4 +53,4 @@ if __name__ == '__main__':
     model.name = name
     model.eval()
 
-    average_prediction_noise(model, DataLoader(Dataset(sys.argv[2]), batch_size=10, shuffle=False), misclassified_low_confidence_only=len(sys.argv) == 4)
+    average_prediction_noise(model, DataLoader(Dataset(sys.argv[2]), batch_size=const.EVAL_BATCH_SIZE, shuffle=False), misclassified_low_confidence_only=len(sys.argv) == 4)

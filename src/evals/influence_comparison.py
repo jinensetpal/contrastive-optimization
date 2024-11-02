@@ -19,6 +19,8 @@ def evaluate_influence(model, gen, misclassified_low_confidence_only=False):
     const.CAM_SIZE = const.IMAGE_SIZE
     for batch_idx, (X, y) in enumerate(gen):
         y_pred = model(X)
+        conf = y_pred[0].max(1).values
+        is_correct = y[1].argmax(1) == y_pred[0].argmax(1)
         cc = model.get_contrastive_cams(y[1], y_pred[1]).detach().abs()
         heatmap = y[0].repeat((cc.shape[1] - 1, 1, 1, 1)).permute(1, 0, 2, 3)
 
@@ -26,9 +28,11 @@ def evaluate_influence(model, gen, misclassified_low_confidence_only=False):
             mask = (y[1].argmax(1) != y_pred[0].argmax(1)) | (y_pred[0].max(dim=1).values < const.CONFIDENCE_THRESHOLD)
             X = X[mask]
             cc = cc[mask]
+            conf = conf[mask]
             heatmap = heatmap[mask]
+            is_correct = is_correct[mask]
 
-        for idx, (X_i, cc_i, heatmap_i) in enumerate(zip(X, cc, heatmap)):
+        for idx, (X_i, cc_i, heatmap_i, conf_i, is_correct_i) in enumerate(zip(X, cc, heatmap, conf, is_correct)):
             fig = plt.figure()
             cc_i = cc_i.sum(dim=0)
 
@@ -47,7 +51,7 @@ def evaluate_influence(model, gen, misclassified_low_confidence_only=False):
             fig.add_subplot(2, 2, 4)
             plt.imshow(background.cpu(), norm=norm)
 
-            fig.suptitle(f'Net Influence: {cc_i.sum()}\nForeground Influence: {foreground.sum()}\nBackground Influence: {background.sum()}')
+            fig.suptitle(f'Net Influence: {cc_i.sum()}\nForeground Influence: {foreground.sum()}\nBackground Influence: {background.sum()}\nAccurate Prediction: {is_correct_i}\nConfidence: {conf_i}')
             plt.tight_layout()
             fig.savefig(path / f'{batch_idx * gen.batch_size + idx}.png')
             if background.sum() / foreground.sum() > 1: fig.savefig(path / f'{batch_idx * gen.batch_size + idx}_high_background.png')
