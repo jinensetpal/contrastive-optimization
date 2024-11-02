@@ -12,8 +12,8 @@ import torch
 import sys
 
 
-def evaluate_influence(model, gen, misclassified_low_confidence_only=False):
-    path = const.DATA_DIR / 'evals' / f'influence_plots{"_mscls" if misclassified_low_confidence_only else ""}' / gen.dataset.split / model.name
+def evaluate_influence(model, gen, failures_only=False):
+    path = const.DATA_DIR / 'evals' / 'influence_plots' / ('epic_fails' if failures_only else 'all') / gen.dataset.split / model.name
     (path).mkdir(exist_ok=True, parents=True)
 
     const.CAM_SIZE = const.IMAGE_SIZE
@@ -24,7 +24,7 @@ def evaluate_influence(model, gen, misclassified_low_confidence_only=False):
         cc = model.get_contrastive_cams(y[1], y_pred[1]).detach().abs()
         heatmap = y[0].repeat((cc.shape[1] - 1, 1, 1, 1)).permute(1, 0, 2, 3)
 
-        if misclassified_low_confidence_only:
+        if failures_only:
             mask = (y[1].argmax(1) != y_pred[0].argmax(1)) | (y_pred[0].max(dim=1).values < const.CONFIDENCE_THRESHOLD)
             X = X[mask]
             cc = cc[mask]
@@ -53,8 +53,13 @@ def evaluate_influence(model, gen, misclassified_low_confidence_only=False):
 
             fig.suptitle(f'Net Influence: {cc_i.sum()}\nForeground Influence: {foreground.sum()}\nBackground Influence: {background.sum()}\nAccurate Prediction: {is_correct_i}\nConfidence: {conf_i}')
             plt.tight_layout()
-            fig.savefig(path / f'{batch_idx * gen.batch_size + idx}.png')
-            if background.sum() / foreground.sum() > 1: fig.savefig(path / f'{batch_idx * gen.batch_size + idx}_high_background.png')
+
+            filename = str(batch_idx * gen.batch_size + idx)
+            if failures_only:
+                if background.sum() / foreground.sum() > 1: filename += '_high_background'
+                if conf_i < const.CONFIDENCE_THRESHOLD: filename += '_low_conf'
+                if not is_correct_i: filename += '_mscls'
+            fig.savefig(path / f'{filename}.png')
             plt.close()
 
 
@@ -67,4 +72,4 @@ if __name__ == '__main__':
     model.name = name
     model.eval()
 
-    evaluate_influence(model, DataLoader(Dataset(sys.argv[2]), batch_size=10, shuffle=False), misclassified_low_confidence_only=len(sys.argv) == 4)
+    evaluate_influence(model, DataLoader(Dataset(sys.argv[2]), batch_size=10, shuffle=False), failures_only=len(sys.argv) == 4)
