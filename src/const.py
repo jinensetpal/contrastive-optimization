@@ -30,6 +30,7 @@ CONFIDENCE_THRESHOLD = .85
 
 # dataset
 SEED = 1024
+BBOX_MAP = True
 SPLITS = ['train', 'valid', 'test']
 IMAGE_SIZE = (224, 224)
 CAM_SIZE = (14, 14)

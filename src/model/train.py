@@ -95,6 +95,7 @@ if __name__ == '__main__':
     const.FINETUNING = 'finetuned' in const.MODEL_NAME
     const.OPTIMIZER = 'Adam' if 'adam' in const.MODEL_NAME else 'SGD'
     const.PRETRAINED_BACKBONE = 'pretrained' in const.MODEL_NAME
+    const.BBOX_MAP = 'bbox' in const.MODEL_NAME
     if 'ablated_only' in const.MODEL_NAME: const.LAMBDAS[-1] = 0
 
     if const.LOG_REMOTE: mlflow.set_tracking_uri(const.MLFLOW_TRACKING_URI)
