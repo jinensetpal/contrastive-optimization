@@ -47,6 +47,7 @@ class Model(nn.Module):
 
     def forward(self, x):
         x = self.backbone(x)
+        if self.training and const.RANDOMIZED_FLATTEN: x = x[:, torch.randperm(x.shape[1])]
         logits = self.linear(x)
 
         if self.training: return logits, self._bp_free_hi_res_cams(logits)

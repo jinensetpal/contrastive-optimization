@@ -35,7 +35,7 @@ class Dataset(torch.utils.data.Dataset):
         heatmap[heatmap == 2] = 0  # set background to 0 (for optimization objective)
         heatmap = torchvision.transforms.functional.resize(heatmap, const.CAM_SIZE, antialias=False).squeeze(0)
 
-        if self.bbox:
+        if self.bbox and heatmap.min() != heatmap.max():
             bbox = masks_to_boxes(heatmap[None, ])[0].to(torch.int).tolist()
             heatmap[bbox[1]:bbox[3]+1, bbox[0]:bbox[2]+1] = 1.
 
