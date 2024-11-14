@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
-from ..data.oxford_iiit_pet import get_generators
+from ..data.oxford_iiit_pet import get_generators as oxford_iiit_pet
+from ..data.imagenet import get_generators as imagenet
 from .loss import ContrastiveLoss
 import torch.nn.functional as F
 from copy import deepcopy
@@ -105,7 +106,7 @@ if __name__ == '__main__':
 
     is_contrastive = 'default' not in const.MODEL_NAME
     model = Model(const.IMAGE_SHAPE, is_contrastive=is_contrastive)
-    train, val, test = get_generators()
+    train, val, test = imagenet() if const.DATASET == 'imagenet' else oxford_iiit_pet()
 
     if const.FINETUNING:
         params = [*model.linear.parameters(),] if is_contrastive else [*model.linear.parameters(),

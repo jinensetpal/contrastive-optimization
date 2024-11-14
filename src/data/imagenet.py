@@ -1,0 +1,47 @@
+#!/usr/bin/env python3
+
+import xml.etree.ElementTree as ET
+from src import const
+import pandas as pd
+import torchvision
+import torch
+
+
+class Dataset(torch.utils.data.Dataset):
+    def __init__(self, split=None):
+        self.df = pd.read_csv(const.DATA_DIR / 'imagenet' / 'index.csv')
+        if split:
+            self.df = df[df['split'] == split].reset_index()
+            self.split = split
+        else:
+            self.df = df
+            self.split = 'all'
+
+    def __len__(self):
+        return len(self.df)
+
+    def __getitem__(self, idx):
+        X = torchvision.transforms.functional.resize(torchvision.io.read_image((self.df['path'].iloc[idx]).as_posix()), const.IMAGE_SIZE, antialias=True)[:3]
+        X = X / 255  # normalization
+
+        bbox = ET.parse(self.df['bbox'].iloc[idx]).getroot()
+        heatmap = torch.zeros(*[int(x.text) for x in bbox.getroot().find('size')[:2]])
+
+        for obj in bbox.findall('object'):
+            box = [int(x.text) for x in obj.find('bndbox')[:]]
+            heatmap[box[0]:box[2], box[1]:box[3]] = 1.
+
+        heatmap = torchvision.transforms.functional.resize(heatmap, const.CAM_SIZE, antialias=False).squeeze(0)
+
+        y = torch.zeros((const.N_CLASSES))
+        y[self.df['label_idx'][idx] - 1] = 1
+
+        return X.to(const.DEVICE), (heatmap.to(const.DEVICE), y.to(const.DEVICE))
+
+
+def get_generators():
+    return *[torch.utils.data.DataLoader(Dataset(split=split, bbox=const.BBOX_MAP), batch_size=const.BATCH_SIZE if split == 'train' else const.EVAL_BATCH_SIZE, shuffle=True) for split in const.SPLITS[:2]], None
+
+
+if __name__ == '__main__':
+    print(Dataset()[0])
