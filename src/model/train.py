@@ -123,20 +123,20 @@ if __name__ == '__main__':
                        'mlflow_run_id': None}
     selected = None
     if const.CHECKPOINTING and len(sys.argv) == 2:  # add extra sys.argv to signify first checkpointing run
-        model.load_state_dict(torch.load(path / f'last.pt', map_location=const.DEVICE))
-        optimizer.load_state_dict(torch.load(path / f'optim.pt', map_location=const.DEVICE))
-        checkpoint_args = json.load(open(path / f'checkpoint_metadata.json'))
+        model.load_state_dict(torch.load(path / 'last.pt', map_location=const.DEVICE))
+        optimizer.load_state_dict(torch.load(path / 'optim.pt', map_location=const.DEVICE))
+        checkpoint_args = json.load(open(path / 'checkpoint_metadata.json'))
         prev_metrics = mlflow.get_run(checkpoint_args['mlflow_run_id']).data.metrics
 
-        selected = {'best': torch.load(path / f'best.pt', map_location='cpu'),
+        selected = {'best': torch.load(path / 'best.pt', map_location='cpu'),
                     'last': model.state_dict(),
                     'epoch': prev_metrics['selected_epoch'],
                     'acc': prev_metrics['selected_valid_acc']}
 
     completed_epochs, selected = fit(model, optimizer, scheduler, criterion, train, val, selected=selected, **checkpoint_args)
-    torch.save(selected['last'], path / f'last.pt')
-    if const.SELECT_BEST: torch.save(selected['best'], path / f'best.pt')
+    torch.save(selected['last'], path / 'last.pt')
+    if const.SELECT_BEST: torch.save(selected['best'], path / 'best.pt')
 
     if const.CHECKPOINTING:
-        torch.save(optimizer.state_dict(), path / f'optim.pt')
-        json.dump({'init_epoch': completed_epochs+1, 'mlflow_run_id': mlflow.last_active_run().info.run_id}, open(path / f'checkpoint_metadata.json', 'w'))
+        torch.save(optimizer.state_dict(), path / 'optim.pt')
+        json.dump({'init_epoch': completed_epochs+1, 'mlflow_run_id': mlflow.last_active_run().info.run_id}, open(path / 'checkpoint_metadata.json', 'w'))

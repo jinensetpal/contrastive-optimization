@@ -22,10 +22,10 @@ class ContrastiveLoss(nn.Module):
         fg_mask_log_probs[fg_mask != 0] = 0
 
         kld = fg_mask_probs * (fg_mask_log_probs - cc_log_probs) * fg_mask
-        ce = F.cross_entropy(ablation, y[1])
+        ace = F.cross_entropy(ablation, y[1])
 
-        self.prev = (ce.item(), (kld.sum() / cc.size(0)).item())
-        return const.LAMBDAS[2] * ce + const.LAMBDAS[3] * kld.sum() / cc.size(0)
+        self.prev = (ace.item(), (kld.sum() / cc.size(0)).item())
+        return const.LAMBDAS[2] * ace + const.LAMBDAS[3] * kld.sum() / cc.size(0)
 
 
 class DoubleKLDLoss(nn.Module):
