@@ -4,9 +4,11 @@ from ..data.oxford_iiit_pet import get_generators as oxford_iiit_pet
 from ..data.imagenet import get_generators as imagenet
 from .loss import ContrastiveLoss
 import torch.nn.functional as F
+from src import const, utils
 from copy import deepcopy
+from torch import optim
 from .arch import Model
-from src import const
+from torch import nn
 import numpy as np
 import mlflow
 import torch
@@ -15,8 +17,8 @@ import time
 import sys
 
 
-def fit(model, optimizer, scheduler, criterion, train, val,
-        selected=None, init_epoch=0, mlflow_run_id=None):
+def fit(model, optimizer, scheduler, criterion, train, val, rank=None,
+        ema=None, selected=None, init_epoch=0, mlflow_run_id=None):
     model.train()
     start_time = time.time()
     selected = selected or {'last': model.state_dict(),
@@ -28,7 +30,7 @@ def fit(model, optimizer, scheduler, criterion, train, val,
         mlflow.log_params({k: v for k, v in const.__dict__.items() if k == k.upper() and all(s not in k for s in ['DIR', 'PATH', 'SELECT_BEST'])})
 
         interval = max(1, (const.EPOCHS // 10))
-        for epoch in range(init_epoch, const.EPOCHS + init_epoch + int(init_epoch == 0)):
+        for epoch in range(init_epoch, const.EPOCHS + int(init_epoch == 0)):
             if not (epoch) % interval: print('-' * 10)
             metrics = {metric: [] for metric in [f'{split}_{report}' for report in ['contrast_loss', 'acc', 'divergence_loss', 'ablated_ce_loss', 'cse_loss'] for split in const.SPLITS[:2]]}
 
@@ -55,6 +57,10 @@ def fit(model, optimizer, scheduler, criterion, train, val,
                         mlflow.log_metric(f'{split}_batchwise_loss', batch_loss.item(), step=epoch * len(dataloader) + batch_idx)
 
                         if not (batch_idx+1) % const.GRAD_ACCUMULATION_STEPS: optimizer.step()
+
+                    if ema and not (batch_idx+1) % const.EMA_STEPS:
+                        ema.update_parameters(model)
+                        if epoch < const.LR_WARMUP_EPOCHS: ema.n_averaged.fill_(0)
             scheduler.step()
 
             metrics = {metric: np.mean(metrics[metric]) for metric in metrics}
@@ -71,6 +77,7 @@ def fit(model, optimizer, scheduler, criterion, train, val,
 
             if const.TRAIN_CUTOFF is not None and time.time() - start_time >= const.TRAIN_CUTOFF: break
 
+        if ema: selected['ema'] = ema
         selected['last'] = deepcopy(model.state_dict())
         if const.SELECT_BEST and 'best' not in selected:
             selected['best'] = deepcopy(model.state_dict())
@@ -98,14 +105,25 @@ if __name__ == '__main__':
     const.PRETRAINED_BACKBONE = 'pretrained' in const.MODEL_NAME
     const.BBOX_MAP = 'bbox' in const.MODEL_NAME
     if 'ablated_only' in const.MODEL_NAME: const.LAMBDAS[-1] = 0
-
-    if const.LOG_REMOTE: mlflow.set_tracking_uri(const.MLFLOW_TRACKING_URI)
+    is_contrastive = 'default' not in const.MODEL_NAME
 
     path = const.MODELS_DIR / const.MODEL_NAME
     (path).mkdir(exist_ok=True, parents=True)
 
-    is_contrastive = 'default' not in const.MODEL_NAME
+    if const.LOG_REMOTE: mlflow.set_tracking_uri(const.MLFLOW_TRACKING_URI)
+
     model = Model(const.IMAGE_SHAPE, is_contrastive=is_contrastive)
+    criterion = ContrastiveLoss(model.get_contrastive_cams) if is_contrastive else nn.CrossEntropyLoss(label_smoothing=const.LABEL_SMOOTHING)
+    ema = utils.ExponentialMovingAverage(model, device=const.DEVICE, decay=1 - min(1, (1 - const.EMA_DECAY) * const.BATCH_SIZE * const.EMA_STEPS / const.EPOCHS)) if const.EMA else None
+
+    if const.DDP:
+        torch.distributed.init_process_group('nccl', const.DEVICE, torch.cuda.device_count(), init_method='tcp://localhost:12345')
+        torch.distributed.barrier()
+
+        model = nn.parallel.DistributedDataParallel(model, device_ids=[const.DEVICE])
+        model.load_state_dict = model.module.load_state_dict
+        model.state_dict = model.module.state_dict
+
     train, val, test = imagenet() if const.DATASET == 'imagenet' else oxford_iiit_pet()
 
     if const.FINETUNING:
@@ -114,11 +132,12 @@ if __name__ == '__main__':
                                                                        *model.backbone.layer4[0].downsample[0].parameters()]
     else: params = model.parameters()
 
-    if const.OPTIMIZER == 'SGD': optimizer = torch.optim.SGD(params, lr=const.LEARNING_RATE, momentum=const.MOMENTUM, weight_decay=const.WEIGHT_DECAY)
-    else: optimizer = torch.optim.Adam(params, lr=const.LEARNING_RATE, weight_decay=const.WEIGHT_DECAY)
+    if const.OPTIMIZER == 'SGD': optimizer = optim.SGD(params, lr=const.LR, momentum=const.MOMENTUM, weight_decay=const.WEIGHT_DECAY)
+    else: optimizer = optim.Adam(params, lr=const.LR, weight_decay=const.WEIGHT_DECAY)
 
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
-    criterion = ContrastiveLoss(model.get_contrastive_cams) if is_contrastive else torch.nn.CrossEntropyLoss()
+    warmup = optim.lr_scheduler.LinearLR(optimizer, factor=const.LR_WARMUP_DECAY, total_iters=const.LR_WARMUP_EPOCHS)
+    cosine_annealing = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=const.EPOCHS - const.LR_WARMUP_EPOCHS)
+    scheduler = optim.lr_scheduler.ChainedScheduler([warmup, cosine_annealing], optimizer=optimizer)
 
     checkpoint_args = {'init_epoch': 0,
                        'mlflow_run_id': None}
@@ -133,10 +152,14 @@ if __name__ == '__main__':
                     'last': model.state_dict(),
                     'epoch': prev_metrics['selected_epoch'],
                     'acc': prev_metrics['selected_valid_acc']}
+        if ema and (path / 'ema.pt').exists():
+            selected['ema'] = torch.load(path / 'ema.pt', map_location=const.DEVICE)
+            ema = selected['ema']
 
-    completed_epochs, selected = fit(model, optimizer, scheduler, criterion, train, val, selected=selected, **checkpoint_args)
+    completed_epochs, selected = fit(model, optimizer, scheduler, criterion, train, val, ema=ema, selected=selected, **checkpoint_args)
     torch.save(selected['last'], path / 'last.pt')
     if const.SELECT_BEST: torch.save(selected['best'], path / 'best.pt')
+    if const.EMA: torch.save(selected['ema'], path / 'ema.pt')
 
     if const.CHECKPOINTING:
         torch.save(optimizer.state_dict(), path / 'optim.pt')

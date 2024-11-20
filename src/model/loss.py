@@ -9,6 +9,7 @@ import torch
 class ContrastiveLoss(nn.Module):
     def __init__(self, get_contrastive_cam_fn, debug=False):
         super().__init__()
+        self.ce = nn.CrossEntropyLoss(label_smoothing=const.LABEL_SMOOTHING)
         self.get_contrastive_cam = get_contrastive_cam_fn
 
     def forward(self, y_pred, y):
@@ -22,7 +23,7 @@ class ContrastiveLoss(nn.Module):
         fg_mask_log_probs[fg_mask != 0] = 0
 
         kld = fg_mask_probs * (fg_mask_log_probs - cc_log_probs) * fg_mask
-        ace = F.cross_entropy(ablation, y[1])
+        ace = self.ce(ablation, y[1])
 
         self.prev = (ace.item(), (kld.sum() / cc.size(0)).item())
         return const.LAMBDAS[2] * ace + const.LAMBDAS[3] * kld.sum() / cc.size(0)
