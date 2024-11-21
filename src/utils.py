@@ -47,32 +47,32 @@ class ClassificationPresetTrain:
         random_transforms = []
         deterministic_transforms = []
 
-        random_transforms.append(T.RandomResizedCrop(crop_size, interpolation=interpolation, antialias=True)) # random
+        random_transforms.append(T.RandomResizedCrop(crop_size, interpolation=interpolation, antialias=True))  # random
         if hflip_prob > 0:
-            random_transforms.append(T.RandomHorizontalFlip(hflip_prob)) # random
+            random_transforms.append(T.RandomHorizontalFlip(hflip_prob))  # random
         if auto_augment_policy is not None:
             if auto_augment_policy == "ra":
                 random_transforms.append(T.RandAugment(interpolation=interpolation, magnitude=ra_magnitude))
             elif auto_augment_policy == "ta_wide":
-                random_transforms.append(T.TrivialAugmentWide(interpolation=interpolation)) # random
+                random_transforms.append(T.TrivialAugmentWide(interpolation=interpolation))  # random
             elif auto_augment_policy == "augmix":
                 random_transforms.append(T.AugMix(interpolation=interpolation, severity=augmix_severity))
             else:
                 aa_policy = T.AutoAugmentPolicy(auto_augment_policy)
                 random_transforms.append(T.AutoAugment(policy=aa_policy, interpolation=interpolation))
 
-        if random_erase_prob > 0: # random
+        if random_erase_prob > 0:  # random
             random_transforms.append(T.RandomErasing(p=random_erase_prob))
 
         deterministic_transforms.extend(
             [
-                T.ToDtype(torch.float, scale=True) if use_v2 else T.ConvertImageDtype(torch.float), # deterministic
-                T.Normalize(mean=mean, std=std), # deterministic
+                T.ToDtype(torch.float, scale=True) if use_v2 else T.ConvertImageDtype(torch.float),  # deterministic
+                T.Normalize(mean=mean, std=std),  # deterministic
             ]
         )
 
         if use_v2:
-            deterministic_transforms.append(T.ToPureTensor()) # deterministic
+            deterministic_transforms.append(T.ToPureTensor())  # deterministic
 
         self.random_transforms = T.Compose(random_transforms)
         self.deterministic_transforms = T.Compose(deterministic_transforms)

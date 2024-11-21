@@ -7,12 +7,13 @@ import torch
 
 
 class Model(nn.Module):
-    def __init__(self, input_shape, device=const.DEVICE,
-                 is_contrastive=True, no_downsampling=False):
+    def __init__(self, input_shape, randomized_flatten=const.RANDOMIZED_FLATTEN,
+                 device=const.DEVICE, is_contrastive=True, no_downsampling=False):
         super().__init__()
 
         self.device = device
         self.is_contrastive = is_contrastive
+        self.randomized_flatten = const.RANDOMIZED_FLATTEN
         self.backbone = torchvision.models.resnet50(weights=torchvision.models.ResNet50_Weights.IMAGENET1K_V2 if const.PRETRAINED_BACKBONE else None)
 
         if no_downsampling:
@@ -49,7 +50,7 @@ class Model(nn.Module):
 
     def forward(self, x):
         x = self.backbone(x)
-        if self.training and const.RANDOMIZED_FLATTEN: x = x[:, torch.randperm(x.shape[1])]
+        if self.training and self.randomized_flatten: x = x[:, torch.randperm(x.shape[1])]
         logits = self.linear(x)
 
         if self.training: return logits, self._bp_free_hi_res_cams(logits)
