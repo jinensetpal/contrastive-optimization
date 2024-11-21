@@ -42,53 +42,49 @@ class ClassificationPresetTrain:
         ra_magnitude=None,
         augmix_severity=None,
         random_erase_prob=0.0,
-        backend="pil",
         use_v2=False,
     ):
-        transforms = []
-        backend = backend.lower()
-        if backend == "tensor":
-            transforms.append(T.PILToTensor())
-        elif backend != "pil":
-            raise ValueError(f"backend can be 'tensor' or 'pil', but got {backend}")
+        random_transforms = []
+        deterministic_transforms = []
 
-        transforms.append(T.RandomResizedCrop(crop_size, interpolation=interpolation, antialias=True))
+        random_transforms.append(T.RandomResizedCrop(crop_size, interpolation=interpolation, antialias=True)) # random
         if hflip_prob > 0:
-            transforms.append(T.RandomHorizontalFlip(hflip_prob))
+            random_transforms.append(T.RandomHorizontalFlip(hflip_prob)) # random
         if auto_augment_policy is not None:
             if auto_augment_policy == "ra":
-                transforms.append(T.RandAugment(interpolation=interpolation, magnitude=ra_magnitude))
+                random_transforms.append(T.RandAugment(interpolation=interpolation, magnitude=ra_magnitude))
             elif auto_augment_policy == "ta_wide":
-                transforms.append(T.TrivialAugmentWide(interpolation=interpolation))
+                random_transforms.append(T.TrivialAugmentWide(interpolation=interpolation)) # random
             elif auto_augment_policy == "augmix":
-                transforms.append(T.AugMix(interpolation=interpolation, severity=augmix_severity))
+                random_transforms.append(T.AugMix(interpolation=interpolation, severity=augmix_severity))
             else:
                 aa_policy = T.AutoAugmentPolicy(auto_augment_policy)
-                transforms.append(T.AutoAugment(policy=aa_policy, interpolation=interpolation))
+                random_transforms.append(T.AutoAugment(policy=aa_policy, interpolation=interpolation))
 
-        if backend == "pil":
-            transforms.append(T.PILToTensor())
+        if random_erase_prob > 0: # random
+            random_transforms.append(T.RandomErasing(p=random_erase_prob))
 
-        transforms.extend(
+        deterministic_transforms.extend(
             [
-                T.ToDtype(torch.float, scale=True) if use_v2 else T.ConvertImageDtype(torch.float),
-                T.Normalize(mean=mean, std=std),
+                T.ToDtype(torch.float, scale=True) if use_v2 else T.ConvertImageDtype(torch.float), # deterministic
+                T.Normalize(mean=mean, std=std), # deterministic
             ]
         )
-        if random_erase_prob > 0:
-            transforms.append(T.RandomErasing(p=random_erase_prob))
 
         if use_v2:
-            transforms.append(T.ToPureTensor())
+            deterministic_transforms.append(T.ToPureTensor()) # deterministic
 
-        self.transforms = T.Compose(transforms)
+        self.random_transforms = T.Compose(random_transforms)
+        self.deterministic_transforms = T.Compose(deterministic_transforms)
 
     def __call__(self, imgs):
         transformed_imgs = []
         state = torch.get_rng_state()
-        for img in imgs:
+        for idx, img in enumerate(imgs):
             torch.set_rng_state(state)
-            transformed_imgs.append(self.transforms(img))
+            img = self.random_transforms(img)
+            if idx == 1: img = self.deterministic_transforms(img)
+            transformed_imgs.append(img)
         return transformed_imgs
 
 

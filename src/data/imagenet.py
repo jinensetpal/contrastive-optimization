@@ -2,7 +2,7 @@
 
 from torch.utils.data.dataloader import default_collate
 from torchvision.transforms.functional import resize
-from torchvision import transforms
+import torchvision.transforms.v2 as transforms
 import xml.etree.ElementTree as ET
 from src import const, utils
 import pandas as pd
@@ -33,6 +33,7 @@ class Dataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         X = torchvision.io.read_image((const.DATA_DIR / 'imagenet' / self.df['path'].iloc[idx]).as_posix()).to(const.DEVICE)
         X = X / 255  # normalization
+        if X.size(0) == 1: X = X.repeat(3, 1, 1)
 
         bbox = ET.parse(const.DATA_DIR / 'imagenet' / self.df['bbox'].iloc[idx]).getroot()
         heatmap = torch.zeros(X.shape[1:], device=const.DEVICE)
@@ -42,13 +43,13 @@ class Dataset(torch.utils.data.Dataset):
             box = [int(x.text) for x in obj.find('bndbox')[:]]
             heatmap[box[1]:box[3], box[0]:box[2]] = 1.
 
+        # X, heatmap = self.transforms([X[None,], heatmap[None, None]])
         heatmap = resize(heatmap[None,], const.CAM_SIZE, antialias=False).squeeze(0)
         heatmap[heatmap > 0] = 1.
 
         y = torch.zeros(const.N_CLASSES, device=const.DEVICE)
         y[int(self.df['label_idx'][idx])] = 1
 
-        X, heatmap = self.transforms([X, heatmap])
         return X, (heatmap, y)
 
 

@@ -98,12 +98,13 @@ def fit(model, optimizer, scheduler, criterion, train, val, rank=None,
 if __name__ == '__main__':
     # Usage: $ python -m path.to.script model_name --nocheckpoint
     const.MODEL_NAME = sys.argv[1]
-    const.BINARY_CLS = 'multiclass' not in const.MODEL_NAME
-    const.N_CLASSES = 2 if const.BINARY_CLS else 37
-    const.FINETUNING = 'finetuned' in const.MODEL_NAME
-    const.OPTIMIZER = 'Adam' if 'adam' in const.MODEL_NAME else 'SGD'
-    const.PRETRAINED_BACKBONE = 'pretrained' in const.MODEL_NAME
-    const.BBOX_MAP = 'bbox' in const.MODEL_NAME
+    if const.DATASET != 'imagenet':
+            const.BINARY_CLS = 'multiclass' not in const.MODEL_NAME
+            const.N_CLASSES = 2 if const.BINARY_CLS else 37
+            const.FINETUNING = 'finetuned' in const.MODEL_NAME
+            const.OPTIMIZER = 'Adam' if 'adam' in const.MODEL_NAME else 'SGD'
+            const.PRETRAINED_BACKBONE = 'pretrained' in const.MODEL_NAME
+            const.BBOX_MAP = 'bbox' in const.MODEL_NAME
     if 'ablated_only' in const.MODEL_NAME: const.LAMBDAS[-1] = 0
     is_contrastive = 'default' not in const.MODEL_NAME
 
@@ -117,7 +118,7 @@ if __name__ == '__main__':
     ema = utils.ExponentialMovingAverage(model, device=const.DEVICE, decay=1 - min(1, (1 - const.EMA_DECAY) * const.BATCH_SIZE * const.EMA_STEPS / const.EPOCHS)) if const.EMA else None
 
     if const.DDP:
-        torch.distributed.init_process_group('nccl', const.DEVICE, torch.cuda.device_count(), init_method='tcp://localhost:12345')
+        torch.distributed.init_process_group('nccl')  # let torchrun specify rank + world size + init method as environment variables
         torch.distributed.barrier()
 
         model = nn.parallel.DistributedDataParallel(model, device_ids=[const.DEVICE])
@@ -135,7 +136,7 @@ if __name__ == '__main__':
     if const.OPTIMIZER == 'SGD': optimizer = optim.SGD(params, lr=const.LR, momentum=const.MOMENTUM, weight_decay=const.WEIGHT_DECAY)
     else: optimizer = optim.Adam(params, lr=const.LR, weight_decay=const.WEIGHT_DECAY)
 
-    warmup = optim.lr_scheduler.LinearLR(optimizer, factor=const.LR_WARMUP_DECAY, total_iters=const.LR_WARMUP_EPOCHS)
+    warmup = optim.lr_scheduler.LinearLR(optimizer, start_factor=const.LR_WARMUP_DECAY, total_iters=const.LR_WARMUP_EPOCHS)
     cosine_annealing = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=const.EPOCHS - const.LR_WARMUP_EPOCHS)
     scheduler = optim.lr_scheduler.ChainedScheduler([warmup, cosine_annealing], optimizer=optimizer)
 

@@ -26,7 +26,7 @@ EPOCHS = 600
 DDP = True
 
 # ema
-MODEL_EMA = True
+EMA = True
 EMA_STEPS = 32
 EMA_DECAY = .99998
 
