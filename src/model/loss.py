@@ -7,6 +7,23 @@ import torch
 
 
 class ContrastiveLoss(nn.Module):
+    def __init__(self, get_contrastive_ablation_fn, debug=False):
+        super().__init__()
+        self.ce = nn.CrossEntropyLoss(label_smoothing=const.LABEL_SMOOTHING)
+        self.get_contrastive_ablation = get_contrastive_ablation_fn
+
+    def forward(self, y_pred, y):
+        cc = self.get_contrastive_ablation(y[1], y_pred[1])
+        fg_mask = y[0].repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
+
+        ablation = (-cc * fg_mask + cc.abs() * (1 - fg_mask)).sum(dim=[2, 3])
+        ace = self.ce(ablation, y[1])
+
+        self.prev = ace.item()
+        return ace
+
+
+class ACEKLDLoss(nn.Module):
     def __init__(self, get_contrastive_cam_fn, debug=False):
         super().__init__()
         self.ce = nn.CrossEntropyLoss(label_smoothing=const.LABEL_SMOOTHING)

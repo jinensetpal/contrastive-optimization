@@ -12,4 +12,4 @@ cd ~/git/contrastive-optimization
 
 MLFLOW_TRACKING_USERNAME=jinensetpal \
 MLFLOW_TRACKING_PASSWORD=$MLFLOW_TOKEN \
-dvc repro contrastive-evaluate -f
+torchrun --standalone --nproc_per_node=gpu -m src.model.train contrastive

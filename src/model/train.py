@@ -15,6 +15,7 @@ import torch
 import json
 import time
 import sys
+import os
 
 
 def fit(model, optimizer, scheduler, criterion, train, val, rank=None,
@@ -27,7 +28,7 @@ def fit(model, optimizer, scheduler, criterion, train, val, rank=None,
 
     with mlflow.start_run(mlflow_run_id):
         # log hyperparameters
-        mlflow.log_params({k: v for k, v in const.__dict__.items() if k == k.upper() and all(s not in k for s in ['DIR', 'PATH', 'SELECT_BEST'])})
+        mlflow.log_params({k: v for k, v in const.__dict__.items() if k == k.upper() and all(s not in k for s in ['DIR', 'PATH', 'SELECT_BEST', 'DEVICE'])})
 
         interval = max(1, (const.EPOCHS // 10))
         for epoch in range(init_epoch, const.EPOCHS + int(init_epoch == 0)):
@@ -48,10 +49,7 @@ def fit(model, optimizer, scheduler, criterion, train, val, rank=None,
                     del y_pred, X, y
                     torch.cuda.empty_cache()
 
-                    if criterion._get_name() != 'CrossEntropyLoss':
-                        metrics[f'{split}_ablated_ce_loss'].append(criterion.prev[0])
-                        metrics[f'{split}_divergence_loss'].append(criterion.prev[1])
-
+                    if criterion._get_name() != 'CrossEntropyLoss': metrics[f'{split}_ablated_ce_loss'].append(criterion.prev)
                     if split == 'train' and epoch > 0:  # epoch 0 is for evaluating performance on initalization
                         batch_loss.backward(inputs=optimizer.param_groups[0]['params'])
                         mlflow.log_metric(f'{split}_batchwise_loss', batch_loss.item(), step=epoch * len(dataloader) + batch_idx)
@@ -61,6 +59,9 @@ def fit(model, optimizer, scheduler, criterion, train, val, rank=None,
                     if ema and not (batch_idx+1) % const.EMA_STEPS:
                         ema.update_parameters(model)
                         if epoch < const.LR_WARMUP_EPOCHS: ema.n_averaged.fill_(0)
+
+                    del batch_loss
+                    torch.cuda.empty_cache()
             scheduler.step()
 
             metrics = {metric: np.mean(metrics[metric]) for metric in metrics}
@@ -121,6 +122,8 @@ if __name__ == '__main__':
     ema = utils.ExponentialMovingAverage(model, device=const.DEVICE, decay=1 - min(1, (1 - const.EMA_DECAY) * const.BATCH_SIZE * const.EMA_STEPS / const.EPOCHS)) if const.EMA else None
 
     if const.DDP:
+        const.DEVICE = int(os.environ["LOCAL_RANK"])
+        torch.cuda.set_device(const.DEVICE)
         torch.distributed.init_process_group('nccl')  # let torchrun specify rank + world size + init method as environment variables
         torch.distributed.barrier()
 
