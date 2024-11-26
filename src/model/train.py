@@ -3,6 +3,7 @@
 from ..data.oxford_iiit_pet import get_generators as oxford_iiit_pet
 from ..data.imagenet import get_generators as imagenet
 from .loss import ContrastiveLoss
+import torch.distributed as dist
 import torch.nn.functional as F
 from src import const, utils
 from copy import deepcopy
@@ -18,7 +19,7 @@ import sys
 import os
 
 
-def fit(model, optimizer, scheduler, criterion, train, val, rank=None,
+def fit(model, optimizer, scheduler, criterion, train, val,
         ema=None, selected=None, init_epoch=0, mlflow_run_id=None):
     model.train()
     start_time = time.time()
@@ -117,16 +118,17 @@ if __name__ == '__main__':
 
     if const.LOG_REMOTE: mlflow.set_tracking_uri(const.MLFLOW_TRACKING_URI)
 
-    model = Model(const.IMAGE_SHAPE, is_contrastive=is_contrastive)
+    if const.DDP:
+        const.DEVICE = int(os.environ["LOCAL_RANK"])
+        torch.cuda.set_device(const.DEVICE)
+        dist.init_process_group('nccl')  # let torchrun specify rank + world size + init method as environment variables
+        dist.barrier(device_ids=[const.DEVICE])
+
+    model = Model(const.IMAGE_SHAPE, is_contrastive=is_contrastive).to(const.DEVICE)
     criterion = ContrastiveLoss(model.get_contrastive_cams) if is_contrastive else nn.CrossEntropyLoss(label_smoothing=const.LABEL_SMOOTHING)
     ema = utils.ExponentialMovingAverage(model, device=const.DEVICE, decay=1 - min(1, (1 - const.EMA_DECAY) * const.BATCH_SIZE * const.EMA_STEPS / const.EPOCHS)) if const.EMA else None
 
     if const.DDP:
-        const.DEVICE = int(os.environ["LOCAL_RANK"])
-        torch.cuda.set_device(const.DEVICE)
-        torch.distributed.init_process_group('nccl')  # let torchrun specify rank + world size + init method as environment variables
-        torch.distributed.barrier()
-
         model = nn.parallel.DistributedDataParallel(model, device_ids=[const.DEVICE])
         model.load_state_dict = model.module.load_state_dict
         model.state_dict = model.module.state_dict
@@ -171,3 +173,5 @@ if __name__ == '__main__':
     if const.CHECKPOINTING:
         torch.save(optimizer.state_dict(), path / 'optim.pt')
         json.dump({'init_epoch': completed_epochs+1, 'mlflow_run_id': mlflow.last_active_run().info.run_id}, open(path / 'checkpoint_metadata.json', 'w'))
+
+    if const.DDP: dist.destroy_process_group()

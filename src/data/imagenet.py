@@ -43,14 +43,16 @@ class Dataset(torch.utils.data.Dataset):
             box = [int(x.text) for x in obj.find('bndbox')[:]]
             heatmap[box[1]:box[3], box[0]:box[2]] = 1.
 
-        # X, heatmap = self.transforms([X[None,], heatmap[None, None]])
-        heatmap = resize(heatmap[None,], const.CAM_SIZE, antialias=False).squeeze(0)
+        heatmap = resize(heatmap[None, None], const.IMAGE_SIZE, antialias=True)
+        X, heatmap = self.transforms([X[None,], heatmap])
+        heatmap = resize(heatmap.mean(dim=1), const.CAM_SIZE, antialias=False).squeeze(0)
         heatmap[heatmap > 0] = 1.
+        heatmap[heatmap < 0] = 0.
 
         y = torch.zeros(const.N_CLASSES, device=const.DEVICE)
         y[int(self.df['label_idx'][idx])] = 1
 
-        return X, (heatmap, y)
+        return X[0], (heatmap, y)
 
 
 # TODO: re-formulate for contrastive
