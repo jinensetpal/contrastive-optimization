@@ -1,15 +1,89 @@
 #!/usr/bin/env python3
 
-# Utils for imagenet training recipe. Code taken with minor modifications from:
+# utils for imagenet training recipe. Code taken with modifications from:
 # https://github.com/pytorch/vision/blob/main/references/classification/utils.py
 # https://github.com/pytorch/vision/blob/main/references/classification/presets.py
 # https://github.com/pytorch/vision/blob/main/references/classification/sampler.py
+# https://github.com/pytorch/vision/blob/main/torchvision/transforms/v2/_augment.py
 
-import math
-import torch
-import torch.distributed as dist
-import torchvision.transforms.v2 as T
+from torchvision.transforms.v2._utils import is_pure_tensor, query_size
 from torchvision.transforms.functional import InterpolationMode
+from torchvision.transforms.v2.functional._meta import get_size
+from torchvision import transforms as tv_tensors
+import torchvision.transforms.v2 as T
+import torch.distributed as dist
+import torch
+import math
+
+
+class CutMix(T.CutMix):
+
+    def _needs_transform_list(self, flat_inputs):
+        return [True for _ in range(len(flat_inputs))]
+
+    def _get_params(self, flat_inputs):
+        lam = float(self._dist.sample(()))  # type: ignore[arg-type]
+
+        H, W = query_size(flat_inputs[0])
+
+        r_x = torch.randint(W, size=(1,))
+        r_y = torch.randint(H, size=(1,))
+
+        r = 0.5 * math.sqrt(1.0 - lam)
+        r_w_half = int(r * W)
+        r_h_half = int(r * H)
+
+        x1 = int(torch.clamp(r_x - r_w_half, min=0))
+        y1 = int(torch.clamp(r_y - r_h_half, min=0))
+        x2 = int(torch.clamp(r_x + r_w_half, max=W))
+        y2 = int(torch.clamp(r_y + r_h_half, max=H))
+        box = (x1, y1, x2, y2)
+
+        lam_adjusted = float(1.0 - (x2 - x1) * (y2 - y1) / (W * H))
+
+        ret = dict(box=box, lam_adjusted=lam_adjusted)
+        return ret
+
+    def _transform(self, inpt, params):
+        if inpt is params["labels"]:
+            return self._mixup_label(inpt, lam=params["lam_adjusted"])
+        elif is_pure_tensor(inpt) or isinstance(inpt, (tv_tensors.Image, tv_tensors.Video)):
+            x1, y1, x2, y2 = params["box"]
+            rolled = inpt.roll(1, 0)
+            output = inpt.clone()
+            output[..., y1:y2, x1:x2] = rolled[..., y1:y2, x1:x2]
+            return output
+        else:
+            return inpt
+
+
+class TrivialAugmentWide(T.TrivialAugmentWide):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.heatmap_turn = False
+
+    def forward(self, *inputs):
+        flat_inputs_with_spec, image_or_video = self._flatten_and_extract_image_or_video(inputs)
+        height, width = get_size(image_or_video)  # type: ignore[arg-type]
+
+        transform_id, (magnitudes_fn, signed) = self._get_random_item(self._AUGMENTATION_SPACE)
+        if self.heatmap_turn and transform_id in ['Brightness', 'Color', 'Contrast', 'Sharpness', 'Posterize', 'Solarize', 'AutoContrast']:  # won't affect position therefore invariant to heatmap
+            self.heatmap_turn = False
+            return image_or_video  # do nothing
+
+        magnitudes = magnitudes_fn(self.num_magnitude_bins, height, width)
+        if magnitudes is not None:
+            magnitude = float(magnitudes[int(torch.randint(self.num_magnitude_bins, ()))])
+            if signed and torch.rand(()) <= 0.5:
+                magnitude *= -1
+        else:
+            magnitude = 0.0
+
+        image_or_video = self._apply_image_or_video_transform(
+            image_or_video, transform_id, magnitude, interpolation=self.interpolation, fill=self._fill
+        )
+        return self._unflatten_and_insert_image_or_video(flat_inputs_with_spec, image_or_video)
 
 
 class ExponentialMovingAverage(torch.optim.swa_utils.AveragedModel):
@@ -54,7 +128,7 @@ class ClassificationPresetTrain:
             if auto_augment_policy == "ra":
                 random_transforms.append(T.RandAugment(interpolation=interpolation, magnitude=ra_magnitude))
             elif auto_augment_policy == "ta_wide":
-                random_transforms.append(T.TrivialAugmentWide(interpolation=interpolation))  # random
+                random_transforms.append(TrivialAugmentWide(interpolation=interpolation))  # random
             elif auto_augment_policy == "augmix":
                 random_transforms.append(T.AugMix(interpolation=interpolation, severity=augmix_severity))
             else:
@@ -82,8 +156,11 @@ class ClassificationPresetTrain:
         state = torch.get_rng_state()
         for idx, img in enumerate(imgs):
             torch.set_rng_state(state)
+
+            self.random_transforms.transforms[2].heatmap_turn = idx == 1
             img = self.random_transforms(img)
-            if idx == 1: img = self.deterministic_transforms(img)
+
+            if idx == 0: img = self.deterministic_transforms(img)
             transformed_imgs.append(img)
         return transformed_imgs
 

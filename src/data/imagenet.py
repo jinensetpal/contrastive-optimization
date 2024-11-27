@@ -32,22 +32,26 @@ class Dataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         X = torchvision.io.read_image((const.DATA_DIR / 'imagenet' / self.df['path'].iloc[idx]).as_posix()).to(const.DEVICE)
-        X = X / 255  # normalization
         if X.size(0) == 1: X = X.repeat(3, 1, 1)
 
-        bbox = ET.parse(const.DATA_DIR / 'imagenet' / self.df['bbox'].iloc[idx]).getroot()
         heatmap = torch.zeros(X.shape[1:], device=const.DEVICE)
         X = resize(X, const.IMAGE_SIZE, antialias=True)[:3]
 
-        for obj in bbox.findall('object'):
-            box = [int(x.text) for x in obj.find('bndbox')[:]]
-            heatmap[box[1]:box[3], box[0]:box[2]] = 1.
+        if const.BBOX_MAP:
+            bbox = ET.parse(const.DATA_DIR / 'imagenet' / self.df['bbox'].iloc[idx]).getroot()
+            for obj in bbox.findall('object'):
+                box = [int(x.text) for x in obj.find('bndbox')[:]]
+                heatmap[box[1]:box[3], box[0]:box[2]] = 1.
 
-        heatmap = resize(heatmap[None, None], const.IMAGE_SIZE, antialias=True)
+            heatmap = resize(heatmap[None, None], const.IMAGE_SIZE, antialias=True)
         X, heatmap = self.transforms([X[None,], heatmap])
+
         heatmap = resize(heatmap.mean(dim=1), const.CAM_SIZE, antialias=False).squeeze(0)
         heatmap[heatmap > 0] = 1.
         heatmap[heatmap < 0] = 0.
+
+        heatmap[heatmap == 0] = -1
+        heatmap[heatmap == 1.] = int(self.df['label_idx'][idx])   # set to class labels for cutmix
 
         y = torch.zeros(const.N_CLASSES, device=const.DEVICE)
         y[int(self.df['label_idx'][idx])] = 1
@@ -55,19 +59,17 @@ class Dataset(torch.utils.data.Dataset):
         return X[0], (heatmap, y)
 
 
-# TODO: re-formulate for contrastive
 def collate_fn(batch):
-    return transforms.RandomChoice((transforms.MixUp(alpha=const.MIXUP_ALPHA, num_classes=const.N_CLASSES),
-                                    transforms.CutMix(alpha=const.CUTMIX_ALPHA, num_classes=const.N_CLASSES)))(*default_collate(batch))
+    return utils.CutMix(alpha=const.CUTMIX_ALPHA, num_classes=const.N_CLASSES, labels_getter=lambda x: x[1][1])(*default_collate(batch))
 
 
 def get_generators():
     const.SPLITS[1] = 'val'
 
     datasets = [Dataset(split=split, bbox=const.BBOX_MAP) for split in const.SPLITS[:2]]
-    samplers = [utils.RASampler(dataset, shuffle=True, repetitions=const.AUGMENT_REPITIONS) for dataset in datasets]
-    return *[torch.utils.data.DataLoader(dataset, sampler=sampler, batch_size=const.BATCH_SIZE if split == 'train' else const.EVAL_BATCH_SIZE)
-             for dataset, sampler, split in zip(datasets, samplers, const.SPLITS[:2])], None
+    # samplers = [utils.RASampler(dataset, shuffle=True, repetitions=const.AUGMENT_REPITIONS) for dataset in datasets]
+    return *[torch.utils.data.DataLoader(dataset, batch_size=const.BATCH_SIZE if split == 'train' else const.EVAL_BATCH_SIZE, collate_fn=collate_fn)
+             for dataset, split in zip(datasets, const.SPLITS[:2])], None
 
 
 if __name__ == '__main__':

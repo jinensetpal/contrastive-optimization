@@ -56,9 +56,14 @@ class Model(nn.Module):
         if self.training: return logits, self._bp_free_hi_res_cams(logits)
         else: return self.softmax(logits), self._hi_res_cams(logits)
 
-    def get_contrastive_cams(self, y, cams):
+    def get_contrastive_cams(self, y, cams, cutmixed=False):
         contrastive_cams = torch.empty((y.shape[0], cams.shape[-3], *cams.shape[-2:]), device=self.device)
-        for idx, (cam, y_idx) in enumerate(zip(cams, y.argmax(dim=1))): contrastive_cams[idx] = cam[y_idx] - cam
+        y = y[int(cutmixed)]
+
+        if cutmixed:
+            for idx, cam in enumerate(cams): contrastive_cams[idx] = (y == idx).to(torch.float) - cam
+        else:
+            for idx, (cam, y_idx) in enumerate(zip(cams, y.argmax(dim=1))): contrastive_cams[idx] = cam[y_idx] - cam
 
         return contrastive_cams
 
