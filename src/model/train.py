@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from ..data.oxford_iiit_pet import get_generators as oxford_iiit_pet
+from torch.distributed.optim import ZeroRedundancyOptimizer
 from ..data.imagenet import get_generators as imagenet
 from .loss import ContrastiveLoss
 import torch.distributed as dist
@@ -79,7 +80,7 @@ def fit(model, optimizer, scheduler, criterion, train, val,
 
             if const.TRAIN_CUTOFF is not None and time.time() - start_time >= const.TRAIN_CUTOFF: break
 
-        if ema: selected['ema'] = ema
+        if ema: selected['ema'] = ema.state_dict()
         selected['last'] = deepcopy(model.state_dict())
         if const.SELECT_BEST and 'best' not in selected:
             selected['best'] = deepcopy(model.state_dict())
@@ -141,8 +142,12 @@ if __name__ == '__main__':
                                                                        *model.backbone.layer4[0].downsample[0].parameters()]
     else: params = model.parameters()
 
-    if const.OPTIMIZER == 'SGD': optimizer = optim.SGD(params, lr=const.LR, momentum=const.MOMENTUM, weight_decay=const.WEIGHT_DECAY)
-    else: optimizer = optim.Adam(params, lr=const.LR, weight_decay=const.WEIGHT_DECAY)
+    if const.OPTIMIZER == 'SGD':
+        if const.DDP: optimizer = ZeroRedundancyOptimizer(params, optim.SGD, lr=const.LR, momentum=const.MOMENTUM, weight_decay=const.WEIGHT_DECAY)
+        else: optimizer = optim.SGD(params, lr=const.LR, momentum=const.MOMENTUM, weight_decay=const.WEIGHT_DECAY)
+    else:
+        if const.DDP: optimizer = ZeroRedundancyOptimizer(params, optim.Adam, lr=const.LR, weight_decay=const.WEIGHT_DECAY)
+        else: optimizer = optim.Adam(params, lr=const.LR, weight_decay=const.WEIGHT_DECAY)
 
     warmup = optim.lr_scheduler.LinearLR(optimizer, start_factor=const.LR_WARMUP_DECAY, total_iters=const.LR_WARMUP_EPOCHS)
     cosine_annealing = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=const.EPOCHS - const.LR_WARMUP_EPOCHS)
@@ -152,8 +157,8 @@ if __name__ == '__main__':
                        'mlflow_run_id': None}
     selected = None
     if const.CHECKPOINTING and len(sys.argv) == 2:  # add extra sys.argv to signify first checkpointing run
-        model.load_state_dict(torch.load(path / 'last.pt', map_location=const.DEVICE))
-        optimizer.load_state_dict(torch.load(path / 'optim.pt', map_location=const.DEVICE))
+        model.load_state_dict(torch.load(path / 'last.pt', map_location=torch.device(const.DEVICE)))
+        optimizer.load_state_dict(torch.load(path / 'optim.pt', map_location=torch.device(const.DEVICE)))
         checkpoint_args = json.load(open(path / 'checkpoint_metadata.json'))
         prev_metrics = mlflow.get_run(checkpoint_args['mlflow_run_id']).data.metrics
 
@@ -162,10 +167,15 @@ if __name__ == '__main__':
                     'epoch': prev_metrics['selected_epoch'],
                     'acc': prev_metrics['selected_valid_acc']}
         if ema and (path / 'ema.pt').exists():
-            selected['ema'] = torch.load(path / 'ema.pt', map_location=const.DEVICE)
+            selected['ema'] = torch.load(path / 'ema.pt', map_location=torch.device(const.DEVICE))
             ema = selected['ema']
 
     completed_epochs, selected = fit(model, optimizer, scheduler, criterion, train, val, ema=ema, selected=selected, **checkpoint_args)
+
+    if const.DDP:
+        optimizer.consolidate_state_dict(to=const.DEVICE)
+        dist.barrier(device_ids=[const.DEVICE])
+
     torch.save(selected['last'], path / 'last.pt')
     if const.SELECT_BEST: torch.save(selected['best'], path / 'best.pt')
     if const.EMA: torch.save(selected['ema'], path / 'ema.pt')
