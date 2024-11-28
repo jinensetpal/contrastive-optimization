@@ -125,7 +125,7 @@ if __name__ == '__main__':
         dist.barrier(device_ids=[const.DEVICE])
 
     model = Model(const.IMAGE_SHAPE, is_contrastive=is_contrastive).to(const.DEVICE)
-    criterion = ContrastiveLoss(model.get_contrastive_cams) if is_contrastive else nn.CrossEntropyLoss(label_smoothing=const.LABEL_SMOOTHING)
+    criterion = ContrastiveLoss(model.get_contrastive_cams, is_label_mask=const.DATASET == 'imagenet') if is_contrastive else nn.CrossEntropyLoss(label_smoothing=const.LABEL_SMOOTHING)
     ema = utils.ExponentialMovingAverage(model, device=const.DEVICE, decay=1 - min(1, (1 - const.EMA_DECAY) * const.BATCH_SIZE * const.EMA_STEPS / const.EPOCHS)) if const.EMA else None
 
     if const.DDP:

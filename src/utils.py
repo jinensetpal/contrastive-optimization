@@ -12,6 +12,7 @@ from torchvision.transforms.v2.functional._meta import get_size
 from torchvision import transforms as tv_tensors
 import torchvision.transforms.v2 as T
 import torch.distributed as dist
+from src import const
 import torch
 import math
 
@@ -48,6 +49,8 @@ class CutMix(T.CutMix):
         if inpt is params["labels"]:
             return self._mixup_label(inpt, lam=params["lam_adjusted"])
         elif is_pure_tensor(inpt) or isinstance(inpt, (tv_tensors.Image, tv_tensors.Video)):
+            if const.CAM_SIZE == inpt.shape[1:]: params['box'] = [int(x / 16) for x in params['box']]
+
             x1, y1, x2, y2 = params["box"]
             rolled = inpt.roll(1, 0)
             output = inpt.clone()

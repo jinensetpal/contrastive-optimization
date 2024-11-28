@@ -2,7 +2,6 @@
 
 from torch.utils.data.dataloader import default_collate
 from torchvision.transforms.functional import resize
-import torchvision.transforms.v2 as transforms
 import xml.etree.ElementTree as ET
 from src import const, utils
 import pandas as pd
@@ -47,11 +46,8 @@ class Dataset(torch.utils.data.Dataset):
         X, heatmap = self.transforms([X[None,], heatmap])
 
         heatmap = resize(heatmap.mean(dim=1), const.CAM_SIZE, antialias=False).squeeze(0)
-        heatmap[heatmap > 0] = 1.
-        heatmap[heatmap < 0] = 0.
-
-        heatmap[heatmap == 0] = -1
-        heatmap[heatmap == 1.] = int(self.df['label_idx'][idx])   # set to class labels for cutmix
+        heatmap[heatmap <= 0] = -1
+        heatmap[heatmap > 0] = int(self.df['label_idx'][idx])   # set to class labels for cutmix
 
         y = torch.zeros(const.N_CLASSES, device=const.DEVICE)
         y[int(self.df['label_idx'][idx])] = 1
@@ -67,9 +63,10 @@ def get_generators():
     const.SPLITS[1] = 'val'
 
     datasets = [Dataset(split=split, bbox=const.BBOX_MAP) for split in const.SPLITS[:2]]
-    # samplers = [utils.RASampler(dataset, shuffle=True, repetitions=const.AUGMENT_REPITIONS) for dataset in datasets]
-    return *[torch.utils.data.DataLoader(dataset, batch_size=const.BATCH_SIZE if split == 'train' else const.EVAL_BATCH_SIZE, collate_fn=collate_fn)
-             for dataset, split in zip(datasets, const.SPLITS[:2])], None
+    samplers = [utils.RASampler(dataset, shuffle=True, repetitions=const.AUGMENT_REPITIONS) for dataset in datasets]
+    return *[torch.utils.data.DataLoader(dataset, collate_fn=collate_fn, sampler=sampler,
+                                         batch_size=const.BATCH_SIZE if split == 'train' else const.EVAL_BATCH_SIZE)
+             for dataset, sampler, split in zip(datasets, samplers, const.SPLITS[:2])], None
 
 
 if __name__ == '__main__':

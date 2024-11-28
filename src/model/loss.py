@@ -7,17 +7,28 @@ import torch
 
 
 class ContrastiveLoss(nn.Module):
-    def __init__(self, get_contrastive_ablation_fn, debug=False, cutmixed=False):
+    def __init__(self, get_contrastive_cams_fn, debug=False, is_label_mask=False):
         super().__init__()
         self.ce = nn.CrossEntropyLoss(label_smoothing=const.LABEL_SMOOTHING)
-        self.get_contrastive_ablation = get_contrastive_ablation_fn
-        self.cutmixed = cutmixed
+        self.get_contrastive_cams = get_contrastive_cams_fn
+        self.is_label_mask = is_label_mask
 
     def forward(self, y_pred, y):
-        cc = self.get_contrastive_ablation(y, y_pred[1], self.cutmixed).to(const.DEVICE)
-        fg_mask = (y[0] != 0).to(torch.int).repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3).to(const.DEVICE)
+        cc = self.get_contrastive_cams(y[1], y_pred[1]).to(const.DEVICE)
 
-        ablation = (-cc * fg_mask + cc.abs() * (1 - fg_mask)).sum(dim=[2, 3])
+        if self.is_label_mask:
+            labels = y[1].argmax(1)
+            fg_mask = torch.cat([(c == y).to(torch.int)[None,] for c, y in zip(y[0], labels)]).repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3).to(const.DEVICE)
+
+            ablation = (-cc * fg_mask + cc.abs() * (1 - fg_mask)).sum(dim=[2, 3])
+
+            for idx, (candidates, target) in enumerate(zip(y[0].flatten(start_dim=1).to(torch.int).unique(dim=1), labels)):
+                for candidate in set(candidates[(candidates != -1) & (candidates != target)].tolist()):
+                    ablation[idx, candidate] += ((y[0][idx] == candidate) * (cc[idx, candidate] - cc[idx, candidate].abs())).sum()
+        else:
+            fg_mask = (y[0] == 1).to(torch.int).repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3).to(const.DEVICE)
+
+            ablation = (-cc * fg_mask + cc.abs() * (1 - fg_mask)).sum(dim=[2, 3])
         ace = self.ce(ablation, y[1])
 
         self.prev = ace.item()
