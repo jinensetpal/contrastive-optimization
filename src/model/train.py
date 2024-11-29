@@ -3,6 +3,7 @@
 from ..data.oxford_iiit_pet import get_generators as oxford_iiit_pet
 from torch.distributed.optim import ZeroRedundancyOptimizer
 from ..data.imagenet import get_generators as imagenet
+from contextlib import nullcontext
 from .loss import ContrastiveLoss
 import torch.distributed as dist
 import torch.nn.functional as F
@@ -27,10 +28,11 @@ def fit(model, optimizer, scheduler, criterion, train, val,
     selected = selected or {'last': model.state_dict(),
                             'epoch': init_epoch,
                             'acc': 0.0}
+    use_mlflow_on_local_rank = not const.DDP or (const.DDP and const.DEVICE == 0)
 
-    with mlflow.start_run(mlflow_run_id):
+    with mlflow.start_run(mlflow_run_id) if use_mlflow_on_local_rank else nullcontext():
         # log hyperparameters
-        mlflow.log_params({k: v for k, v in const.__dict__.items() if k == k.upper() and all(s not in k for s in ['DIR', 'PATH', 'SELECT_BEST', 'DEVICE'])})
+        if use_mlflow_on_local_rank: mlflow.log_params({k: v for k, v in const.__dict__.items() if k == k.upper() and all(s not in k for s in ['DIR', 'PATH', 'SELECT_BEST', 'DEVICE'])})
 
         interval = max(1, (const.EPOCHS // 10))
         for epoch in range(init_epoch, const.EPOCHS + int(init_epoch == 0)):
@@ -54,7 +56,7 @@ def fit(model, optimizer, scheduler, criterion, train, val,
                     if criterion._get_name() != 'CrossEntropyLoss': metrics[f'{split}_ablated_ce_loss'].append(criterion.prev)
                     if split == 'train' and epoch > 0:  # epoch 0 is for evaluating performance on initalization
                         batch_loss.backward(inputs=optimizer.param_groups[0]['params'])
-                        mlflow.log_metric(f'{split}_batchwise_loss', batch_loss.item(), step=epoch * len(dataloader) + batch_idx)
+                        if use_mlflow_on_local_rank: mlflow.log_metric(f'{split}_batchwise_loss', batch_loss.item(), step=epoch * len(dataloader) + batch_idx)
 
                         if not (batch_idx+1) % const.GRAD_ACCUMULATION_STEPS: optimizer.step()
 
@@ -67,7 +69,14 @@ def fit(model, optimizer, scheduler, criterion, train, val,
             scheduler.step()
 
             metrics = {metric: np.mean(metrics[metric]) for metric in metrics}
-            mlflow.log_metrics(metrics, step=epoch-1)
+            if const.DDP: store.set(f'metric_{const.DEVICE}', metrics)
+
+            if use_mlflow_on_local_rank:
+                if const.DDP:
+                    dist_metrics = [store.get(f'metric_{id}') for i in range(int(os.environ['LOCAL_RANK']))]
+                    metrics = {key: np.mean([metric[key] for metric in dist_metrics]) for key in metrics.keys()}
+
+                mlflow.log_metrics(metrics, step=epoch-1)
 
             if const.SELECT_BEST and metrics['valid_acc'] > selected['acc']:
                 selected['best'] = deepcopy(model.state_dict())
@@ -88,8 +97,8 @@ def fit(model, optimizer, scheduler, criterion, train, val,
             selected['acc'] = metrics['valid_acc']
 
         if const.SELECT_BEST:
-            mlflow.log_metrics({'selected_epoch': selected['epoch'],
-                                'selected_valid_acc': selected['acc']}, step=epoch)
+            if use_mlflow_on_local_rank: mlflow.log_metrics({'selected_epoch': selected['epoch'],
+                                                             'selected_valid_acc': selected['acc']}, step=epoch)
             model.load_state_dict(selected['best'])
         else:
             selected['epoch'] = epoch
@@ -120,7 +129,8 @@ if __name__ == '__main__':
     if const.LOG_REMOTE: mlflow.set_tracking_uri(const.MLFLOW_TRACKING_URI)
 
     if const.DDP:
-        const.DEVICE = int(os.environ["LOCAL_RANK"])
+        store = dist.FileStore('/tmp/filestore')
+        const.DEVICE = int(os.environ['LOCAL_RANK'])
         torch.cuda.set_device(const.DEVICE)
         dist.init_process_group('nccl')  # let torchrun specify rank + world size + init method as environment variables
         dist.barrier(device_ids=[const.DEVICE])
