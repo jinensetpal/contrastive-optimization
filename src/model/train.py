@@ -145,7 +145,6 @@ if __name__ == '__main__':
     ema = optim.swa_utils.AveragedModel(model, device=const.DEVICE, avg_fn=optim.swa_utils.get_ema_avg_fn(1 - min(1, (1 - const.EMA_DECAY) * const.BATCH_SIZE * const.EMA_STEPS / const.EPOCHS)), use_buffers=True) if const.EMA else None
 
     if const.DDP:
-        model(torch.randn(1, *const.IMAGE_SHAPE).to(const.DEVICE))  # initialization
         model = nn.parallel.DistributedDataParallel(model, device_ids=[const.DEVICE])
         model.load_state_dict = model.module.load_state_dict
         model.state_dict = model.module.state_dict
@@ -189,7 +188,7 @@ if __name__ == '__main__':
     completed_epochs, selected = fit(model, optimizer, scheduler, criterion, train, val, ema=ema, selected=selected, **checkpoint_args)
 
     if const.DDP:
-        optimizer.consolidate_state_dict(to=const.DEVICE)
+        optimizer.consolidate_state_dict()
         dist.destroy_process_group()
 
     if not const.DDP or (const.DDP and const.DEVICE == 0):

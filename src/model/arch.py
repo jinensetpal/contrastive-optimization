@@ -35,11 +35,10 @@ class Model(nn.Module):
         self.backbone.layer4[-1].conv3.register_forward_hook(self._hook)
         self.backbone.fc = nn.Identity()
 
-        self.linear = nn.LazyLinear(const.N_CLASSES, bias=not is_contrastive)
+        self.linear = nn.Linear(2048, const.N_CLASSES, bias=not is_contrastive)
         self.softmax = nn.Softmax(dim=1)  # ~equivalent to sigmoid since classes = 2; relevant for CAMs
 
         self.to(self.device)
-        if not const.DDP: self(torch.randn(1, *input_shape).to(self.device))  # initialization
 
     def _hook(self, model, i, o):
         def assign(grad):
@@ -56,10 +55,7 @@ class Model(nn.Module):
         else: return self.softmax(logits), self._hi_res_cams(logits)
 
     def get_contrastive_cams(self, y, cams):
-        contrastive_cams = torch.empty((y.shape[0], cams.shape[-3], *cams.shape[-2:]), device=self.device)
-        for idx, (cam, y_idx) in enumerate(zip(cams, y.argmax(dim=1))): contrastive_cams[idx] = cam[y_idx] - cam
-
-        return contrastive_cams
+        return torch.index_select(cams.view(-1, *cams.shape[2:]), 0, y.argmax(1) + (torch.arange(cams.size(0), device=const.DEVICE) * cams.size(1))).repeat(1, cams.size(1), 1).view(*cams.shape) - cams
 
     def _bp_free_hi_res_cams(self):  # required to obtain gradients on self.linear.weight
         return (self.linear.weight @ self.feature_rect.flatten(2)).unflatten(2, self.feature_rect.shape[2:]) / self.feature_rect.shape[-1]**2
