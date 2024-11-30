@@ -32,10 +32,10 @@ def fit(model, optimizer, scheduler, criterion, train, val,
 
     with mlflow.start_run(mlflow_run_id) if is_primary_rank else nullcontext():
         # log hyperparameters
-        if is_primary_rank: mlflow.log_params({k: v for k, v in const.__dict__.items() if k == k.upper() and all(s not in k for s in ['DIR', 'PATH', 'SELECT_BEST', 'DEVICE', 'TMP_FILESTORE'])})
+        if is_primary_rank: mlflow.log_params({k: v for k, v in const.__dict__.items() if k == k.upper() and all(s not in k for s in ['DIR', 'PATH', 'EPOCHS', 'SELECT_BEST', 'DEVICE', 'TRAIN_CUTOFF', 'TMP_FILESTORE'])})
 
         interval = max(1, (const.EPOCHS // 10))
-        for epoch in range(init_epoch, const.EPOCHS + int(init_epoch == 0)):
+        for epoch in range(init_epoch, const.EPOCHS + 1 + int(init_epoch == 0)):
             if not (epoch) % interval: print('-' * 10)
             metrics = {metric: [] for metric in [f'{split}_{report}' for report in ['contrast_loss', 'acc', 'divergence_loss', 'ablated_ce_loss', 'cse_loss'] for split in const.SPLITS[:2]]}
 
@@ -76,7 +76,7 @@ def fit(model, optimizer, scheduler, criterion, train, val,
             if not is_primary_rank: continue
 
             if const.DDP:
-                dist_metrics = [json.loads(store.get(f'metric_{rank}')) for rank in range(int(os.environ['LOCAL_RANK']))]
+                dist_metrics = [json.loads(store.get(f'metric_{rank}')) for rank in range(int(os.environ['WORLD_SIZE']))]
                 metrics = {key: np.mean([metric[key] for metric in dist_metrics]) for key in metrics.keys()}
 
             mlflow.log_metrics(metrics, step=epoch-1)
@@ -93,7 +93,7 @@ def fit(model, optimizer, scheduler, criterion, train, val,
             if const.TRAIN_CUTOFF is not None and time.time() - start_time >= const.TRAIN_CUTOFF: break
 
         if is_primary_rank:
-            if ema: selected['ema'] = ema.state_dict()
+            if ema: selected['ema'] = ema
             selected['last'] = deepcopy(model.state_dict())
             if const.SELECT_BEST and 'best' not in selected:
                 selected['best'] = deepcopy(model.state_dict())
@@ -173,30 +173,30 @@ if __name__ == '__main__':
                        'mlflow_run_id': None}
     selected = None
     if const.CHECKPOINTING and len(sys.argv) == 2:  # add extra sys.argv to signify first checkpointing run
-        model.load_state_dict(torch.load(path / 'last.pt', map_location=torch.device(const.DEVICE)))
-        optimizer.load_state_dict(torch.load(path / 'optim.pt', map_location=torch.device(const.DEVICE)))
+        model.load_state_dict(torch.load(path / 'last.pt', map_location=torch.device(const.DEVICE), weights_only=True))
+        optimizer.load_state_dict(torch.load(path / 'optim.pt', map_location=torch.device(const.DEVICE), weights_only=True))
         checkpoint_args = json.load(open(path / 'checkpoint_metadata.json'))
         prev_metrics = mlflow.get_run(checkpoint_args['mlflow_run_id']).data.metrics
 
-        selected = {'best': torch.load(path / 'best.pt', map_location='cpu'),
+        selected = {'best': torch.load(path / 'best.pt', map_location='cpu', weights_only=True),
                     'last': model.state_dict(),
                     'epoch': prev_metrics['selected_epoch'],
                     'acc': prev_metrics['selected_valid_acc']}
         if ema and (path / 'ema.pt').exists():
-            selected['ema'] = torch.load(path / 'ema.pt', map_location=torch.device(const.DEVICE))
+            selected['ema'] = torch.load(path / 'ema.pt', map_location=torch.device(const.DEVICE), weights_only=False)
             ema = selected['ema']
 
     completed_epochs, selected = fit(model, optimizer, scheduler, criterion, train, val, ema=ema, selected=selected, **checkpoint_args)
 
     if const.DDP:
         optimizer.consolidate_state_dict(to=const.DEVICE)
-        dist.barrier(device_ids=[const.DEVICE])
         dist.destroy_process_group()
 
-    torch.save(selected['last'], path / 'last.pt')
-    if const.SELECT_BEST: torch.save(selected['best'], path / 'best.pt')
-    if const.EMA: torch.save(selected['ema'], path / 'ema.pt')
+    if not const.DDP or (const.DDP and const.DEVICE == 0):
+        torch.save(selected['last'], path / 'last.pt')
+        if const.SELECT_BEST: torch.save(selected['best'], path / 'best.pt')
+        if const.EMA: torch.save(selected['ema'], path / 'ema.pt')
 
-    if const.CHECKPOINTING:
-        torch.save(optimizer.state_dict(), path / 'optim.pt')
-        json.dump({'init_epoch': completed_epochs+1, 'mlflow_run_id': mlflow.last_active_run().info.run_id}, open(path / 'checkpoint_metadata.json', 'w'))
+        if const.CHECKPOINTING:
+            torch.save(optimizer.state_dict(), path / 'optim.pt')
+            json.dump({'init_epoch': completed_epochs+1, 'mlflow_run_id': mlflow.last_active_run().info.run_id}, open(path / 'checkpoint_metadata.json', 'w'))
