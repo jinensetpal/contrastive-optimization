@@ -64,9 +64,11 @@ def get_generators():
 
     datasets = [Dataset(split=split, bbox=const.BBOX_MAP) for split in const.SPLITS[:2]]
     samplers = [utils.RASampler(dataset, shuffle=True, repetitions=const.AUGMENT_REPITIONS) for dataset in datasets]
-    return *[torch.utils.data.DataLoader(dataset, collate_fn=collate_fn, sampler=sampler,
-                                         batch_size=const.BATCH_SIZE if split == 'train' else const.EVAL_BATCH_SIZE)
-             for dataset, sampler, split in zip(datasets, samplers, const.SPLITS[:2])], None
+    dataloaders = *[torch.utils.data.DataLoader(dataset, collate_fn=collate_fn, sampler=sampler,
+                                                batch_size=const.BATCH_SIZE if split == 'train' else const.EVAL_BATCH_SIZE)
+                    for dataset, sampler, split in zip(datasets, samplers, const.SPLITS[:2])], None
+    const.SPLITS[1] = 'valid'
+    return dataloaders
 
 
 if __name__ == '__main__':

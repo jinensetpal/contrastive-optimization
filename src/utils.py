@@ -89,20 +89,6 @@ class TrivialAugmentWide(T.TrivialAugmentWide):
         return self._unflatten_and_insert_image_or_video(flat_inputs_with_spec, image_or_video)
 
 
-class ExponentialMovingAverage(torch.optim.swa_utils.AveragedModel):
-    """Maintains moving averages of model parameters using an exponential decay.
-    ``ema_avg = decay * avg_model_param + (1 - decay) * model_param``
-    `torch.optim.swa_utils.AveragedModel <https://pytorch.org/docs/stable/optim.html#custom-averaging-strategies>`_
-    is used to compute the EMA.
-    """
-
-    def __init__(self, model, decay, device="cpu"):
-        def ema_avg(avg_model_param, model_param, num_averaged):
-            return decay * avg_model_param + (1 - decay) * model_param
-
-        super().__init__(model, device, ema_avg, use_buffers=True)
-
-
 class ClassificationPresetTrain:
     # Note: this transform assumes that the input to forward() are always PIL
     # images, regardless of the backend parameter. We may change that in the

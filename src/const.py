@@ -7,6 +7,7 @@ import torch
 BASE_DIR = Path(__file__).parent.parent
 DATA_DIR = BASE_DIR / 'data'
 MODELS_DIR = BASE_DIR / 'models'
+TMP_FILESTORE = BASE_DIR / 'filestore'
 
 # training
 DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
@@ -20,7 +21,7 @@ WEIGHT_DECAY = 2E-5
 SELECT_BEST = True
 FINETUNING = False
 OPTIMIZER = 'SGD'
-BATCH_SIZE = 1
+BATCH_SIZE = 256
 MOMENTUM = .9
 EPOCHS = 600
 DDP = True

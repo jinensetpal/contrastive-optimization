@@ -7,10 +7,10 @@ from contextlib import nullcontext
 from .loss import ContrastiveLoss
 import torch.distributed as dist
 import torch.nn.functional as F
-from src import const, utils
 from copy import deepcopy
 from torch import optim
 from .arch import Model
+from src import const
 from torch import nn
 import numpy as np
 import mlflow
@@ -28,11 +28,11 @@ def fit(model, optimizer, scheduler, criterion, train, val,
     selected = selected or {'last': model.state_dict(),
                             'epoch': init_epoch,
                             'acc': 0.0}
-    use_mlflow_on_local_rank = not const.DDP or (const.DDP and const.DEVICE == 0)
+    is_primary_rank = not const.DDP or (const.DDP and const.DEVICE == 0)
 
-    with mlflow.start_run(mlflow_run_id) if use_mlflow_on_local_rank else nullcontext():
+    with mlflow.start_run(mlflow_run_id) if is_primary_rank else nullcontext():
         # log hyperparameters
-        if use_mlflow_on_local_rank: mlflow.log_params({k: v for k, v in const.__dict__.items() if k == k.upper() and all(s not in k for s in ['DIR', 'PATH', 'SELECT_BEST', 'DEVICE'])})
+        if is_primary_rank: mlflow.log_params({k: v for k, v in const.__dict__.items() if k == k.upper() and all(s not in k for s in ['DIR', 'PATH', 'SELECT_BEST', 'DEVICE', 'TMP_FILESTORE'])})
 
         interval = max(1, (const.EPOCHS // 10))
         for epoch in range(init_epoch, const.EPOCHS + int(init_epoch == 0)):
@@ -56,7 +56,7 @@ def fit(model, optimizer, scheduler, criterion, train, val,
                     if criterion._get_name() != 'CrossEntropyLoss': metrics[f'{split}_ablated_ce_loss'].append(criterion.prev)
                     if split == 'train' and epoch > 0:  # epoch 0 is for evaluating performance on initalization
                         batch_loss.backward(inputs=optimizer.param_groups[0]['params'])
-                        if use_mlflow_on_local_rank: mlflow.log_metric(f'{split}_batchwise_loss', batch_loss.item(), step=epoch * len(dataloader) + batch_idx)
+                        if is_primary_rank: mlflow.log_metric(f'{split}_batchwise_loss', batch_loss.item(), step=epoch * len(dataloader) + batch_idx)
 
                         if not (batch_idx+1) % const.GRAD_ACCUMULATION_STEPS: optimizer.step()
 
@@ -69,15 +69,17 @@ def fit(model, optimizer, scheduler, criterion, train, val,
             scheduler.step()
 
             metrics = {metric: np.mean(metrics[metric]) for metric in metrics}
-            if const.DDP: store.set(f'metric_{const.DEVICE}', json.dumps(metrics))
+            if const.DDP:
+                store.set(f'metric_{const.DEVICE}', json.dumps(metrics))
+                dist.barrier(device_ids=[const.DEVICE])
 
-            if use_mlflow_on_local_rank:
-                if const.DDP:
-                    dist.barrier(device_ids=[const.DEVICE])
-                    dist_metrics = [json.loads(store.get(f'metric_{rank}')) for rank in range(int(os.environ['LOCAL_RANK']))]
-                    metrics = {key: np.mean([metric[key] for metric in dist_metrics]) for key in metrics.keys()}
+            if not is_primary_rank: continue
 
-                mlflow.log_metrics(metrics, step=epoch-1)
+            if const.DDP:
+                dist_metrics = [json.loads(store.get(f'metric_{rank}')) for rank in range(int(os.environ['LOCAL_RANK']))]
+                metrics = {key: np.mean([metric[key] for metric in dist_metrics]) for key in metrics.keys()}
+
+            mlflow.log_metrics(metrics, step=epoch-1)
 
             if const.SELECT_BEST and metrics['valid_acc'] > selected['acc']:
                 selected['best'] = deepcopy(model.state_dict())
@@ -90,20 +92,22 @@ def fit(model, optimizer, scheduler, criterion, train, val,
 
             if const.TRAIN_CUTOFF is not None and time.time() - start_time >= const.TRAIN_CUTOFF: break
 
-        if ema: selected['ema'] = ema.state_dict()
-        selected['last'] = deepcopy(model.state_dict())
-        if const.SELECT_BEST and 'best' not in selected:
-            selected['best'] = deepcopy(model.state_dict())
-            selected['epoch'] = epoch
-            selected['acc'] = metrics['valid_acc']
+        if is_primary_rank:
+            if ema: selected['ema'] = ema.state_dict()
+            selected['last'] = deepcopy(model.state_dict())
+            if const.SELECT_BEST and 'best' not in selected:
+                selected['best'] = deepcopy(model.state_dict())
+                selected['epoch'] = epoch
+                selected['acc'] = metrics['valid_acc']
 
-        if const.SELECT_BEST:
-            if use_mlflow_on_local_rank: mlflow.log_metrics({'selected_epoch': selected['epoch'],
-                                                             'selected_valid_acc': selected['acc']}, step=epoch)
-            model.load_state_dict(selected['best'])
-        else:
-            selected['epoch'] = epoch
-            selected['acc'] = metrics['valid_acc']
+            if const.SELECT_BEST:
+                mlflow.log_metrics({'selected_epoch': selected['epoch'],
+                                    'selected_valid_acc': selected['acc']}, step=epoch)
+                model.load_state_dict(selected['best'])
+            else:
+                selected['epoch'] = epoch
+                selected['acc'] = metrics['valid_acc']
+
         print('-' * 10)
         return epoch, selected
 
@@ -130,7 +134,7 @@ if __name__ == '__main__':
     if const.LOG_REMOTE: mlflow.set_tracking_uri(const.MLFLOW_TRACKING_URI)
 
     if const.DDP:
-        store = dist.FileStore('/tmp/filestore')
+        store = dist.FileStore(const.TMP_FILESTORE.as_posix())
         const.DEVICE = int(os.environ['LOCAL_RANK'])
         torch.cuda.set_device(const.DEVICE)
         dist.init_process_group('nccl')  # let torchrun specify rank + world size + init method as environment variables
@@ -138,9 +142,10 @@ if __name__ == '__main__':
 
     model = Model(const.IMAGE_SHAPE, is_contrastive=is_contrastive).to(const.DEVICE)
     criterion = ContrastiveLoss(model.get_contrastive_cams, is_label_mask=const.DATASET == 'imagenet') if is_contrastive else nn.CrossEntropyLoss(label_smoothing=const.LABEL_SMOOTHING)
-    ema = utils.ExponentialMovingAverage(model, device=const.DEVICE, decay=1 - min(1, (1 - const.EMA_DECAY) * const.BATCH_SIZE * const.EMA_STEPS / const.EPOCHS)) if const.EMA else None
+    ema = optim.swa_utils.AveragedModel(model, device=const.DEVICE, avg_fn=optim.swa_utils.get_ema_avg_fn(1 - min(1, (1 - const.EMA_DECAY) * const.BATCH_SIZE * const.EMA_STEPS / const.EPOCHS)), use_buffers=True) if const.EMA else None
 
     if const.DDP:
+        model(torch.randn(1, *const.IMAGE_SHAPE).to(const.DEVICE))  # initialization
         model = nn.parallel.DistributedDataParallel(model, device_ids=[const.DEVICE])
         model.load_state_dict = model.module.load_state_dict
         model.state_dict = model.module.state_dict
@@ -186,6 +191,7 @@ if __name__ == '__main__':
     if const.DDP:
         optimizer.consolidate_state_dict(to=const.DEVICE)
         dist.barrier(device_ids=[const.DEVICE])
+        dist.destroy_process_group()
 
     torch.save(selected['last'], path / 'last.pt')
     if const.SELECT_BEST: torch.save(selected['best'], path / 'best.pt')
@@ -194,5 +200,3 @@ if __name__ == '__main__':
     if const.CHECKPOINTING:
         torch.save(optimizer.state_dict(), path / 'optim.pt')
         json.dump({'init_epoch': completed_epochs+1, 'mlflow_run_id': mlflow.last_active_run().info.run_id}, open(path / 'checkpoint_metadata.json', 'w'))
-
-    if const.DDP: dist.destroy_process_group()

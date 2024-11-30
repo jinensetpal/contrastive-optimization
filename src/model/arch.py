@@ -39,7 +39,7 @@ class Model(nn.Module):
         self.softmax = nn.Softmax(dim=1)  # ~equivalent to sigmoid since classes = 2; relevant for CAMs
 
         self.to(self.device)
-        self(torch.randn(1, *input_shape).to(self.device))  # initialization
+        if not const.DDP: self(torch.randn(1, *input_shape).to(self.device))  # initialization
 
     def _hook(self, model, i, o):
         def assign(grad):
@@ -62,7 +62,7 @@ class Model(nn.Module):
         return contrastive_cams
 
     def _bp_free_hi_res_cams(self):  # required to obtain gradients on self.linear.weight
-        return (self.linear.weight @ self.feature_rect.flatten(2)).unflatten(2, (14, 14)) / const.CAM_SIZE[0]**2
+        return (self.linear.weight @ self.feature_rect.flatten(2)).unflatten(2, self.feature_rect.shape[2:]) / self.feature_rect.shape[-1]**2
 
     def _hi_res_cams(self, logits):
         cams = torch.zeros(*logits.shape, *self.feature_rect.shape[2:], device=self.device)
