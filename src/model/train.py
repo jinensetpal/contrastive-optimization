@@ -69,11 +69,12 @@ def fit(model, optimizer, scheduler, criterion, train, val,
             scheduler.step()
 
             metrics = {metric: np.mean(metrics[metric]) for metric in metrics}
-            if const.DDP: store.set(f'metric_{const.DEVICE}', metrics)
+            if const.DDP: store.set(f'metric_{const.DEVICE}', json.dumps(metrics))
 
             if use_mlflow_on_local_rank:
                 if const.DDP:
-                    dist_metrics = [store.get(f'metric_{id}') for i in range(int(os.environ['LOCAL_RANK']))]
+                    dist.barrier(device_ids=[const.DEVICE])
+                    dist_metrics = [json.loads(store.get(f'metric_{rank}')) for rank in range(int(os.environ['LOCAL_RANK']))]
                     metrics = {key: np.mean([metric[key] for metric in dist_metrics]) for key in metrics.keys()}
 
                 mlflow.log_metrics(metrics, step=epoch-1)

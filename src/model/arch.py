@@ -8,7 +8,7 @@ import torch
 
 class Model(nn.Module):
     def __init__(self, input_shape, randomized_flatten=const.RANDOMIZED_FLATTEN,
-                 device=const.DEVICE, is_contrastive=True, no_downsampling=False):
+                 device=const.DEVICE, is_contrastive=True, downsampling_level=1):
         super().__init__()
 
         self.device = device
@@ -16,7 +16,10 @@ class Model(nn.Module):
         self.randomized_flatten = const.RANDOMIZED_FLATTEN
         self.backbone = torchvision.models.resnet50(weights=torchvision.models.ResNet50_Weights.IMAGENET1K_V2 if const.PRETRAINED_BACKBONE else None)
 
-        if no_downsampling:
+        if downsampling_level >= 1:
+            self.backbone.layer4[0].conv2.stride = (1, 1)
+            self.backbone.layer4[0].downsample[0].stride = (1, 1)
+        if downsampling_level >= 2:
             self.backbone.conv1.stride = (1, 1)
             self.backbone.maxpool.stride = 1
 
@@ -25,10 +28,6 @@ class Model(nn.Module):
 
             self.backbone.layer3[0].conv2.stride = (1, 1)
             self.backbone.layer3[0].downsample[0].stride = (1, 1)
-
-        # one ablated downsampling is required for (224, 224) input
-        self.backbone.layer4[0].conv2.stride = (1, 1)
-        self.backbone.layer4[0].downsample[0].stride = (1, 1)
 
         if is_contrastive:
             self.backbone.layer4[-1].bn3 = nn.Identity()
@@ -53,7 +52,7 @@ class Model(nn.Module):
         if self.training and self.randomized_flatten: x = x[:, torch.randperm(x.shape[1])]
         logits = self.linear(x)
 
-        if self.training: return logits, self._bp_free_hi_res_cams(logits)
+        if self.training: return logits, self._bp_free_hi_res_cams()
         else: return self.softmax(logits), self._hi_res_cams(logits)
 
     def get_contrastive_cams(self, y, cams):
@@ -62,16 +61,8 @@ class Model(nn.Module):
 
         return contrastive_cams
 
-    def _bp_free_hi_res_cams(self, logits):  # required to obtain gradients on self.linear.weight
-        cams = torch.zeros(*logits.shape, *self.feature_rect.shape[2:], device=self.device)
-        for img_idx in range(logits.shape[0]):
-            for class_idx, weight in enumerate(self.linear.weight):
-                cams[img_idx, class_idx] = (weight[None, None].repeat(*const.CAM_SIZE, 1).permute(2, 0, 1) * self.feature_rect[img_idx]).sum(dim=0)
-        cams /= const.CAM_SIZE[0]**2
-
-        self.feature_rect = None
-
-        return cams
+    def _bp_free_hi_res_cams(self):  # required to obtain gradients on self.linear.weight
+        return (self.linear.weight @ self.feature_rect.flatten(2)).unflatten(2, (14, 14)) / const.CAM_SIZE[0]**2
 
     def _hi_res_cams(self, logits):
         cams = torch.zeros(*logits.shape, *self.feature_rect.shape[2:], device=self.device)
