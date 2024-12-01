@@ -42,6 +42,8 @@ def fit(model, optimizer, scheduler, criterion, train, val,
             for split, dataloader in zip(const.SPLITS[:2], (train, val)):
                 for batch_idx, (X, y) in enumerate(dataloader):
                     if not (batch_idx+1) % const.GRAD_ACCUMULATION_STEPS: optimizer.zero_grad()
+                    X = X.to(const.DEVICE)
+                    y = [y_i.to(const.DEVICE) for y_i in y]
 
                     y_pred = model(X)
                     batch_loss = criterion(y_pred, y) if criterion._get_name() != 'CrossEntropyLoss' else criterion(y_pred[0], y[1])
