@@ -30,10 +30,10 @@ class Dataset(torch.utils.data.Dataset):
         return len(self.df)
 
     def __getitem__(self, idx):
-        X = torchvision.io.read_image((const.DATA_DIR / 'imagenet' / self.df['path'].iloc[idx]).as_posix()).to(const.DEVICE)
+        X = torchvision.io.read_image((const.DATA_DIR / 'imagenet' / self.df['path'].iloc[idx]).as_posix())
         if X.size(0) == 1: X = X.repeat(3, 1, 1)
 
-        heatmap = torch.zeros(X.shape[1:], device=const.DEVICE)
+        heatmap = torch.zeros(X.shape[1:])
         X = resize(X, const.IMAGE_SIZE, antialias=True)[:3]
 
         if const.BBOX_MAP:
@@ -46,17 +46,22 @@ class Dataset(torch.utils.data.Dataset):
         X, heatmap = self.transforms([X[None,], heatmap])
 
         heatmap = resize(heatmap.mean(dim=1), const.CAM_SIZE, antialias=False).squeeze(0)
-        heatmap[heatmap <= 0] = -1
-        heatmap[heatmap > 0] = int(self.df['label_idx'][idx])   # set to class labels for cutmix
 
-        y = torch.zeros(const.N_CLASSES, device=const.DEVICE)
+        if const.USE_CUTMIX:
+            heatmap[heatmap <= 0] = -1
+            heatmap[heatmap > 0] = int(self.df['label_idx'][idx])   # set to class labels for cutmix
+        else:
+            heatmap[heatmap < 0] = 0
+            heatmap[heatmap > 0] = 1
+
+        y = torch.zeros(const.N_CLASSES)
         y[int(self.df['label_idx'][idx])] = 1
 
         return X[0], (heatmap, y)
 
 
 def collate_fn(batch):
-    return utils.CutMix(alpha=const.CUTMIX_ALPHA, num_classes=const.N_CLASSES, labels_getter=lambda x: x[1][1])(*default_collate(batch))
+    return utils.CutMix(alpha=const.CUTMIX_ALPHA, num_classes=const.N_CLASSES, labels_getter=lambda x: x[1][1])(*default_collate(batch)) if const.USE_CUTMIX else None
 
 
 def get_generators():

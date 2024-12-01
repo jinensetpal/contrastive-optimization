@@ -143,7 +143,7 @@ if __name__ == '__main__':
         dist.barrier(device_ids=[const.DEVICE])
 
     model = Model(const.IMAGE_SHAPE, is_contrastive=is_contrastive).to(const.DEVICE)
-    criterion = ContrastiveLoss(model.get_contrastive_cams, is_label_mask=const.DATASET == 'imagenet') if is_contrastive else nn.CrossEntropyLoss(label_smoothing=const.LABEL_SMOOTHING)
+    criterion = ContrastiveLoss(model.get_contrastive_cams, is_label_mask=const.USE_CUTMIX) if is_contrastive else nn.CrossEntropyLoss(label_smoothing=const.LABEL_SMOOTHING)
     ema = optim.swa_utils.AveragedModel(model, device=const.DEVICE, avg_fn=optim.swa_utils.get_ema_avg_fn(1 - min(1, (1 - const.EMA_DECAY) * const.BATCH_SIZE * const.EMA_STEPS / const.EPOCHS)), use_buffers=True) if const.EMA else None
 
     if const.DDP:
