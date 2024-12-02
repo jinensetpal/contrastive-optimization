@@ -136,6 +136,7 @@ if __name__ == '__main__':
     if const.LOG_REMOTE: mlflow.set_tracking_uri(const.MLFLOW_TRACKING_URI)
 
     if const.DDP:
+        (const.TMP_FILESTORE.parent).mkdir(exist_ok=True, parents=True)
         store = dist.FileStore(const.TMP_FILESTORE.as_posix())
         const.DEVICE = int(os.environ['LOCAL_RANK'])
         torch.cuda.set_device(const.DEVICE)

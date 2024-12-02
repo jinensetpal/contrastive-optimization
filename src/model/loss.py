@@ -13,18 +13,6 @@ class ContrastiveLoss(nn.Module):
         self.get_contrastive_cams = get_contrastive_cams_fn
         self.is_label_mask = is_label_mask
 
-        self.apply_cutmix_ablation_jit = torch.jit.trace(self.apply_cutmix_ablation, (torch.rand(const.BATCH_SIZE, const.N_CLASSES),
-                                                                                      torch.randn(const.BATCH_SIZE, const.N_CLASSES, *const.CAM_SIZE),
-                                                                                      torch.randn(const.BATCH_SIZE, const.N_CLASSES, *const.CAM_SIZE),
-                                                                                      torch.randn(const.BATCH_SIZE)))
-
-    @staticmethod
-    def apply_cutmix_ablation(ablation, cc, cams, labels):
-        for idx, (candidates, target) in enumerate(zip(cams.flatten(start_dim=1).to(torch.int).unique(dim=1), labels)):
-            for candidate in set(candidates[(candidates != -1) & (candidates != target)].tolist()):
-                ablation[idx, candidate] += ((cams[idx] == candidate) * (cc[idx, candidate] - cc[idx, candidate].abs())).sum()
-        return ablation
-
     def forward(self, y_pred, y):
         cc = self.get_contrastive_cams(y[1], y_pred[1]).to(const.DEVICE)
 
@@ -33,7 +21,16 @@ class ContrastiveLoss(nn.Module):
             fg_mask = torch.cat([(c == y).to(torch.int)[None,] for c, y in zip(y[0], labels)]).repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3).to(const.DEVICE)
 
             ablation = (-cc * fg_mask + cc.abs() * (1 - fg_mask)).sum(dim=[2, 3])
-            ablation = self.apply_cutmix_ablation_jit(ablation, cc, y[0], labels)
+
+            mixup_sparse_mask = torch.zeros(cc.shape, device=const.DEVICE, dtype=torch.int)
+            mixup_mask = 1 - fg_mask[:, 0] - (y[0] == -1).to(torch.int)
+            mixed_idx = (mixup_mask * (y[0] + 1)).to(torch.int).flatten(start_dim=1).max(dim=1).values - 1
+
+            flattened_idx = ((mixed_idx + 1) + torch.arange(const.BATCH_SIZE, device=const.DEVICE) * const.N_CLASSES)
+            flattened_idx = flattened_idx[(flattened_idx % const.N_CLASSES).nonzero().flatten()]
+            mixup_sparse_mask.view(-1, *const.CAM_SIZE)[flattened_idx] = mixup_mask[(mixed_idx + 1).nonzero().flatten()]
+
+            ablation += (mixup_sparse_mask * (-cc.abs() + cc)).sum(dim=[2, 3])
         else:
             fg_mask = (y[0] == 1).to(torch.int).repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3).to(const.DEVICE)
 
