@@ -20,21 +20,17 @@ class ContrastiveLoss(nn.Module):
             labels = y[1].argmax(1)
             fg_mask = torch.cat([(c == y).to(torch.int)[None,] for c, y in zip(y[0], labels)]).repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3).to(const.DEVICE)
 
-            ablation = (-cc * fg_mask + cc.abs() * (1 - fg_mask)).sum(dim=[2, 3])
-
-            mixup_sparse_mask = torch.zeros(cc.shape, device=const.DEVICE, dtype=torch.int)
             mixup_mask = 1 - fg_mask[:, 0] - (y[0] == -1).to(torch.int)
-            mixed_idx = (mixup_mask * (y[0] + 1)).to(torch.int).flatten(start_dim=1).max(dim=1).values - 1
+            mixup_sparse_mask = torch.zeros(cc.shape, device=const.DEVICE, dtype=torch.int)
+            mixed_idx = (mixup_mask * (y[0] + 1)).to(torch.int).flatten(start_dim=1).max(dim=1).values
+            mixup_sparse_mask.view(-1, *const.CAM_SIZE)[mixed_idx[mixed_idx.nonzero().flatten()] - 1 + mixed_idx.nonzero().flatten() * const.N_CLASSES] = mixup_mask[mixed_idx.nonzero().flatten()]
 
-            flattened_idx = ((mixed_idx + 1) + torch.arange(const.BATCH_SIZE, device=const.DEVICE) * const.N_CLASSES)
-            flattened_idx = flattened_idx[(flattened_idx % const.N_CLASSES).nonzero().flatten()]
-            mixup_sparse_mask.view(-1, *const.CAM_SIZE)[flattened_idx] = mixup_mask[(mixed_idx + 1).nonzero().flatten()]
-
+            ablation = (-cc * fg_mask + cc.abs() * (1 - fg_mask)).sum(dim=[2, 3])
             ablation += (mixup_sparse_mask * (-cc.abs() + cc)).sum(dim=[2, 3])
         else:
             fg_mask = (y[0] == 1).to(torch.int).repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3).to(const.DEVICE)
-
             ablation = (-cc * fg_mask + cc.abs() * (1 - fg_mask)).sum(dim=[2, 3])
+
         ace = self.ce(ablation, y[1])
 
         self.prev = ace.item()
