@@ -2,12 +2,13 @@
 
 from pathlib import Path
 import torch
+import uuid
 
 # directories
 BASE_DIR = Path(__file__).parent.parent
 DATA_DIR = BASE_DIR / 'data'
 MODELS_DIR = BASE_DIR / 'models'
-TMP_FILESTORE = BASE_DIR / 'filestore'
+TMP_FILESTORE = BASE_DIR / 'filestore' / uuid.uuid1().hex
 
 # training
 DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
@@ -43,26 +44,24 @@ CONFIDENCE_THRESHOLD = .85
 # dataset
 SEED = 1024
 BBOX_MAP = True
-AUTO_AUGMENT_POLICY = 'ta_wide'
+USE_CUTMIX = True
+CUTMIX_ALPHA = 1.
+BINARY_CLS = True
+N_CHANNELS = 3
+CAM_SIZE = (14, 14)
+DATASET = 'imagenet'
 VAL_CROP_SIZE = 224
+LABEL_SMOOTHING = .1
 VAL_RESIZE_SIZE = 232
 TRAIN_CROP_SIZE = 224
-RANDOM_ERASE_PROB = .1
-USE_CUTMIX = False
-CUTMIX_ALPHA = 1.
-DATASET = 'imagenet'
-LABEL_SMOOTHING = .1
 AUGMENT_REPITIONS = 4
-SPLITS = ['train', 'valid', 'test']
+RANDOM_ERASE_PROB = .1
 IMAGE_SIZE = (224, 224)
-CAM_SIZE = (14, 14)
-N_CHANNELS = 3
-BINARY_CLS = True
+AUTO_AUGMENT_POLICY = 'ta_wide'
+SPLITS = ['train', 'valid', 'test']
 IMAGE_SHAPE = (N_CHANNELS,) + IMAGE_SIZE
 
-if DATASET == 'imagenet':
-    N_CLASSES = 1000
-    SPLITS[1] = 'val'
+if DATASET == 'imagenet': N_CLASSES = 1000
 else: N_CLASSES = 2 if BINARY_CLS else 37
 
 # logging

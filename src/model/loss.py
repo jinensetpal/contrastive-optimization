@@ -13,6 +13,18 @@ class ContrastiveLoss(nn.Module):
         self.get_contrastive_cams = get_contrastive_cams_fn
         self.is_label_mask = is_label_mask
 
+        self.apply_cutmix_ablation_jit = torch.jit.trace(self.apply_cutmix_ablation, (torch.rand(const.BATCH_SIZE, const.N_CLASSES),
+                                                                                      torch.randn(const.BATCH_SIZE, const.N_CLASSES, *const.CAM_SIZE),
+                                                                                      torch.randn(const.BATCH_SIZE, const.N_CLASSES, *const.CAM_SIZE),
+                                                                                      torch.randn(const.BATCH_SIZE)))
+
+    @staticmethod
+    def apply_cutmix_ablation(ablation, cc, cams, labels):
+        for idx, (candidates, target) in enumerate(zip(cams.flatten(start_dim=1).to(torch.int).unique(dim=1), labels)):
+            for candidate in set(candidates[(candidates != -1) & (candidates != target)].tolist()):
+                ablation[idx, candidate] += ((cams[idx] == candidate) * (cc[idx, candidate] - cc[idx, candidate].abs())).sum()
+        return ablation
+
     def forward(self, y_pred, y):
         cc = self.get_contrastive_cams(y[1], y_pred[1]).to(const.DEVICE)
 
@@ -21,10 +33,7 @@ class ContrastiveLoss(nn.Module):
             fg_mask = torch.cat([(c == y).to(torch.int)[None,] for c, y in zip(y[0], labels)]).repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3).to(const.DEVICE)
 
             ablation = (-cc * fg_mask + cc.abs() * (1 - fg_mask)).sum(dim=[2, 3])
-
-            for idx, (candidates, target) in enumerate(zip(y[0].flatten(start_dim=1).to(torch.int).unique(dim=1), labels)):
-                for candidate in set(candidates[(candidates != -1) & (candidates != target)].tolist()):
-                    ablation[idx, candidate] += ((y[0][idx] == candidate) * (cc[idx, candidate] - cc[idx, candidate].abs())).sum()
+            ablation = self.apply_cutmix_ablation_jit(ablation, cc, y[0], labels)
         else:
             fg_mask = (y[0] == 1).to(torch.int).repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3).to(const.DEVICE)
 

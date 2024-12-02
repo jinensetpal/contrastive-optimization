@@ -61,11 +61,11 @@ class Dataset(torch.utils.data.Dataset):
 
 
 def collate_fn(batch):
-    return utils.CutMix(alpha=const.CUTMIX_ALPHA, num_classes=const.N_CLASSES, labels_getter=lambda x: x[1][1])(*default_collate(batch)) if const.USE_CUTMIX else None
+    return utils.CutMix(alpha=const.CUTMIX_ALPHA, num_classes=const.N_CLASSES, labels_getter=lambda x: x[1][1])(*default_collate(batch)) if const.USE_CUTMIX else default_collate(batch)
 
 
 def get_generators():
-    torch.multiprocessing.set_start_method('spawn')
+    torch.multiprocessing.set_start_method('spawn', force=True)
     const.SPLITS[1] = 'val'
 
     datasets = [Dataset(split=split, bbox=const.BBOX_MAP) for split in const.SPLITS[:2]]
