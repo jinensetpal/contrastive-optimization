@@ -58,7 +58,7 @@ def fit(model, optimizer, scheduler, criterion, train, val,
                     if criterion._get_name() != 'CrossEntropyLoss': metrics[f'{split}_ablated_ce_loss'].append(criterion.prev)
                     if split == 'train' and epoch > 0:  # epoch 0 is for evaluating performance on initalization
                         batch_loss.backward(inputs=optimizer.param_groups[0]['params'])
-                        if is_primary_rank: mlflow.log_metric(f'{split}_batchwise_loss', batch_loss.item(), step=epoch * len(dataloader) + batch_idx)
+                        if is_primary_rank: mlflow.log_metric(f'{split}_batchwise_loss', batch_loss.item(), step=(epoch-1) * len(dataloader) + batch_idx)
 
                         if not (batch_idx+1) % const.GRAD_ACCUMULATION_STEPS: optimizer.step()
 
@@ -68,20 +68,23 @@ def fit(model, optimizer, scheduler, criterion, train, val,
 
                     del batch_loss
                     torch.cuda.empty_cache()
-            scheduler.step()
 
             metrics = {metric: np.mean(metrics[metric]) for metric in metrics}
             if const.DDP:
                 store.set(f'metric_{const.DEVICE}', json.dumps(metrics))
                 dist.barrier(device_ids=[const.DEVICE])
 
-            if not is_primary_rank: continue
+            if not is_primary_rank:
+                scheduler.step()
+                continue
 
             if const.DDP:
                 dist_metrics = [json.loads(store.get(f'metric_{rank}')) for rank in range(int(os.environ['WORLD_SIZE']))]
                 metrics = {key: np.mean([metric[key] for metric in dist_metrics]) for key in metrics.keys()}
 
+            metrics['lr'] = scheduler.get_last_lr()[-1]
             mlflow.log_metrics(metrics, step=epoch-1)
+            scheduler.step()
 
             if const.SELECT_BEST and metrics['valid_acc'] > selected['acc']:
                 selected['best'] = deepcopy(model.state_dict())
