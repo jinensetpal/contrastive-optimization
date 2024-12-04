@@ -32,7 +32,7 @@ def fit(model, optimizer, scheduler, criterion, train, val,
 
     with mlflow.start_run(mlflow_run_id) if is_primary_rank else nullcontext():
         # log hyperparameters
-        if is_primary_rank: mlflow.log_params({k: v for k, v in const.__dict__.items() if k == k.upper() and all(s not in k for s in ['DIR', 'PATH', 'EPOCHS', 'SELECT_BEST', 'DEVICE', 'TRAIN_CUTOFF', 'TMP_FILESTORE'])})
+        if is_primary_rank: mlflow.log_params({k: v for k, v in const.__dict__.items() if k == k.upper() and all(s not in k for s in ['DIR', 'PATH', 'EPOCHS', 'SELECT_BEST', 'DEVICE', 'TRAIN_CUTOFF', 'PORT'])})
 
         interval = max(1, (const.EPOCHS // 10))
         for epoch in range(init_epoch, const.EPOCHS + 1 + int(init_epoch == 0)):
@@ -139,11 +139,10 @@ if __name__ == '__main__':
     if const.LOG_REMOTE: mlflow.set_tracking_uri(const.MLFLOW_TRACKING_URI)
 
     if const.DDP:
-        (const.TMP_FILESTORE.parent).mkdir(exist_ok=True, parents=True)
-        store = dist.FileStore(const.TMP_FILESTORE.as_posix())
         const.DEVICE = int(os.environ['LOCAL_RANK'])
+        store = dist.TCPStore('127.0.0.1', const.PORT, is_master=const.DEVICE == 0)
         torch.cuda.set_device(const.DEVICE)
-        dist.init_process_group('nccl')  # let torchrun specify rank + world size + init method as environment variables
+        dist.init_process_group('nccl')
         dist.barrier(device_ids=[const.DEVICE])
 
     model = Model(const.IMAGE_SHAPE, is_contrastive=is_contrastive).to(const.DEVICE)

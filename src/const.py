@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 
+from src.utils import get_open_port
 from pathlib import Path
 import torch
-import uuid
 
 # directories
 BASE_DIR = Path(__file__).parent.parent
 DATA_DIR = BASE_DIR / 'data'
 MODELS_DIR = BASE_DIR / 'models'
-TMP_FILESTORE = BASE_DIR / 'filestore' / uuid.uuid1().hex
 
 # training
 DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
@@ -17,6 +16,7 @@ LAMBDAS = [1E1, 5E1, 1, 0]
 GRAD_ACCUMULATION_STEPS = 2
 PRETRAINED_BACKBONE = False
 RANDOMIZED_FLATTEN = False
+PORT = get_open_port()
 CHECKPOINTING = True
 WEIGHT_DECAY = 2E-5
 SELECT_BEST = True
