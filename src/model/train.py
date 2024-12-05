@@ -35,7 +35,7 @@ def fit(model, optimizer, scheduler, criterion, train, val,
         if is_primary_rank: mlflow.log_params({k: v for k, v in const.__dict__.items() if k == k.upper() and all(s not in k for s in ['DIR', 'PATH', 'EPOCHS', 'SELECT_BEST', 'DEVICE', 'TRAIN_CUTOFF', 'PORT'])})
 
         interval = max(1, (const.EPOCHS // 10))
-        for epoch in range(init_epoch, const.EPOCHS + 1 + int(init_epoch == 0)):
+        for epoch in range(init_epoch, const.EPOCHS + int(init_epoch == 0)):
             if not (epoch) % interval: print('-' * 10)
             metrics = {metric: [] for metric in [f'{split}_{report}' for report in ['contrast_loss', 'acc', 'divergence_loss', 'ablated_ce_loss', 'cse_loss'] for split in const.SPLITS[:2]]}
 
@@ -98,7 +98,7 @@ def fit(model, optimizer, scheduler, criterion, train, val,
             if const.TRAIN_CUTOFF is not None and time.time() - start_time >= const.TRAIN_CUTOFF: break
 
         if is_primary_rank:
-            if ema: selected['ema'] = ema
+            if ema: selected['ema'] = ema.state_dict()
             selected['last'] = deepcopy(model.state_dict())
             if const.SELECT_BEST and 'best' not in selected:
                 selected['best'] = deepcopy(model.state_dict())
@@ -130,6 +130,7 @@ if __name__ == '__main__':
     else:
         const.PRETRAINED_BACKBONE = False
         const.FINETUNING = False
+        const.USE_CUTMIX = 'cutmixed' in const.MODEL_NAME
     if 'ablated_only' in const.MODEL_NAME: const.LAMBDAS[-1] = 0
     is_contrastive = 'default' not in const.MODEL_NAME
 
