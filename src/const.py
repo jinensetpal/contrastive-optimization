@@ -69,4 +69,5 @@ AUTO_AUGMENT_POLICY = 'ta_wide'
 
 # logging
 MLFLOW_TRACKING_URI = 'https://dagshub.com/jinensetpal/contrastive-optimization.mlflow'
+LOG_BATCHWISE = True
 LOG_REMOTE = False

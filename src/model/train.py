@@ -25,7 +25,9 @@ import os
 def configure(model_name):
     const.MODEL_NAME = model_name
     const.OPTIMIZER = 'Adam' if 'adam' in const.MODEL_NAME else 'SGD'
-    const.USE_ZERO = 'zero' in const.MODEL_NAME
+    const.USE_ZERO = 'zero' in const.MODEL_NAME and const.DDP
+    const.EMA = 'ema' in const.MODEL_NAME
+    const.DATASET = 'imagenet' if 'imagenet' in const.MODEL_NAME else 'oxford-iiit'
     if 'ablated_only' in const.MODEL_NAME: const.LAMBDAS[-1] = 0
 
     if const.DATASET != 'imagenet':
@@ -35,7 +37,6 @@ def configure(model_name):
         const.PRETRAINED_BACKBONE = 'pretrained' in const.MODEL_NAME
         const.BBOX_MAP = 'bbox' in const.MODEL_NAME
     else:
-        const.EMA = 'ema' in const.MODEL_NAME
         const.USE_CUTMIX = 'cutmixed' in const.MODEL_NAME
         const.AUGMENT = 'augmented' in const.MODEL_NAME
         if 'label_smoothing' not in const.MODEL_NAME: const.LABEL_SMOOTHING = 0
@@ -80,7 +81,7 @@ def fit(model, optimizer, scheduler, criterion, train, val,
                     if criterion._get_name() != 'CrossEntropyLoss': metrics[f'{split}_ablated_ce_loss'].append(criterion.prev)
                     if split == 'train' and epoch > 0:  # epoch 0 is for evaluating performance on initalization
                         batch_loss.backward(inputs=optimizer.param_groups[0]['params'])
-                        if is_primary_rank: mlflow.log_metric(f'{split}_batchwise_loss', batch_loss.item(), step=(epoch-1) * len(dataloader) + batch_idx)
+                        if is_primary_rank and const.LOG_BATCHWISE: mlflow.log_metric(f'{split}_batchwise_loss', batch_loss.item(), step=(epoch-1) * len(dataloader) + batch_idx)
 
                         if not (batch_idx+1) % const.GRAD_ACCUMULATION_STEPS: optimizer.step()
 
