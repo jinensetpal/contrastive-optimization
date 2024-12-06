@@ -43,7 +43,9 @@ class Dataset(torch.utils.data.Dataset):
                 heatmap[box[1]:box[3], box[0]:box[2]] = 1.
 
             heatmap = resize(heatmap[None, None], const.IMAGE_SIZE, antialias=True)
-        X, heatmap = self.transforms([X[None,], heatmap])
+
+        if const.AUGMENT: X, heatmap = self.transforms([X[None,], heatmap])
+        else: X = X[None,] / 255  # normalization
 
         heatmap = resize(heatmap.mean(dim=1), const.CAM_SIZE, antialias=False).squeeze(0)
 
@@ -70,8 +72,8 @@ def get_generators():
 
     datasets = [Dataset(split=split, bbox=const.BBOX_MAP) for split in const.SPLITS[:2]]
     samplers = [utils.RASampler(dataset, shuffle=True, repetitions=const.AUGMENT_REPITIONS) for dataset in datasets]
-    dataloaders = *[torch.utils.data.DataLoader(dataset, collate_fn=collate_fn, sampler=sampler, num_workers=2, pin_memory=True,
-                                                batch_size=const.BATCH_SIZE if split == 'train' else const.EVAL_BATCH_SIZE)
+    dataloaders = *[torch.utils.data.DataLoader(dataset, collate_fn=collate_fn, sampler=sampler,
+                                                num_workers=2, pin_memory=True, batch_size=const.BATCH_SIZE)
                     for dataset, sampler, split in zip(datasets, samplers, const.SPLITS[:2])], None
     const.SPLITS[1] = 'valid'
     return dataloaders

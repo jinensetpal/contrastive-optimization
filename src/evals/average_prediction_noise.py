@@ -54,4 +54,4 @@ if __name__ == '__main__':
     model.name = name
     model.eval()
 
-    average_prediction_noise(model, DataLoader(Dataset(sys.argv[2]), batch_size=const.EVAL_BATCH_SIZE, shuffle=False), failures_only=len(sys.argv) == 4)
+    average_prediction_noise(model, DataLoader(Dataset(sys.argv[2]), batch_size=const.BATCH_SIZE, shuffle=False), failures_only=len(sys.argv) == 4)

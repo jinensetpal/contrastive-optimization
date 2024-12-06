@@ -38,31 +38,33 @@ LR_WARMUP_EPOCHS = 5
 LR_WARMUP_DECAY = .01
 
 # evals
-EVAL_BATCH_SIZE = 10
 CONFIDENCE_THRESHOLD = .85
 
 # dataset
 SEED = 1024
-BBOX_MAP = True
-USE_CUTMIX = True
-CUTMIX_ALPHA = 1.
-BINARY_CLS = True
 N_CHANNELS = 3
-CAM_SIZE = (14, 14)
+BBOX_MAP = True
+BINARY_CLS = True
 DATASET = 'imagenet'
+CAM_SIZE = (14, 14)
 VAL_CROP_SIZE = 224
-LABEL_SMOOTHING = .1
 VAL_RESIZE_SIZE = 232
 TRAIN_CROP_SIZE = 224
-AUGMENT_REPITIONS = 4
-RANDOM_ERASE_PROB = .1
 IMAGE_SIZE = (224, 224)
-AUTO_AUGMENT_POLICY = 'ta_wide'
 SPLITS = ['train', 'valid', 'test']
 IMAGE_SHAPE = (N_CHANNELS,) + IMAGE_SIZE
 
 if DATASET == 'imagenet': N_CLASSES = 1000
 else: N_CLASSES = 2 if BINARY_CLS else 37
+
+# augmentation
+AUGMENT = False
+USE_CUTMIX = False
+CUTMIX_ALPHA = 1.
+LABEL_SMOOTHING = .1
+AUGMENT_REPITIONS = 4
+RANDOM_ERASE_PROB = .1
+AUTO_AUGMENT_POLICY = 'ta_wide'
 
 # logging
 MLFLOW_TRACKING_URI = 'https://dagshub.com/jinensetpal/contrastive-optimization.mlflow'
