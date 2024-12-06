@@ -25,6 +25,9 @@ import os
 def configure(model_name):
     const.MODEL_NAME = model_name
     const.OPTIMIZER = 'Adam' if 'adam' in const.MODEL_NAME else 'SGD'
+    const.USE_ZERO = 'zero' in const.MODEL_NAME
+    if 'ablated_only' in const.MODEL_NAME: const.LAMBDAS[-1] = 0
+
     if const.DATASET != 'imagenet':
         const.BINARY_CLS = 'multiclass' not in const.MODEL_NAME
         const.N_CLASSES = 2 if const.BINARY_CLS else 37
@@ -38,8 +41,6 @@ def configure(model_name):
         if 'label_smoothing' not in const.MODEL_NAME: const.LABEL_SMOOTHING = 0
         const.PRETRAINED_BACKBONE = False
         const.FINETUNING = False
-
-    if 'ablated_only' in const.MODEL_NAME: const.LAMBDAS[-1] = 0
 
 
 def fit(model, optimizer, scheduler, criterion, train, val,
@@ -174,10 +175,10 @@ if __name__ == '__main__':
     else: params = model.parameters()
 
     if const.OPTIMIZER == 'SGD':
-        if const.DDP: optimizer = ZeroRedundancyOptimizer(params, optim.SGD, lr=const.LR, momentum=const.MOMENTUM, weight_decay=const.WEIGHT_DECAY)
+        if const.DDP and const.USE_ZERO: optimizer = ZeroRedundancyOptimizer(params, optim.SGD, lr=const.LR, momentum=const.MOMENTUM, weight_decay=const.WEIGHT_DECAY)
         else: optimizer = optim.SGD(params, lr=const.LR, momentum=const.MOMENTUM, weight_decay=const.WEIGHT_DECAY)
     else:
-        if const.DDP: optimizer = ZeroRedundancyOptimizer(params, optim.Adam, lr=const.LR, weight_decay=const.WEIGHT_DECAY)
+        if const.DDP and const.USE_ZERO: optimizer = ZeroRedundancyOptimizer(params, optim.Adam, lr=const.LR, weight_decay=const.WEIGHT_DECAY)
         else: optimizer = optim.Adam(params, lr=const.LR, weight_decay=const.WEIGHT_DECAY)
 
     warmup = optim.lr_scheduler.LinearLR(optimizer, start_factor=const.LR_WARMUP_DECAY, total_iters=const.LR_WARMUP_EPOCHS)
@@ -204,7 +205,7 @@ if __name__ == '__main__':
     completed_epochs, selected = fit(model, optimizer, scheduler, criterion, train, val, ema=ema, selected=selected, **checkpoint_args)
 
     if const.DDP:
-        optimizer.consolidate_state_dict()
+        if const.USE_ZERO: optimizer.consolidate_state_dict()
         dist.destroy_process_group()
 
     if not const.DDP or (const.DDP and const.DEVICE == 0):
