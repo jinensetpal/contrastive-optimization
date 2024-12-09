@@ -19,7 +19,7 @@ if __name__ == '__main__':
     random.seed(const.SEED)
 
     model = Model(input_shape=const.IMAGE_SHAPE, is_contrastive='default' not in name)
-    model.load_state_dict(torch.load(const.MODELS_DIR / f'{name}.pt', map_location=const.DEVICE))
+    model.load_state_dict(torch.load(const.MODELS_DIR / name / 'best.pt', map_location=const.DEVICE))
     model.name = name
     model.eval()
 

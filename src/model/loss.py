@@ -28,7 +28,7 @@ class ContrastiveLoss(nn.Module):
 
             ablation = (-cc * fg_mask + cc.abs() * (1 - fg_mask) + (-cc.abs() + cc) * mixup_sparse_mask).sum(dim=[2, 3])
         else:
-            fg_mask = (y[0] == 1).to(torch.int).repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3).to(const.DEVICE)
+            fg_mask = y[0].repeat(1, const.N_CLASSES, 1).view(y[0].size(0), -1, *y[0].shape[1:]).to(torch.int).to(const.DEVICE)
             ablation = (-cc * fg_mask + cc.abs() * (1 - fg_mask)).sum(dim=[2, 3])
 
         ace = self.ce(ablation, y[1])

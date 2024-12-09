@@ -182,9 +182,10 @@ if __name__ == '__main__':
         if const.DDP and const.USE_ZERO: optimizer = ZeroRedundancyOptimizer(params, optim.Adam, lr=const.LR, weight_decay=const.WEIGHT_DECAY)
         else: optimizer = optim.Adam(params, lr=const.LR, weight_decay=const.WEIGHT_DECAY)
 
-    warmup = optim.lr_scheduler.LinearLR(optimizer, start_factor=const.LR_WARMUP_DECAY, total_iters=const.LR_WARMUP_EPOCHS)
-    cosine_annealing = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=const.EPOCHS - const.LR_WARMUP_EPOCHS)
-    scheduler = optim.lr_scheduler.ChainedScheduler([warmup, cosine_annealing], optimizer=optimizer)
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=const.EPOCHS - const.LR_WARMUP_EPOCHS)
+    if const.LR_WARMUP_EPOCHS:
+        warmup = optim.lr_scheduler.LinearLR(optimizer, start_factor=const.LR_WARMUP_DECAY, total_iters=const.LR_WARMUP_EPOCHS)
+        scheduler = optim.lr_scheduler.ChainedScheduler([warmup, scheduler], optimizer=optimizer)
 
     checkpoint_args = {'init_epoch': 0,
                        'mlflow_run_id': None}
