@@ -3,6 +3,7 @@
 from src.utils import get_open_port
 from pathlib import Path
 import torch
+import os
 
 # directories
 BASE_DIR = Path(__file__).parent.parent
@@ -13,20 +14,20 @@ MODELS_DIR = BASE_DIR / 'models'
 DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 TRAIN_CUTOFF = 12600  # max training time in seconds
 LAMBDAS = [1E1, 5E1, 1, 0]
-GRAD_ACCUMULATION_STEPS = 2
+GRAD_ACCUMULATION_STEPS = 1
 PRETRAINED_BACKBONE = False
 RANDOMIZED_FLATTEN = False
 PORT = get_open_port()
 CHECKPOINTING = True
-WEIGHT_DECAY = 2E-5
+WEIGHT_DECAY = 1E-4
 SELECT_BEST = True
 FINETUNING = False
 USE_ZERO = False
 OPTIMIZER = 'SGD'
-BATCH_SIZE = 128
+BATCH_SIZE = 192
 MOMENTUM = .9
-EPOCHS = 600
-DDP = True
+EPOCHS = 150
+DDP = isinstance(int, type(os.getenv('LOCAL_RANK')))
 
 # ema
 EMA = True
@@ -34,8 +35,8 @@ EMA_STEPS = 32
 EMA_DECAY = .99998
 
 # learning rate
-LR = .5
-LR_WARMUP_EPOCHS = 5
+LR = 1E-3
+LR_WARMUP_EPOCHS = 0
 LR_WARMUP_DECAY = .01
 
 # evals
@@ -62,7 +63,7 @@ else: N_CLASSES = 2 if BINARY_CLS else 37
 AUGMENT = False
 USE_CUTMIX = False
 CUTMIX_ALPHA = 1.
-LABEL_SMOOTHING = .1
+LABEL_SMOOTHING = 0
 AUGMENT_REPITIONS = 4
 RANDOM_ERASE_PROB = .1
 AUTO_AUGMENT_POLICY = 'ta_wide'

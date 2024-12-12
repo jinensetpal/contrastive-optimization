@@ -37,6 +37,7 @@ def configure(model_name):
         const.PRETRAINED_BACKBONE = 'pretrained' in const.MODEL_NAME
         const.BBOX_MAP = 'bbox' in const.MODEL_NAME
     else:
+        const.N_CLASSES = 1000
         const.USE_CUTMIX = 'cutmixed' in const.MODEL_NAME
         const.AUGMENT = 'augmented' in const.MODEL_NAME
         if 'label_smoothing' not in const.MODEL_NAME: const.LABEL_SMOOTHING = 0
@@ -182,7 +183,7 @@ if __name__ == '__main__':
         if const.DDP and const.USE_ZERO: optimizer = ZeroRedundancyOptimizer(params, optim.Adam, lr=const.LR, weight_decay=const.WEIGHT_DECAY)
         else: optimizer = optim.Adam(params, lr=const.LR, weight_decay=const.WEIGHT_DECAY)
 
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=const.EPOCHS - const.LR_WARMUP_EPOCHS)
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=const.EPOCHS - const.LR_WARMUP_EPOCHS, eta_min=2E-4)
     if const.LR_WARMUP_EPOCHS:
         warmup = optim.lr_scheduler.LinearLR(optimizer, start_factor=const.LR_WARMUP_DECAY, total_iters=const.LR_WARMUP_EPOCHS)
         scheduler = optim.lr_scheduler.ChainedScheduler([warmup, scheduler], optimizer=optimizer)

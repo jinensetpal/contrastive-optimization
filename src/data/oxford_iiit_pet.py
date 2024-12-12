@@ -54,6 +54,5 @@ def get_generators():
                                         pin_memory=True, batch_size=const.BATCH_SIZE, shuffle=True) for split in const.SPLITS]
 
 
-
 if __name__ == '__main__':
     print(Dataset()[0])
