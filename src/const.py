@@ -27,7 +27,7 @@ OPTIMIZER = 'SGD'
 BATCH_SIZE = 192
 MOMENTUM = .9
 EPOCHS = 150
-DDP = isinstance(int, type(os.getenv('LOCAL_RANK')))
+DDP = True
 
 # ema
 EMA = True
@@ -63,7 +63,7 @@ else: N_CLASSES = 2 if BINARY_CLS else 37
 AUGMENT = False
 USE_CUTMIX = False
 CUTMIX_ALPHA = 1.
-LABEL_SMOOTHING = 0
+LABEL_SMOOTHING = .1
 AUGMENT_REPITIONS = 4
 RANDOM_ERASE_PROB = .1
 AUTO_AUGMENT_POLICY = 'ta_wide'

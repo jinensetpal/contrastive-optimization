@@ -11,8 +11,9 @@ import torch
 
 class Dataset(torch.utils.data.Dataset):
     def __init__(self, split=None, bbox=True):
+        self.use_bbox = bbox
         df = pd.read_csv(const.DATA_DIR / 'imagenet' / 'index.csv')
-        if bbox: df = df[df['bbox_exists']].reset_index()
+        if self.use_bbox: df = df[df['bbox_exists']].reset_index()
         if split:
             self.df = df[df['split'] == split].reset_index()
             self.split = split
@@ -36,7 +37,7 @@ class Dataset(torch.utils.data.Dataset):
         heatmap = torch.zeros(X.shape[1:])
         X = resize(X, const.IMAGE_SIZE, antialias=True)[:3]
 
-        if const.BBOX_MAP:
+        if self.use_bbox:
             bbox = ET.parse(const.DATA_DIR / 'imagenet' / self.df['bbox'].iloc[idx]).getroot()
             for obj in bbox.findall('object'):
                 box = [int(x.text) for x in obj.find('bndbox')[:]]
@@ -47,14 +48,15 @@ class Dataset(torch.utils.data.Dataset):
         if const.AUGMENT: X, heatmap = self.transforms([X[None,], heatmap])
         else: X = X[None,] / 255  # normalization
 
-        heatmap = resize(heatmap.mean(dim=1), const.CAM_SIZE, antialias=False).squeeze(0)
+        if self.use_bbox:
+            heatmap = resize(heatmap.mean(dim=1), const.CAM_SIZE, antialias=False).squeeze(0)
 
-        if const.USE_CUTMIX:
-            heatmap[heatmap <= 0] = -1
-            heatmap[heatmap > 0] = int(self.df['label_idx'][idx])   # set to class labels for cutmix
-        else:
-            heatmap[heatmap < 0] = 0
-            heatmap[heatmap > 0] = 1
+            if const.USE_CUTMIX:
+                heatmap[heatmap <= 0] = -1
+                heatmap[heatmap > 0] = int(self.df['label_idx'][idx])   # set to class labels for cutmix
+            else:
+                heatmap[heatmap < 0] = 0
+                heatmap[heatmap > 0] = 1
 
         y = torch.zeros(const.N_CLASSES)
         y[int(self.df['label_idx'][idx])] = 1

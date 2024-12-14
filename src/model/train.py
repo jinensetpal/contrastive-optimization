@@ -5,6 +5,7 @@ from torch.distributed.optim import ZeroRedundancyOptimizer
 from ..data.imagenet import get_generators as imagenet
 from contextlib import nullcontext
 from .loss import ContrastiveLoss
+from torch_optimizer import Lamb
 import torch.distributed as dist
 import torch.nn.functional as F
 from copy import deepcopy
@@ -25,6 +26,7 @@ import os
 def configure(model_name):
     const.MODEL_NAME = model_name
     const.OPTIMIZER = 'Adam' if 'adam' in const.MODEL_NAME else 'SGD'
+    const.OPTIMIZER = 'Lamb' if 'lamb' in const.MODEL_NAME else const.OPTIMIZER
     const.USE_ZERO = 'zero' in const.MODEL_NAME and const.DDP
     const.EMA = 'ema' in const.MODEL_NAME
     const.DATASET = 'imagenet' if 'imagenet' in const.MODEL_NAME else 'oxford-iiit'
@@ -38,6 +40,7 @@ def configure(model_name):
         const.BBOX_MAP = 'bbox' in const.MODEL_NAME
     else:
         const.N_CLASSES = 1000
+        const.BBOX_MAP = 'blank_bboxes' not in const.MODEL_NAME
         const.USE_CUTMIX = 'cutmixed' in const.MODEL_NAME
         const.AUGMENT = 'augmented' in const.MODEL_NAME
         if 'label_smoothing' not in const.MODEL_NAME: const.LABEL_SMOOTHING = 0
@@ -176,12 +179,15 @@ if __name__ == '__main__':
                                                                        *model.backbone.layer4[0].downsample[0].parameters()]
     else: params = model.parameters()
 
-    if const.OPTIMIZER == 'SGD':
-        if const.DDP and const.USE_ZERO: optimizer = ZeroRedundancyOptimizer(params, optim.SGD, lr=const.LR, momentum=const.MOMENTUM, weight_decay=const.WEIGHT_DECAY)
-        else: optimizer = optim.SGD(params, lr=const.LR, momentum=const.MOMENTUM, weight_decay=const.WEIGHT_DECAY)
-    else:
+    if const.OPTIMIZER == 'Adam':
         if const.DDP and const.USE_ZERO: optimizer = ZeroRedundancyOptimizer(params, optim.Adam, lr=const.LR, weight_decay=const.WEIGHT_DECAY)
         else: optimizer = optim.Adam(params, lr=const.LR, weight_decay=const.WEIGHT_DECAY)
+    elif const.OPTIMIZER == 'Lamb':
+        if const.DDP and const.USE_ZERO: optimizer = ZeroRedundancyOptimizer(params, Lamb, lr=const.LR, weight_decay=const.WEIGHT_DECAY)
+        else: optimizer = Lamb(params, lr=const.LR, weight_decay=const.WEIGHT_DECAY)
+    else:
+        if const.DDP and const.USE_ZERO: optimizer = ZeroRedundancyOptimizer(params, optim.SGD, lr=const.LR, momentum=const.MOMENTUM, weight_decay=const.WEIGHT_DECAY)
+        else: optimizer = optim.SGD(params, lr=const.LR, momentum=const.MOMENTUM, weight_decay=const.WEIGHT_DECAY)
 
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=const.EPOCHS - const.LR_WARMUP_EPOCHS, eta_min=2E-4)
     if const.LR_WARMUP_EPOCHS:
