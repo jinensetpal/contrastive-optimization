@@ -34,7 +34,7 @@ class Dataset(torch.utils.data.Dataset):
         X = torchvision.io.read_image((const.DATA_DIR / 'imagenet' / self.df['path'].iloc[idx]).as_posix())
         if X.size(0) == 1: X = X.repeat(3, 1, 1)
 
-        heatmap = torch.zeros(X.shape[1:])
+        heatmap = torch.zeros(X.shape[1:] if self.use_bbox else const.CAM_SIZE)
         X = resize(X, const.IMAGE_SIZE, antialias=True)[:3]
 
         if self.use_bbox:
