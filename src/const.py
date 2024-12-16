@@ -27,7 +27,7 @@ OPTIMIZER = 'SGD'
 BATCH_SIZE = 192
 MOMENTUM = .9
 EPOCHS = 150
-DDP = True
+DDP = os.getenv('WORLD_SIZE') is not None
 
 # ema
 EMA = True
@@ -45,7 +45,7 @@ CONFIDENCE_THRESHOLD = .85
 # dataset
 SEED = 1024
 N_CHANNELS = 3
-BBOX_MAP = True
+BBOX_MAP = False
 BINARY_CLS = True
 DATASET = 'imagenet'
 CAM_SIZE = (14, 14)

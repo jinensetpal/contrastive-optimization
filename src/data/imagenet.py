@@ -10,8 +10,10 @@ import torch
 
 
 class Dataset(torch.utils.data.Dataset):
-    def __init__(self, split=None, bbox=True):
+    def __init__(self, split=None, bbox=True, device=const.DEVICE):
         self.use_bbox = bbox
+        self.device = device
+
         df = pd.read_csv(const.DATA_DIR / 'imagenet' / 'index.csv')
         if self.use_bbox: df = df[df['bbox_exists']].reset_index()
         if split:
@@ -31,10 +33,10 @@ class Dataset(torch.utils.data.Dataset):
         return len(self.df)
 
     def __getitem__(self, idx):
-        X = torchvision.io.read_image((const.DATA_DIR / 'imagenet' / self.df['path'].iloc[idx]).as_posix())
+        X = torchvision.io.read_image((const.DATA_DIR / 'imagenet' / self.df['path'].iloc[idx]).as_posix()).to(self.device)
         if X.size(0) == 1: X = X.repeat(3, 1, 1)
 
-        heatmap = torch.zeros(X.shape[1:] if self.use_bbox else const.CAM_SIZE)
+        heatmap = torch.zeros(X.shape[1:] if self.use_bbox else const.CAM_SIZE, device=self.device)
         X = resize(X, const.IMAGE_SIZE, antialias=True)[:3]
 
         if self.use_bbox:
@@ -58,7 +60,7 @@ class Dataset(torch.utils.data.Dataset):
                 heatmap[heatmap < 0] = 0
                 heatmap[heatmap > 0] = 1
 
-        y = torch.zeros(const.N_CLASSES)
+        y = torch.zeros(const.N_CLASSES, device=self.device)
         y[int(self.df['label_idx'][idx])] = 1
 
         return X[0], (heatmap, y)
@@ -72,7 +74,7 @@ def get_generators():
     torch.multiprocessing.set_start_method('spawn', force=True)
     const.SPLITS[1] = 'val'
 
-    datasets = [Dataset(split=split, bbox=const.BBOX_MAP) for split in const.SPLITS[:2]]
+    datasets = [Dataset(split=split, bbox=const.BBOX_MAP, device='cpu') for split in const.SPLITS[:2]]
     samplers = [utils.RASampler(dataset, shuffle=True, repetitions=const.AUGMENT_REPITIONS) for dataset in datasets]
     dataloaders = *[torch.utils.data.DataLoader(dataset, collate_fn=collate_fn, sampler=sampler,
                                                 num_workers=2, pin_memory=True, batch_size=const.BATCH_SIZE)

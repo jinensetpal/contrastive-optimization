@@ -7,7 +7,7 @@ import torch
 
 
 class Dataset(torch.utils.data.Dataset):
-    def __init__(self):
+    def __init__(self, split=None):
         self.images = glob((const.DATA_DIR / 'pet-images' / '**' / '*.jpg').as_posix(), recursive=True)
 
     def __len__(self):
