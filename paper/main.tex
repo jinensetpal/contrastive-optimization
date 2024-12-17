@@ -34,7 +34,9 @@
 \usepackage{microtype}      % microtypography
 \usepackage{xcolor}         % colors
 \usepackage{graphicx}
+\usepackage{amsfonts}
 \usepackage{amsmath}
+\usepackage{amssymb}
 \usepackage{amsthm}
 \usepackage{subfig}
 \usepackage{float}
@@ -249,13 +251,14 @@ Further, we can use the segmentation trimaps from the Oxford-IIIT Pets dataset a
 	\end{tabular}
 \end{table}
 
-Crucially, we observe that weights optimized from random initialization leverage more of the background than the actual target to inform the final prediction. In training classification models, an implicit assumption is that the best approximator of the class label is the target itself, which experimentally are observed to not hold. Despite fine-tuning on pre-trained weights mitigating the problem, it still learnt a feature that can be exploited adversarially.
+We observe that weights optimized from random initialization leverage more of the background than the actual target to inform the final prediction. In training classification models, an implicit assumption is that the best approximator of the class label is the target itself, which experimentally are observed to not hold. Despite fine-tuning on pre-trained weights mitigating the problem, it still learnt a feature that can be exploited adversarially.
 
 This is especially concerning for cases wherein the target is far away from the camera, in which case the emphasis is objectively placed on learning the best spurious surrogate to the actual target, rather than obtaining an approximation of the target's feature representation using the fewer available pixels.
 
 % TODO: adversarial ablation
 
 \subsection{Constraining Optimization to an Interpretable Basis}
+\label{sec:constraining-optimization}
 
 The primary distinction between the contrastive optimization objective over standard risk is that it preserves spatial information. We know at a pointwise level how each feature contributes to the final prediction.
 
@@ -292,10 +295,10 @@ $\lambda_2$ \& $\lambda_3$ are hyperparameters that scale the activation maps, s
 
 A more mathematically rigorous approach involves performing an ablation over class logits to penalize background influence.
 
-\begin{theorem}\label{ablatedce}
+\begin{theorem}\label{ace}
 	We can integrate backgroud invariance to the definition of cross-entropy using the following formulation:
 	\begin{gather}
-		\mathcal{J}(\theta, \mathcal{D}) = -\log \left( \frac{1}{\sum_i \text{exp}\left({-\sum^{}h \odot \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)} + \sum |(1-h) \odot \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)}}|\right)} \right)
+		\mathcal{J}(\theta, \mathcal{D}) = -\log \left( \frac{1}{\sum_i \text{exp}\left(-\sum h \odot \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)} + \sum |(1-h) \odot \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)}|\right)} \right)
 	\end{gather}
 \end{theorem}
 \begin{proof} Using the definition of HiResCAMs, ContrastiveCAMs and the elementwise difference setup from \ref{classprobdiff}, we have:
@@ -391,7 +394,7 @@ This dataset contains a class imbalance (4978 dogs to 2371 cats), however no tra
 	\caption{Plots comparing benchmark cross-entropy loss, training and validation accuracy. The web version of this comparison can be found \href{https://dagshub.com/jinensetpal/contrastive-optimization/experiments\#/compare?experiments=[\%22m_cea5cf4fcbbb4c3f984b2396927cf80c\%22,\%22m_101287828f604122a092a2501ec3facb\%22]}{here}. The orange line represents cross-entropy loss, while the blue line represents the contrastive approach.}
 \end{figure}
 
-Crucially, on comparing contrastive activation maps, we can see that each of the cases of the random sample, the model uses the target region for prediction and not spurious features. In the case of the standard training procedure, this is not the case, and the model does not focus on the target in making it's prediction.
+On comparing contrastive activation maps, we observe in each of the random samples, that the model uses the target region for prediction and not spurious features. In the case of the standard training procedure, this is not the case, and the model does not focus on the target in making it's prediction.
 
 \begin{figure}[H]
 	\centering
@@ -447,6 +450,8 @@ The next goal is to further understand and minimize this generalization gap.
 
 \section{Upcoming / In Progress Tasks} 
 
+\paragraph{Scaling the Approach} Training ResNet-50 on ImageNet and PASCAL VOC can allow us to evaluate if the approach scales effectively, with the performance gain not being constrained to the Oxford-IIIT Pets Dataset.
+
 \paragraph{Understanding the Generalization Gap} While the model for the multiclass paradigm is able to fit the training dataset excellently -- achieving $\approx 93\%$ training accuracy -- the validation accuracy is significantly behind at $\approx 51\%$. This could imply memorization of samples, which was something that this approach was intended to mitigate. Further investigation could help support or disprove this hypothesis.
 
 \paragraph{Evaluating Adversarial Robustness} Could the model looking only at the object to affect the classification score improve adversarial performance?
@@ -457,5 +462,37 @@ The next goal is to further understand and minimize this generalization gap.
 
 \bibliographystyle{plain}
 \bibliography{references}
+
+\appendix
+
+\section{Ablated Cross-Entropy Adaptations}
+
+In addition to cross-entropy, we also adapted training methodologies from \citet{imagenetrecipe}. These required additional modifications to the approach. These modifications are discussed in the following sections, remaining consistent with principles discussed in Section \ref{sec:constraining-optimization}.
+
+\subsection{Contrastive CutMix}
+
+CutMix\cite{yun2019cutmix} is a batch-wise augmentation technique that encourages better regularization by a) ``cutting'' out a randomized rectangle (randomized portion remaining consistent across the batch) of a given image and b) ``mixing'' the cut-out with it's neighbor. The corresponding labels are mixed by a randomly sampled parameter $\lambda$. For our experiments, $\lambda \sim \text{Uniform}(0,1)$.
+
+\begin{figure}[h!]
+	\centering
+	\includegraphics[width=\textwidth]{img/cutmix}
+\end{figure}
+
+CutMix can be effectively adapted to work with our setup: given a cut-out, we motivate differential contrast; if non-target pixels are contained in the new image, irresepective of the label, contrast should be generated in favor of the non-target class for the non-target, foreground subset of pixels. This affects the downstream prediction confidence, representative of the label being shifted from one-hot encoding to a randomized affine combination.
+
+Let segmentation mask $h$ take the following form:
+\begin{gather*}
+	h := \begin{cases}
+		-1 & \text{pixel does not contain any class} \\
+		c & \text{pixel contains class } c
+	\end{cases}
+\end{gather*}
+
+Then, Ablated Cross Entropy (\ref{ace}) is formulated as follows:
+\begin{gather}
+	\mathcal{J}(\theta, \mathcal{D}) = -\log \left( \frac{1}{\sum_i \text{exp}\left(-\sum \mathbbm{1}_{c}(h) \odot \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)} + \sum |\mathbbm{1}_{-1}(h) \odot \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)}| + \sum \mathbbm{1}_{i}(h) \odot \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)} \right)} \right)
+\end{gather}
+
+Where the third newly introduced term within the exponent expresses differential contrast.
 
 \end{document}
