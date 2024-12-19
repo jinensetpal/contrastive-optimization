@@ -102,7 +102,7 @@ def fit(model, optimizer, scheduler, criterion, train, val,
                 dist.barrier(device_ids=[const.DEVICE])
 
             if not is_primary_rank:
-                scheduler.step()
+                if epoch: scheduler.step()
                 continue
 
             if const.DDP:
@@ -111,7 +111,7 @@ def fit(model, optimizer, scheduler, criterion, train, val,
 
             metrics['lr'] = scheduler.get_last_lr()[-1]
             mlflow.log_metrics(metrics, step=epoch-1)
-            scheduler.step()
+            if epoch: scheduler.step()
 
             if const.SELECT_BEST and metrics['valid_acc'] > selected['acc']:
                 selected['best'] = deepcopy(model.state_dict())
