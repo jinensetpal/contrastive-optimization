@@ -30,13 +30,13 @@ def configure(model_name):
     const.USE_ZERO = 'zero' in const.MODEL_NAME and const.DDP
     const.EMA = 'ema' in const.MODEL_NAME
     const.DATASET = 'imagenet' if 'imagenet' in const.MODEL_NAME else 'oxford-iiit'
+    const.PRETRAINED_BACKBONE = 'pretrained' in const.MODEL_NAME
     if 'ablated_only' in const.MODEL_NAME: const.LAMBDAS[-1] = 0
 
     if const.DATASET != 'imagenet':
         const.BINARY_CLS = 'multiclass' not in const.MODEL_NAME
         const.N_CLASSES = 2 if const.BINARY_CLS else 37
         const.FINETUNING = 'finetuned' in const.MODEL_NAME
-        const.PRETRAINED_BACKBONE = 'pretrained' in const.MODEL_NAME
         const.BBOX_MAP = 'bbox' in const.MODEL_NAME
     else:
         const.N_CLASSES = 1000
@@ -44,7 +44,6 @@ def configure(model_name):
         const.USE_CUTMIX = 'cutmixed' in const.MODEL_NAME
         const.AUGMENT = 'augmented' in const.MODEL_NAME
         if 'label_smoothing' not in const.MODEL_NAME: const.LABEL_SMOOTHING = 0
-        const.PRETRAINED_BACKBONE = False
         const.FINETUNING = False
 
 

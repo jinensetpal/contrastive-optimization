@@ -33,10 +33,12 @@ class Model(nn.Module):
             self.backbone.layer4[-1].bn3 = nn.Identity()
             self.backbone.layer4[-1].relu = nn.Identity()
         self.backbone.layer4[-1].conv3.register_forward_hook(self._hook)
-        self.backbone.fc = nn.Identity()
 
         self.linear = nn.Linear(2048, const.N_CLASSES, bias=not is_contrastive)
         self.softmax = nn.Softmax(dim=1)  # ~equivalent to sigmoid since classes = 2; relevant for CAMs
+
+        if const.DATASET == 'imagenet' and const.PRETRAINED_BACKBONE: self.linear.weight = self.backbone.fc.weight
+        self.backbone.fc = nn.Identity()
 
         self.to(self.device)
 
