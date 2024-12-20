@@ -37,7 +37,9 @@ class Model(nn.Module):
         self.linear = nn.Linear(2048, const.N_CLASSES, bias=not is_contrastive)
         self.softmax = nn.Softmax(dim=1)  # ~equivalent to sigmoid since classes = 2; relevant for CAMs
 
-        if const.DATASET == 'imagenet' and const.PRETRAINED_BACKBONE: self.linear.weight = self.backbone.fc.weight
+        if const.DATASET == 'imagenet' and const.PRETRAINED_BACKBONE:
+            self.linear.weight = self.backbone.fc.weight
+            if not is_contrastive: self.linear.bias = self.backbone.fc.bias
         self.backbone.fc = nn.Identity()
 
         self.to(self.device)
