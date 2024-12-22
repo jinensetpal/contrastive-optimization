@@ -3,6 +3,7 @@
 from ..data.oxford_iiit_pet import get_generators as oxford_iiit_pet
 from torch.distributed.optim import ZeroRedundancyOptimizer
 from ..data.imagenet import get_generators as imagenet
+from ..data.sbd import get_generators as sbd
 from contextlib import nullcontext
 from .loss import ContrastiveLoss
 from torch_optimizer import Lamb
@@ -30,21 +31,26 @@ def configure(model_name):
     const.USE_ZERO = 'zero' in const.MODEL_NAME and const.DDP
     const.EMA = 'ema' in const.MODEL_NAME
     const.DATASET = 'imagenet' if 'imagenet' in const.MODEL_NAME else 'oxford-iiit'
+    const.DATASET = 'sbd' if 'sbd' in const.MODEL_NAME else const.DATASET
     const.PRETRAINED_BACKBONE = 'pretrained' in const.MODEL_NAME
     if 'ablated_only' in const.MODEL_NAME: const.LAMBDAS[-1] = 0
+    if 'label_smoothing' not in const.MODEL_NAME: const.LABEL_SMOOTHING = 0
 
-    if const.DATASET != 'imagenet':
+    if const.DATASET == 'imagenet':
+        const.N_CLASSES = 1000
+        const.BINARY_CLS = False
+        const.BBOX_MAP = 'blank_bboxes' not in const.MODEL_NAME
+        const.USE_CUTMIX = 'cutmixed' in const.MODEL_NAME
+        const.AUGMENT = 'augmented' in const.MODEL_NAME
+        const.FINETUNING = False
+    elif const.DATASET == 'sbd':
+        const.N_CLASSES = 20
+        const.BINARY_CLS = False
+    else:
         const.BINARY_CLS = 'multiclass' not in const.MODEL_NAME
         const.N_CLASSES = 2 if const.BINARY_CLS else 37
         const.FINETUNING = 'finetuned' in const.MODEL_NAME
         const.BBOX_MAP = 'bbox' in const.MODEL_NAME
-    else:
-        const.N_CLASSES = 1000
-        const.BBOX_MAP = 'blank_bboxes' not in const.MODEL_NAME
-        const.USE_CUTMIX = 'cutmixed' in const.MODEL_NAME
-        const.AUGMENT = 'augmented' in const.MODEL_NAME
-        if 'label_smoothing' not in const.MODEL_NAME: const.LABEL_SMOOTHING = 0
-        const.FINETUNING = False
 
 
 def fit(model, optimizer, scheduler, criterion, train, val,
@@ -72,7 +78,7 @@ def fit(model, optimizer, scheduler, criterion, train, val,
                     y = [y_i.to(const.DEVICE) for y_i in y]
 
                     y_pred = model(X)
-                    batch_loss = criterion(y_pred, y) if criterion._get_name() != 'CrossEntropyLoss' else criterion(y_pred[0], y[1])
+                    batch_loss = criterion(y_pred, y) if criterion._get_name() == 'ContrastiveLoss' else criterion(y_pred[0], y[1])
 
                     metrics[f'{split}_acc'].extend(y[1].argmax(1).eq(y_pred[0].argmax(1)).unsqueeze(1).tolist())
                     metrics[f'{split}_contrast_loss'].append(batch_loss.item())
@@ -148,6 +154,7 @@ if __name__ == '__main__':
     configure(sys.argv[1])
 
     is_contrastive = 'default' not in const.MODEL_NAME
+    is_multilabel = const.DATASET == 'sbd'
 
     path = const.MODELS_DIR / const.MODEL_NAME
     (path).mkdir(exist_ok=True, parents=True)
@@ -162,15 +169,20 @@ if __name__ == '__main__':
         dist.barrier(device_ids=[const.DEVICE])
 
     model = Model(const.IMAGE_SHAPE, is_contrastive=is_contrastive).to(const.DEVICE)
-    criterion = ContrastiveLoss(model.get_contrastive_cams, is_label_mask=const.USE_CUTMIX) if is_contrastive else nn.CrossEntropyLoss(label_smoothing=const.LABEL_SMOOTHING)
     ema = optim.swa_utils.AveragedModel(model, device=const.DEVICE, avg_fn=optim.swa_utils.get_ema_avg_fn(1 - min(1, (1 - const.EMA_DECAY) * const.BATCH_SIZE * const.EMA_STEPS / const.EPOCHS)), use_buffers=True) if const.EMA else None
+
+    if is_contrastive: criterion = ContrastiveLoss(model.get_contrastive_cams, is_label_mask=const.USE_CUTMIX, multilabel=is_multilabel)
+    elif is_multilabel: criterion = nn.BCELoss()
+    else: criterion = nn.CrossEntropyLoss(label_smoothing=const.LABEL_SMOOTHING)
 
     if const.DDP:
         model = nn.parallel.DistributedDataParallel(model, device_ids=[const.DEVICE])
         model.load_state_dict = model.module.load_state_dict
         model.state_dict = model.module.state_dict
 
-    train, val, test = imagenet() if const.DATASET == 'imagenet' else oxford_iiit_pet()
+    if const.DATASET == 'imagenet': train, val, test = imagenet()
+    elif const.DATASET == 'sbd': train, val, test = sbd()
+    else: train, val, test = oxford_iiit_pet()
 
     if const.FINETUNING:
         params = [*model.linear.parameters(),] if is_contrastive else [*model.linear.parameters(),

@@ -7,7 +7,7 @@ import torch
 
 
 class Model(nn.Module):
-    def __init__(self, input_shape, randomized_flatten=const.RANDOMIZED_FLATTEN,
+    def __init__(self, input_shape, randomized_flatten=const.RANDOMIZED_FLATTEN, multilabel=False,
                  device=const.DEVICE, is_contrastive=True, downsampling_level=1):
         super().__init__()
 
@@ -35,7 +35,7 @@ class Model(nn.Module):
         self.backbone.layer4[-1].conv3.register_forward_hook(self._hook)
 
         self.linear = nn.Linear(2048, const.N_CLASSES, bias=not is_contrastive)
-        self.softmax = nn.Softmax(dim=1)  # ~equivalent to sigmoid since classes = 2; relevant for CAMs
+        self.probabilities = nn.Softmax(dim=1) if not multilabel else nn.Sigmoid()
 
         if const.DATASET == 'imagenet' and const.PRETRAINED_BACKBONE:
             self.linear.weight = self.backbone.fc.weight
@@ -56,7 +56,7 @@ class Model(nn.Module):
         logits = self.linear(x)
 
         if self.training: return logits, self._bp_free_hi_res_cams()
-        else: return self.softmax(logits), self._hi_res_cams(logits)
+        else: return self.probabilities(logits), self._hi_res_cams(logits)
 
     def get_contrastive_cams(self, y, cams):
         return torch.index_select(cams.view(-1, *cams.shape[2:]), 0, y.argmax(1) + (torch.arange(cams.size(0), device=const.DEVICE) * cams.size(1))).repeat(1, cams.size(1), 1).view(*cams.shape) - cams

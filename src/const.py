@@ -24,7 +24,7 @@ SELECT_BEST = True
 FINETUNING = False
 USE_ZERO = False
 OPTIMIZER = 'SGD'
-BATCH_SIZE = 192
+BATCH_SIZE = 440
 MOMENTUM = .9
 EPOCHS = 150
 DDP = os.getenv('WORLD_SIZE') is not None
@@ -57,6 +57,7 @@ SPLITS = ['train', 'valid', 'test']
 IMAGE_SHAPE = (N_CHANNELS,) + IMAGE_SIZE
 
 if DATASET == 'imagenet': N_CLASSES = 1000
+elif DATASET == 'sbd': N_CLASSES = 20
 else: N_CLASSES = 2 if BINARY_CLS else 37
 
 # augmentation
