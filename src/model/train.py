@@ -71,35 +71,38 @@ def fit(model, optimizer, scheduler, criterion, train, val,
             if not (epoch) % interval: print('-' * 10)
             metrics = {metric: [] for metric in [f'{split}_{report}' for report in ['contrast_loss', 'acc', 'divergence_loss', 'ablated_ce_loss', 'cse_loss'] for split in const.SPLITS[:2]]}
 
-            for split, dataloader in zip(const.SPLITS[:2], (train, val)):
-                for batch_idx, (X, y) in enumerate(dataloader):
-                    if not (batch_idx+1) % const.GRAD_ACCUMULATION_STEPS: optimizer.zero_grad()
-                    X = X.to(const.DEVICE)
-                    y = [y_i.to(const.DEVICE) for y_i in y]
+            try:
+                for split, dataloader in zip(const.SPLITS[:2], (train, val)):
+                    for batch_idx, (X, y) in enumerate(dataloader):
+                        if not (batch_idx+1) % const.GRAD_ACCUMULATION_STEPS: optimizer.zero_grad()
+                        X = X.to(const.DEVICE)
+                        y = [y_i.to(const.DEVICE) for y_i in y]
 
-                    y_pred = model(X)
-                    batch_loss = criterion(y_pred, y) if criterion._get_name() == 'ContrastiveLoss' else criterion(y_pred[0], y[1])
+                        y_pred = model(X)
+                        batch_loss = criterion(y_pred, y) if criterion._get_name() == 'ContrastiveLoss' else criterion(y_pred[0], y[1])
 
-                    metrics[f'{split}_acc'].extend(y[1].argmax(1).eq(y_pred[0].argmax(1)).unsqueeze(1).tolist())
-                    metrics[f'{split}_contrast_loss'].append(batch_loss.item())
-                    metrics[f'{split}_cse_loss'].append(F.cross_entropy(y_pred[0], y[1]).item())
+                        metrics[f'{split}_acc'].extend(y[1].argmax(1).eq(y_pred[0].argmax(1)).unsqueeze(1).tolist())
+                        metrics[f'{split}_contrast_loss'].append(batch_loss.item())
+                        metrics[f'{split}_cse_loss'].append(F.cross_entropy(y_pred[0], y[1]).item())
 
-                    del y_pred, X, y
-                    torch.cuda.empty_cache()
+                        del y_pred, X, y
+                        torch.cuda.empty_cache()
 
-                    if criterion._get_name() != 'CrossEntropyLoss': metrics[f'{split}_ablated_ce_loss'].append(criterion.prev)
-                    if split == 'train' and epoch > 0:  # epoch 0 is for evaluating performance on initalization
-                        batch_loss.backward(inputs=optimizer.param_groups[0]['params'])
-                        if is_primary_rank and const.LOG_BATCHWISE: mlflow.log_metric(f'{split}_batchwise_loss', batch_loss.item(), step=(epoch-1) * len(dataloader) + batch_idx)
+                        if criterion._get_name() != 'CrossEntropyLoss': metrics[f'{split}_ablated_ce_loss'].append(criterion.prev)
+                        if split == 'train' and epoch > 0:  # epoch 0 is for evaluating performance on initalization
+                            batch_loss.backward(inputs=optimizer.param_groups[0]['params'])
+                            if is_primary_rank and const.LOG_BATCHWISE: mlflow.log_metric(f'{split}_batchwise_loss', batch_loss.item(), step=(epoch-1) * len(dataloader) + batch_idx)
 
-                        if not (batch_idx+1) % const.GRAD_ACCUMULATION_STEPS: optimizer.step()
+                            if not (batch_idx+1) % const.GRAD_ACCUMULATION_STEPS: optimizer.step()
 
-                    if ema and not (batch_idx+1) % const.EMA_STEPS:
-                        ema.update_parameters(model)
-                        if epoch < const.LR_WARMUP_EPOCHS: ema.n_averaged.fill_(0)
+                        if ema and not (batch_idx+1) % const.EMA_STEPS:
+                            ema.update_parameters(model)
+                            if epoch < const.LR_WARMUP_EPOCHS: ema.n_averaged.fill_(0)
 
-                    del batch_loss
-                    torch.cuda.empty_cache()
+                        del batch_loss
+                        torch.cuda.empty_cache()
+            except KeyboardInterrupt:
+                break
 
             metrics = {metric: np.mean(metrics[metric]) for metric in metrics}
             if const.DDP:
@@ -168,11 +171,11 @@ if __name__ == '__main__':
         dist.init_process_group('nccl')
         dist.barrier(device_ids=[const.DEVICE])
 
-    model = Model(const.IMAGE_SHAPE, is_contrastive=is_contrastive).to(const.DEVICE)
+    model = Model(const.IMAGE_SHAPE, is_contrastive=is_contrastive, multilabel=is_multilabel).to(const.DEVICE)
     ema = optim.swa_utils.AveragedModel(model, device=const.DEVICE, avg_fn=optim.swa_utils.get_ema_avg_fn(1 - min(1, (1 - const.EMA_DECAY) * const.BATCH_SIZE * const.EMA_STEPS / const.EPOCHS)), use_buffers=True) if const.EMA else None
 
     if is_contrastive: criterion = ContrastiveLoss(model.get_contrastive_cams, is_label_mask=const.USE_CUTMIX, multilabel=is_multilabel)
-    elif is_multilabel: criterion = nn.BCELoss()
+    elif is_multilabel: criterion = nn.BCEWithLogitsLoss()
     else: criterion = nn.CrossEntropyLoss(label_smoothing=const.LABEL_SMOOTHING)
 
     if const.DDP:

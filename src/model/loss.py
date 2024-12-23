@@ -10,15 +10,15 @@ class ContrastiveLoss(nn.Module):
     def __init__(self, get_contrastive_cams_fn, debug=False, is_label_mask=False, multilabel=False):
         super().__init__()
 
-        self.ce = nn.BCELoss() if multilabel else nn.CrossEntropyLoss(label_smoothing=const.LABEL_SMOOTHING)
+        self.ce = nn.BCEWithLogitsLoss() if multilabel else nn.CrossEntropyLoss(label_smoothing=const.LABEL_SMOOTHING)
         self.get_contrastive_cams = get_contrastive_cams_fn
         self.is_label_mask = is_label_mask
         self.multilabel = multilabel
 
     def forward(self, y_pred, y):
         if self.multilabel:
-            labels = ((torch.arange(const.N_CLASSES) + 1) * torch.ones(*const.CAM_SIZE, const.N_CLASSES)).T[None,].repeat(y[0].size(0), 1, 1, 1)
-            fg_mask = labels == y[0].repeat(1, const.N_CLASSES, 1).view(y[0].size(0), -1, *y[0].shape[1:]).to(torch.int).to(const.DEVICE)
+            labels = ((torch.arange(const.N_CLASSES) + 1) * torch.ones(*const.CAM_SIZE, const.N_CLASSES)).T[None,].repeat(y[0].size(0), 1, 1, 1).to(const.DEVICE)
+            fg_mask = (labels == y[0].repeat(1, const.N_CLASSES, 1).view(y[0].size(0), -1, *y[0].shape[1:])).to(torch.int)
             ablation = (-y_pred[1] * fg_mask + y_pred[1].abs() * (1 - fg_mask)).sum(dim=[2, 3])
         elif self.is_label_mask:
             cc = self.get_contrastive_cams(y[1], y_pred[1]).to(const.DEVICE)
