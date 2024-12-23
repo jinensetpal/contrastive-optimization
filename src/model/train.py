@@ -53,7 +53,7 @@ def configure(model_name):
         const.BBOX_MAP = 'bbox' in const.MODEL_NAME
 
 
-def fit(model, optimizer, scheduler, criterion, train, val,
+def fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=False,
         ema=None, selected=None, init_epoch=0, mlflow_run_id=None):
     model.train()
     start_time = time.time()
@@ -81,14 +81,18 @@ def fit(model, optimizer, scheduler, criterion, train, val,
                         y_pred = model(X)
                         batch_loss = criterion(y_pred, y) if criterion._get_name() == 'ContrastiveLoss' else criterion(y_pred[0], y[1])
 
-                        metrics[f'{split}_acc'].extend(y[1].argmax(1).eq(y_pred[0].argmax(1)).unsqueeze(1).tolist())
+                        if is_multilabel:
+                            metrics[f'{split}_acc'].extend(y[1].argmax(1).eq(y_pred[0].argmax(1)).unsqueeze(1).tolist())
+                            metrics[f'{split}_cse_loss'].append(F.cross_entropy(y_pred[0], y[1]).item())
+                        else:
+                            metrics[f'{split}_acc'].extend(((y[1] > 0) == (y_pred[0] > 0)).flatten().to(torch.uint8).tolist())
+                            metrics[f'{split}_cse_loss'].append(F.binary_cross_entropy_with_logits(y_pred[0], y[1]).item())
                         metrics[f'{split}_contrast_loss'].append(batch_loss.item())
-                        metrics[f'{split}_cse_loss'].append(F.cross_entropy(y_pred[0], y[1]).item())
 
                         del y_pred, X, y
                         torch.cuda.empty_cache()
 
-                        if criterion._get_name() != 'CrossEntropyLoss': metrics[f'{split}_ablated_ce_loss'].append(criterion.prev)
+                        if criterion._get_name() == 'ContrastiveLoss': metrics[f'{split}_ablated_ce_loss'].append(criterion.prev)
                         if split == 'train' and epoch > 0:  # epoch 0 is for evaluating performance on initalization
                             batch_loss.backward(inputs=optimizer.param_groups[0]['params'])
                             if is_primary_rank and const.LOG_BATCHWISE: mlflow.log_metric(f'{split}_batchwise_loss', batch_loss.item(), step=(epoch-1) * len(dataloader) + batch_idx)
@@ -225,7 +229,7 @@ if __name__ == '__main__':
             selected['ema'] = torch.load(path / 'ema.pt', map_location=torch.device(const.DEVICE), weights_only=False)
             ema = selected['ema']
 
-    completed_epochs, selected = fit(model, optimizer, scheduler, criterion, train, val, ema=ema, selected=selected, **checkpoint_args)
+    completed_epochs, selected = fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=is_multilabel, ema=ema, selected=selected, **checkpoint_args)
 
     if const.DDP:
         if const.USE_ZERO: optimizer.consolidate_state_dict()
