@@ -82,7 +82,7 @@ def fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=False,
                         batch_loss = criterion(y_pred, y) if criterion._get_name() == 'ContrastiveLoss' else criterion(y_pred[0], y[1])
 
                         if is_multilabel:
-                            metrics[f'{split}_acc'].extend(((y[1] > 0) == (y_pred[0] > 0)).flatten().to(torch.uint8).tolist())
+                            metrics[f'{split}_acc'].extend(((y[1] > 0) == (y_pred[0] > 2)).flatten().to(torch.uint8).tolist())
                             metrics[f'{split}_cse_loss'].append(F.binary_cross_entropy_with_logits(y_pred[0], y[1]).item())
                         else:
                             metrics[f'{split}_acc'].extend(y[1].argmax(1).eq(y_pred[0].argmax(1)).unsqueeze(1).tolist())
