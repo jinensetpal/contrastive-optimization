@@ -3,6 +3,7 @@
 from ..data.oxford_iiit_pet import get_generators as oxford_iiit_pet
 from torch.distributed.optim import ZeroRedundancyOptimizer
 from ..data.imagenet import get_generators as imagenet
+from torcheval.metrics.functional import binary_auroc
 from ..data.sbd import get_generators as sbd
 from contextlib import nullcontext
 from .loss import ContrastiveLoss
@@ -82,7 +83,7 @@ def fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=False,
                         batch_loss = criterion(y_pred, y) if criterion._get_name() == 'ContrastiveLoss' else criterion(y_pred[0], y[1])
 
                         if is_multilabel:
-                            metrics[f'{split}_acc'].extend(((y[1] > 0) == (y_pred[0] > 2)).flatten().to(torch.uint8).tolist())
+                            metrics[f'{split}_acc'].append(binary_auroc((y_pred[0] > 2).to(torch.int8).flatten(), y[1].flatten()).item())
                             metrics[f'{split}_cse_loss'].append(F.binary_cross_entropy_with_logits(y_pred[0], y[1]).item())
                         else:
                             metrics[f'{split}_acc'].extend(y[1].argmax(1).eq(y_pred[0].argmax(1)).unsqueeze(1).tolist())
@@ -175,21 +176,21 @@ if __name__ == '__main__':
         dist.init_process_group('nccl')
         dist.barrier(device_ids=[const.DEVICE])
 
+    if const.DATASET == 'imagenet': train, val, test = imagenet()
+    elif const.DATASET == 'sbd': train, val, test = sbd()
+    else: train, val, test = oxford_iiit_pet()
+
     model = Model(const.IMAGE_SHAPE, is_contrastive=is_contrastive, multilabel=is_multilabel).to(const.DEVICE)
     ema = optim.swa_utils.AveragedModel(model, device=const.DEVICE, avg_fn=optim.swa_utils.get_ema_avg_fn(1 - min(1, (1 - const.EMA_DECAY) * const.BATCH_SIZE * const.EMA_STEPS / const.EPOCHS)), use_buffers=True) if const.EMA else None
 
-    if is_contrastive: criterion = ContrastiveLoss(model.get_contrastive_cams, is_label_mask=const.USE_CUTMIX, multilabel=is_multilabel)
-    elif is_multilabel: criterion = nn.BCEWithLogitsLoss()
+    if is_contrastive: criterion = ContrastiveLoss(model.get_contrastive_cams, is_label_mask=const.USE_CUTMIX, multilabel=is_multilabel, pos_weight=train.dataset.reweight if is_multilabel else None)
+    elif is_multilabel: criterion = nn.BCEWithLogitsLoss(pos_weight=train.dataset.reweight)
     else: criterion = nn.CrossEntropyLoss(label_smoothing=const.LABEL_SMOOTHING)
 
     if const.DDP:
         model = nn.parallel.DistributedDataParallel(model, device_ids=[const.DEVICE])
         model.load_state_dict = model.module.load_state_dict
         model.state_dict = model.module.state_dict
-
-    if const.DATASET == 'imagenet': train, val, test = imagenet()
-    elif const.DATASET == 'sbd': train, val, test = sbd()
-    else: train, val, test = oxford_iiit_pet()
 
     if const.FINETUNING:
         params = [*model.linear.parameters(),] if is_contrastive else [*model.linear.parameters(),
