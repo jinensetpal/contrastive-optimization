@@ -96,7 +96,7 @@ def fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=False,
                         if criterion._get_name() == 'ContrastiveLoss': metrics[f'{split}_ablated_ce_loss'].append(criterion.prev)
                         if split == 'train' and epoch > 0:  # epoch 0 is for evaluating performance on initalization
                             batch_loss.backward(inputs=optimizer.param_groups[0]['params'])
-                            if is_primary_rank and const.LOG_BATCHWISE: mlflow.log_metric(f'{split}_batchwise_loss', batch_loss.item(), step=(epoch-1) * len(dataloader) + batch_idx)
+                            if is_primary_rank and const.LOG_BATCHWISE: mlflow.log_metric(f'{split}_batchwise_loss', batch_loss.item(), synchronous=False, step=(epoch-1) * len(dataloader) + batch_idx)
 
                             if not (batch_idx+1) % const.GRAD_ACCUMULATION_STEPS: optimizer.step()
 
@@ -123,7 +123,7 @@ def fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=False,
                 metrics = {key: np.mean([metric[key] for metric in dist_metrics]) for key in metrics.keys()}
 
             metrics['lr'] = scheduler.get_last_lr()[-1]
-            mlflow.log_metrics(metrics, step=epoch-1)
+            mlflow.log_metrics(metrics, synchronous=False, step=epoch-1)
             if epoch: scheduler.step()
 
             if const.SELECT_BEST and metrics['valid_acc'] > selected['acc']:
@@ -147,7 +147,7 @@ def fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=False,
 
             if const.SELECT_BEST:
                 mlflow.log_metrics({'selected_epoch': selected['epoch'],
-                                    'selected_valid_acc': selected['acc']}, step=epoch)
+                                    'selected_valid_acc': selected['acc']}, synchronous=False, step=epoch)
                 model.load_state_dict(selected['best'])
             else:
                 selected['epoch'] = epoch
