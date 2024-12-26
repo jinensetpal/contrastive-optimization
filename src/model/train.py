@@ -84,7 +84,7 @@ def fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=False,
 
                         if is_multilabel:
                             metrics[f'{split}_acc'].append(binary_auroc(y_pred[0].flatten(), y[1].flatten()).item())
-                            metrics[f'{split}_cse_loss'].append(F.binary_cross_entropy_with_logits(y_pred[0], y[1]).item(), pos_weight=train.dataset.reweight)
+                            metrics[f'{split}_cse_loss'].append(F.binary_cross_entropy_with_logits(y_pred[0], y[1], pos_weight=train.dataset.reweight).item())
                         else:
                             metrics[f'{split}_acc'].extend(y[1].argmax(1).eq(y_pred[0].argmax(1)).unsqueeze(1).tolist())
                             metrics[f'{split}_cse_loss'].append(F.cross_entropy(y_pred[0], y[1]).item())
@@ -93,7 +93,9 @@ def fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=False,
                         del y_pred, X, y
                         torch.cuda.empty_cache()
 
-                        if criterion._get_name() == 'ContrastiveLoss': metrics[f'{split}_ablated_ce_loss'].append(criterion.prev)
+                        if criterion._get_name() == 'ContrastiveLoss':
+                            metrics[f'{split}_ablated_ce_loss'].append(criterion.prev[0])
+                            metrics[f'{split}_divergence_loss'].append(criterion.prev[1])
                         if split == 'train' and epoch > 0:  # epoch 0 is for evaluating performance on initalization
                             batch_loss.backward(inputs=optimizer.param_groups[0]['params'])
                             if is_primary_rank and const.LOG_BATCHWISE: mlflow.log_metric(f'{split}_batchwise_loss', batch_loss.item(), synchronous=False, step=(epoch-1) * len(dataloader) + batch_idx)
@@ -183,7 +185,7 @@ if __name__ == '__main__':
     model = Model(const.IMAGE_SHAPE, is_contrastive=is_contrastive, multilabel=is_multilabel).to(const.DEVICE)
     ema = optim.swa_utils.AveragedModel(model, device=const.DEVICE, avg_fn=optim.swa_utils.get_ema_avg_fn(1 - min(1, (1 - const.EMA_DECAY) * const.BATCH_SIZE * const.EMA_STEPS / const.EPOCHS)), use_buffers=True) if const.EMA else None
 
-    if is_contrastive: criterion = ContrastiveLoss(model.get_contrastive_cams, is_label_mask=const.USE_CUTMIX, multilabel=is_multilabel)
+    if is_contrastive: criterion = ContrastiveLoss(model.get_contrastive_cams, is_label_mask=const.USE_CUTMIX, multilabel=is_multilabel, divergence=bool(const.LAMBDAS[-1]))
     elif is_multilabel: criterion = nn.BCEWithLogitsLoss(pos_weight=train.dataset.reweight)
     else: criterion = nn.CrossEntropyLoss(label_smoothing=const.LABEL_SMOOTHING)
 
