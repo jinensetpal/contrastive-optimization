@@ -13,7 +13,7 @@ MODELS_DIR = BASE_DIR / 'models'
 # training
 DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 TRAIN_CUTOFF = 12600  # max training time in seconds
-LAMBDAS = [1E1, 5E1, 1, 0]
+LAMBDAS = [1E1, 5E1, 1, 1]
 GRAD_ACCUMULATION_STEPS = 1
 PRETRAINED_BACKBONE = False
 RANDOMIZED_FLATTEN = False
@@ -47,7 +47,7 @@ SEED = 1024
 N_CHANNELS = 3
 BBOX_MAP = False
 BINARY_CLS = True
-DATASET = 'imagenet'
+DATASET = 'soodimagenet'
 CAM_SIZE = (14, 14)
 VAL_CROP_SIZE = 224
 VAL_RESIZE_SIZE = 232
@@ -57,6 +57,7 @@ SPLITS = ['train', 'valid', 'test']
 IMAGE_SHAPE = (N_CHANNELS,) + IMAGE_SIZE
 
 if DATASET == 'imagenet': N_CLASSES = 1000
+elif DATASET == 'soodimagenet': N_CLASSES = 56
 elif DATASET == 'sbd': N_CLASSES = 20
 else: N_CLASSES = 2 if BINARY_CLS else 37
 

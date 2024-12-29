@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from ..data.oxford_iiit_pet import get_generators as oxford_iiit_pet
+from ..data.soodimagenet import get_generators as soodimagenet
 from torch.distributed.optim import ZeroRedundancyOptimizer
 from ..data.imagenet import get_generators as imagenet
 from torcheval.metrics.functional import binary_auroc
@@ -44,6 +45,10 @@ def configure(model_name):
         const.USE_CUTMIX = 'cutmixed' in const.MODEL_NAME
         const.AUGMENT = 'augmented' in const.MODEL_NAME
         const.FINETUNING = False
+    elif const.DATASET == 'imagenet':
+        const.N_CLASSES = 56
+        const.USE_CUTMIX = True
+        const.BINARY_CLS = False
     elif const.DATASET == 'sbd':
         const.N_CLASSES = 20
         const.BINARY_CLS = False
@@ -178,8 +183,9 @@ if __name__ == '__main__':
         dist.init_process_group('nccl')
         dist.barrier(device_ids=[const.DEVICE])
 
-    if const.DATASET == 'imagenet': train, val, test = imagenet()
-    elif const.DATASET == 'sbd': train, val, test = sbd()
+    if const.DATASET == 'imagenet': train, val, _ = imagenet()
+    elif const.DATASET == 'soodimagenet': train, val, _ = soodimagenet('train_val')
+    elif const.DATASET == 'sbd': train, val, _ = sbd()
     else: train, val, test = oxford_iiit_pet()
 
     model = Model(const.IMAGE_SHAPE, is_contrastive=is_contrastive, multilabel=is_multilabel).to(const.DEVICE)
