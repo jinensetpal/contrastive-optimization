@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 
+from torchvision.transforms.functional import resize
 from utils.SOODImageNetDataset import SOODImageNetS
 from src import const
+import torchvision
 import random
 import torch
 
@@ -25,9 +27,11 @@ class Dataset(SOODImageNetS):
 
     def __getitem__(self, idx):
         X, heatmap, label_idx, class_name, synset = super().__getitem__(idx)
+        heatmap[heatmap.nonzero()] = 1
+        heatmap = resize(heatmap[None,], const.CAM_SIZE, interpolation=torchvision.transforms.InterpolationMode.NEAREST)[0]
 
         y = torch.zeros(const.N_CLASSES)
-        y[int(label_idx)] = 1
+        y[int(label_idx) - 1] = 1
 
         return X.to(self.device), (heatmap.to(self.device), y.to(self.device))
 

@@ -33,6 +33,7 @@ def configure(model_name):
     const.USE_ZERO = 'zero' in const.MODEL_NAME and const.DDP
     const.EMA = 'ema' in const.MODEL_NAME
     const.DATASET = 'imagenet' if 'imagenet' in const.MODEL_NAME else 'oxford-iiit'
+    const.DATASET = 'soodimagenet' if 'soodimagenet' in const.MODEL_NAME else const.DATASET
     const.DATASET = 'sbd' if 'sbd' in const.MODEL_NAME else const.DATASET
     const.PRETRAINED_BACKBONE = 'pretrained' in const.MODEL_NAME
     if 'ablated_only' in const.MODEL_NAME: const.LAMBDAS[-1] = 0
@@ -45,9 +46,8 @@ def configure(model_name):
         const.USE_CUTMIX = 'cutmixed' in const.MODEL_NAME
         const.AUGMENT = 'augmented' in const.MODEL_NAME
         const.FINETUNING = False
-    elif const.DATASET == 'imagenet':
+    elif const.DATASET == 'soodimagenet':
         const.N_CLASSES = 56
-        const.USE_CUTMIX = True
         const.BINARY_CLS = False
     elif const.DATASET == 'sbd':
         const.N_CLASSES = 20
@@ -184,7 +184,7 @@ if __name__ == '__main__':
         dist.barrier(device_ids=[const.DEVICE])
 
     if const.DATASET == 'imagenet': train, val, _ = imagenet()
-    elif const.DATASET == 'soodimagenet': train, val, _ = soodimagenet('train_val')
+    elif const.DATASET == 'soodimagenet': train, val, _ = soodimagenet('train')
     elif const.DATASET == 'sbd': train, val, _ = sbd()
     else: train, val, test = oxford_iiit_pet()
 
