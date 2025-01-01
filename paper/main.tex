@@ -344,6 +344,41 @@ We therefore combined the divergence based loss with ablated cross-entropy. The 
 
 For this setting, $\bm{\lambda} = \{1, 50, 1, 10^{-3}\}$ was set for $i = \{1, \ldots, 4\}$ respectively. As in the previous setting, these were identified empirically, without rigorous optimization.
 
+\subsubsection{Ablated Binary Cross-Entropy}
+
+For sigmoid-activated binary / multilabel classification tasks, we leverage similar principles to defined an ablation to binary cross-entropy. Since we do not have a contrastive process in softmax-activation, this definitions relies only on HiResCAMs.
+
+\begin{theorem}\label{abce}
+	We can integrate backgroud invariance to the definition of binary cross-entropy using the following formulation:
+	\begin{gather}
+		\begin{split}
+			H(\theta, \mathcal{D}) = &- y_i \log \left(\sigma\left(h \odot \sum_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}} - (1-h) \odot \sum_{j,k}|\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}}|\right) \right) \\
+			&- (1 - y_i) \log \left(1 - \sigma\left(h \odot \sum_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}} + (1-h) \odot \sum_{j,k}|\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}}|\right) \right)
+		\end{split}
+	\end{gather}
+\end{theorem}
+\begin{proof} For any logit $i$, binary cross-entropy loss is defined as:
+	\begin{align}
+		H(\theta, \mathcal{D}) &= -\left[ y_i \log (\sigma(\bm{s}_i)) + (1 - y_i) \log (1 - \sigma(\bm{s}_i)) \right] \\
+		&= -\left[ y_i \log \left(\sigma\left(\sum_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}}\right) \right) + (1 - y_i) \log \left(1 - \sigma\left(\sum_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}}\right) \right) \right]
+	\end{align}
+	Similar to Theorem \ref{ace}, we can break down each HiResCAM to foreground and background components:
+	\begin{gather}
+		\begin{split}
+			H(\theta, \mathcal{D}) = &- y_i \log \left(\sigma\left(h \odot \sum_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}} + (1-h) \odot \sum_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}}\right) \right) \\
+			&- (1 - y_i) \log \left(1 - \sigma\left(h \odot \sum_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}} + (1-h) \odot \sum_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}}\right) \right)
+		\end{split}
+	\end{gather}
+	The current formulation motivates activating either the foreground or the background for positive classification, and similarly motivates de-activating every pixel of the non-positive class. We therefore penalize activation on the background for the both cases, motivating learning invariance to noise in the form of the background despite it the improving the final logit score.
+	\begin{gather}
+		\begin{split}
+			H(\theta, \mathcal{D}) = &- y_i \log \left(\sigma\left(h \odot \sum_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}} - (1-h) \odot \sum_{j,k}|\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}}|\right) \right) \\
+			&- (1 - y_i) \log \left(1 - \sigma\left(h \odot \sum_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}} + (1-h) \odot \sum_{j,k}|\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}}|\right) \right)
+		\end{split}
+	\end{gather}
+	This gives us the ablated binary cross-entropy formulation.
+\end{proof}
+
 \subsection{Training Detail}
 
 % \begin{figure}
