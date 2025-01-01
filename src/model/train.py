@@ -227,6 +227,7 @@ if __name__ == '__main__':
     if const.CHECKPOINTING and len(sys.argv) == 2:  # add extra sys.argv to signify first checkpointing run
         model.load_state_dict(torch.load(path / 'last.pt', map_location=torch.device(const.DEVICE), weights_only=True))
         optimizer.load_state_dict(torch.load(path / 'optim.pt', map_location=torch.device(const.DEVICE), weights_only=True))
+        scheduler.load_state_dict(torch.load(path / 'scheduler.pt', map_location=torch.device(const.DEVICE), weights_only=True))
         checkpoint_args = json.load(open(path / 'checkpoint_metadata.json'))
         prev_metrics = mlflow.get_run(checkpoint_args['mlflow_run_id']).data.metrics
 
@@ -235,8 +236,8 @@ if __name__ == '__main__':
                     'epoch': prev_metrics['selected_epoch'],
                     'acc': prev_metrics['selected_valid_acc']}
         if ema and (path / 'ema.pt').exists():
-            selected['ema'] = torch.load(path / 'ema.pt', map_location=torch.device(const.DEVICE), weights_only=False)
-            ema = selected['ema']
+            selected['ema'] = torch.load(path / 'ema.pt', map_location=torch.device(const.DEVICE), weights_only=True)
+            ema.load_state_dict(selected['ema'])
 
     completed_epochs, selected = fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=is_multilabel, ema=ema, selected=selected, **checkpoint_args)
 
@@ -251,4 +252,5 @@ if __name__ == '__main__':
 
         if const.CHECKPOINTING:
             torch.save(optimizer.state_dict(), path / 'optim.pt')
+            torch.save(scheduler.state_dict(), path / 'scheduler.pt')
             json.dump({'init_epoch': completed_epochs+1, 'mlflow_run_id': mlflow.last_active_run().info.run_id}, open(path / 'checkpoint_metadata.json', 'w'))

@@ -18,7 +18,7 @@ if __name__ == '__main__':
     model.name = name
     model.eval()
 
-    for test, test_loader in zip(('easy', 'hard'), get_generators('train')):
+    for test, test_loader in zip(('easy', 'hard'), get_generators('test')):
         preds = torch.empty(0, device=const.DEVICE)
         targets = torch.empty(0, device=const.DEVICE)
         for X, (heatmap, y) in test_loader:
