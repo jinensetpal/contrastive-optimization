@@ -20,7 +20,7 @@ class ContrastiveLoss(nn.Module):
         if self.multilabel:
             labels = ((torch.arange(const.N_CLASSES) + 1) * torch.ones(*const.CAM_SIZE, const.N_CLASSES)).T[None,].repeat(y[0].size(0), 1, 1, 1).to(const.DEVICE)
             fg_mask = (labels == y[0].repeat(1, const.N_CLASSES, 1).view(y[0].size(0), -1, *y[0].shape[1:])).to(torch.int)
-            ablation = (fg_mask * y_pred[1] - (1 - fg_mask) * y_pred[1].abs()).sum(dim=[2, 3]) * y[1] + ((1 - fg_mask) * y_pred[1]).sum(dim=[2, 3]) * (1 - y[1])
+            ablation = (fg_mask * y_pred[1] - (1 - fg_mask) * y_pred[1].abs()).sum(dim=[2, 3]) * y[1] + (fg_mask * y_pred[1] + (1 - fg_mask) * y_pred[1].abs()).sum(dim=[2, 3]) * (1 - y[1])
         elif self.is_label_mask:
             cc = self.get_contrastive_cams(y[1], y_pred[1]).to(const.DEVICE)
 
