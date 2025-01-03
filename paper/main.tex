@@ -351,10 +351,7 @@ For sigmoid-activated binary / multilabel classification tasks, we leverage simi
 \begin{theorem}\label{abce}
 	We can integrate backgroud invariance to the definition of binary cross-entropy using the following formulation:
 	\begin{gather}
-		\begin{split}
-			H(\theta, \mathcal{D}) = &- y_i \log \left(\sigma\left(h \odot \sum_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}} - (1-h) \odot \sum_{j,k}|\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}}|\right) \right) \\
-			&- (1 - y_i) \log \left(1 - \sigma\left(h \odot \sum_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}} + (1-h) \odot \sum_{j,k}|\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}}|\right) \right)
-		\end{split}
+		H(\theta, \mathcal{D}) = - y_i \log \left(\sigma\left(h \odot \sum_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}} - (1-h) \odot \sum_{j,k}|\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}}|\right) \right) - (1 - y_i) \log \left( \bm{s}_i \right)
 	\end{gather}
 \end{theorem}
 \begin{proof} For any logit $i$, binary cross-entropy loss is defined as:
@@ -362,19 +359,13 @@ For sigmoid-activated binary / multilabel classification tasks, we leverage simi
 		H(\theta, \mathcal{D}) &= -\left[ y_i \log (\sigma(\bm{s}_i)) + (1 - y_i) \log (1 - \sigma(\bm{s}_i)) \right] \\
 		&= -\left[ y_i \log \left(\sigma\left(\sum_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}}\right) \right) + (1 - y_i) \log \left(1 - \sigma\left(\sum_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}}\right) \right) \right]
 	\end{align}
-	Similar to Theorem \ref{ace}, we can break down each HiResCAM to foreground and background components:
+	Similar to Theorem \ref{ace}, we can break down each HiResCAM to foreground and background components. For a non-target HiResCAM, anything that is not the target is inherently the background. Therefore, it's definition is retrained.
 	\begin{gather}
-		\begin{split}
-			H(\theta, \mathcal{D}) = &- y_i \log \left(\sigma\left(h \odot \sum_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}} + (1-h) \odot \sum_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}}\right) \right) \\
-			&- (1 - y_i) \log \left(1 - \sigma\left(h \odot \sum_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}} + (1-h) \odot \sum_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}}\right) \right)
-		\end{split}
+		H(\theta, \mathcal{D}) = - y_i \log \left(\sigma\left(h \odot \sum_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}} - (1-h) \odot \sum_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}}\right) \right) - (1 - y_i) \log \left( \bm{s}_i \right)
 	\end{gather}
-	The current formulation motivates activating either the foreground or the background for positive classification, and similarly motivates de-activating every pixel of the non-positive class. We therefore penalize activation on the background for the both cases, motivating learning invariance to noise in the form of the background despite it the improving the final logit score.
+	The current formulation motivates activating either the foreground or the background for positive classification, and motivates de-activating every pixel of the non-positive class. We penalize activation on the background for the positive class only:
 	\begin{gather}
-		\begin{split}
-			H(\theta, \mathcal{D}) = &- y_i \log \left(\sigma\left(h \odot \sum_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}} - (1-h) \odot \sum_{j,k}|\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}}|\right) \right) \\
-			&- (1 - y_i) \log \left(1 - \sigma\left(h \odot \sum_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}} + (1-h) \odot \sum_{j,k}|\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}}|\right) \right)
-		\end{split}
+		H(\theta, \mathcal{D}) = - y_i \log \left(\sigma\left(h \odot \sum_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}} - (1-h) \odot \sum_{j,k}|\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}}|\right) \right) - (1 - y_i) \log \left( \bm{s}_i \right)
 	\end{gather}
 	This gives us the ablated binary cross-entropy formulation.
 \end{proof}

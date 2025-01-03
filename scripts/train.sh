@@ -1,7 +1,7 @@
 #!/usr/bin/bash
 
 run=`ls .log/  | wc -l`
-echo "Writing to .logs/training-$run.log"
+echo "Writing to .log/training-$run.log"
 
 MLFLOW_TRACKING_USERNAME=jinensetpal \
 MLFLOW_TRACKING_PASSWORD=$MLFLOW_TOKEN \
