@@ -16,7 +16,7 @@ import sys
 
 if __name__ == '__main__':
     multilabel = len(sys.argv) == 2
-    data = sbd('data/sbd', mode='segmentation') if multilabel else oxford_iiit_pet('train')
+    data = sbd(mode='segmentation') if multilabel else oxford_iiit_pet('train')
     model = Model(const.IMAGE_SHAPE)
     optim = torch.optim.Adam(model.parameters(), lr=1E-3)
     criterion = ContrastiveLoss(model.get_contrastive_cams, multilabel=multilabel, divergence=bool(const.LAMBDAS[-1]))

@@ -145,7 +145,9 @@ def fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=False,
             if const.TRAIN_CUTOFF is not None and time.time() - start_time >= const.TRAIN_CUTOFF: break
 
         if is_primary_rank:
-            if ema: selected['ema'] = ema.state_dict()
+            if ema:
+                selected['ema'] = ema.state_dict()
+                selected['ema_weights'] = ema.module.state_dict()
             selected['last'] = deepcopy(model.state_dict())
             if const.SELECT_BEST and 'best' not in selected:
                 selected['best'] = deepcopy(model.state_dict())
@@ -248,7 +250,9 @@ if __name__ == '__main__':
     if not const.DDP or (const.DDP and const.DEVICE == 0):
         torch.save(selected['last'], path / 'last.pt')
         if const.SELECT_BEST: torch.save(selected['best'], path / 'best.pt')
-        if const.EMA: torch.save(selected['ema'], path / 'ema.pt')
+        if const.EMA:
+            torch.save(selected['ema'], path / 'ema.pt')
+            torch.save(selected['ema_weights'], path / 'ema_weights.pt')
 
         if const.CHECKPOINTING:
             torch.save(optimizer.state_dict(), path / 'optim.pt')
