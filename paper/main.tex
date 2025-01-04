@@ -351,7 +351,7 @@ For sigmoid-activated binary / multilabel classification tasks, we leverage simi
 \begin{theorem}\label{abce}
 	We can integrate backgroud invariance to the definition of binary cross-entropy using the following formulation:
 	\begin{gather}
-		H(\theta, \mathcal{D}) = - y_i \log \left(\sigma\left(h \odot \sum_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}} - (1-h) \odot \sum_{j,k}|\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}}|\right) \right) - (1 - y_i) \log \left( \bm{s}_i \right)
+		\mathcal{J}(\theta, \mathcal{D}) = - y_i \log \left(\sigma\left(h \odot \sum_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}} - (1-h) \odot \sum_{j,k}|\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}}|\right) \right) - (1 - y_i) \log \left( \bm{s}_i \right)
 	\end{gather}
 \end{theorem}
 \begin{proof} For any logit $i$, binary cross-entropy loss is defined as:
@@ -365,10 +365,20 @@ For sigmoid-activated binary / multilabel classification tasks, we leverage simi
 	\end{gather}
 	The current formulation motivates activating either the foreground or the background for positive classification, and motivates de-activating every pixel of the non-positive class. We penalize activation on the background for the positive class only:
 	\begin{gather}
-		H(\theta, \mathcal{D}) = - y_i \log \left(\sigma\left(h \odot \sum_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}} - (1-h) \odot \sum_{j,k}|\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}}|\right) \right) - (1 - y_i) \log \left( \bm{s}_i \right)
+		\mathcal{J}(\theta, \mathcal{D}) = - y_i \log \left(\sigma\left(h \odot \sum_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}} - (1-h) \odot \sum_{j,k}|\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}}|\right) \right) - (1 - y_i) \log \left( \bm{s}_i \right)
 	\end{gather}
 	This gives us the ablated binary cross-entropy formulation.
 \end{proof}
+
+\subsubsection{Ablated Binary Cross-Entropy Divergence Formulation}
+
+Similar to ACE, we define a divergence term for the target class to motivate learning the foreground as part of the training process.
+\begin{gather}
+	\begin{split}
+		\mathcal{\bm{J}}(\theta, \mathcal{D}) := &\ \frac{1}{|C|} \sum^{|C|}_{i} \lambda_1 D_{KL}(\sigma_{\text{softmax}}(\lambda_3 h)\ ||\ \sigma_{\text{softmax}}(\lambda_2 \tilde{\mathcal{\bm{A}}}_{i}^{\text{HiResCAM}})) \\
+		&- \lambda_2 \bigg[ y_i \log \left(\sigma\left(h \odot \sum_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}} - (1-h) \odot \sum_{j,k}|\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}}|\right) \right) + (1 - y_i) \log \left( \bm{s}_i \right) \bigg]
+	\end{split}
+\end{gather}
 
 \subsection{Training Detail}
 

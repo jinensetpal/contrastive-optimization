@@ -49,7 +49,7 @@ class ContrastiveLoss(nn.Module):
             fg_mask_log_probs = fg_mask_probs.log()
             fg_mask_log_probs[fg_mask != 0] = 0
 
-            kld = fg_mask_probs * (fg_mask_log_probs - cam_log_probs) * fg_mask
+            kld = fg_mask_probs * (fg_mask_log_probs - cam_log_probs)
         else: kld = torch.tensor(0)
 
         self.prev = (ace.item(), (kld.sum() / y[0].size(0)).item())
@@ -112,7 +112,6 @@ class KLDPenaltyLoss(nn.Module):
         super().__init__()
         self.get_contrastive_cam = get_contrastive_cam_fn
         self.debug = debug
-
     def forward(self, y_pred, y):
         cc = self.get_contrastive_cam(y[1], y_pred[1])
         fg_mask = y[0].repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
