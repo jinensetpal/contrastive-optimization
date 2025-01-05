@@ -1,0 +1,6 @@
+outs:
+- md5: 3eb79052ba0a1af118d6a243b19a66e4.dir
+  size: 1825582181
+  nfiles: 16135
+  hash: md5
+  path: VOC2012Test

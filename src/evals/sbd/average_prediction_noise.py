@@ -49,4 +49,5 @@ if __name__ == '__main__':
     model.eval()
 
     torch.multiprocessing.set_start_method('spawn', force=True)
-    average_prediction_noise(model, DataLoader(Dataset(mode='segmentation'), batch_size=const.BATCH_SIZE, num_workers=4, shuffle=False), failures_only=len(sys.argv) == 3)
+    average_prediction_noise(model, DataLoader(Dataset(mode='segmentation', image_set=sys.argv[2]), batch_size=const.BATCH_SIZE,
+                                               num_workers=const.N_WORKERS, shuffle=False), failures_only=len(sys.argv) == 4)

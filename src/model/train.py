@@ -77,7 +77,7 @@ def fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=False,
         for epoch in range(init_epoch, const.EPOCHS + int(init_epoch == 0)):
             if not (epoch) % interval: print('-' * 10)
             metrics = {metric: [] for metric in [f'{split}_{report}' for report in ['contrast_loss', 'divergence_loss', 'ablated_ce_loss', 'cse_loss'] for split in const.SPLITS[:2]]}
-            for split in const.SPLITS[:2]: metrics[f'{split}_acc'] = BinaryAUROC() if is_multilabel else MulticlassAccuracy()
+            for split in const.SPLITS[:2]: metrics[f'{split}_acc'] = BinaryAUROC(device=torch.device(const.DEVICE)) if is_multilabel else MulticlassAccuracy(device=torch.device(const.DEVICE))
 
             try:
                 for split, dataloader in zip(const.SPLITS[:2], (train, val)):
@@ -90,10 +90,10 @@ def fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=False,
                         batch_loss = criterion(y_pred, y) if criterion._get_name() == 'ContrastiveLoss' else criterion(y_pred[0], y[1])
 
                         if is_multilabel:
-                            metrics[f'{split}_acc'].update(y_pred[0].flatten(), y[1].flatten())
+                            metrics[f'{split}_acc'].update(y_pred[0].detach().flatten(), y[1].flatten())
                             metrics[f'{split}_cse_loss'].append(F.binary_cross_entropy_with_logits(y_pred[0], y[1], pos_weight=train.dataset.reweight).item())
                         else:
-                            metrics[f'{split}_acc'].update(y_pred[0], y[1].argmax(1))
+                            metrics[f'{split}_acc'].update(y_pred[0].detach(), y[1].argmax(1))
                             metrics[f'{split}_cse_loss'].append(F.cross_entropy(y_pred[0], y[1]).item())
                         metrics[f'{split}_contrast_loss'].append(batch_loss.item())
 

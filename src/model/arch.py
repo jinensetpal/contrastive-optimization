@@ -61,7 +61,7 @@ class Model(nn.Module):
 
     def get_semantic_map(self, cams):
         segmentation_map = cams.max(1)
-        return (segmentation_map.values > self.segmentation_threshold).to(torch.int) * (segmentation_map.indices + 1)
+        return (segmentation_map.values > self.segmentation_threshold).to(torch.uint8) * (segmentation_map.indices + 1).to(torch.uint8)
 
     def get_contrastive_cams(self, y, cams):
         return torch.index_select(cams.view(-1, *cams.shape[2:]), 0, y.argmax(1) + (torch.arange(cams.size(0), device=const.DEVICE) * cams.size(1))).repeat(1, cams.size(1), 1).view(*cams.shape) - cams
