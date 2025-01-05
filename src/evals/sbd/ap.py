@@ -11,15 +11,13 @@ import sys
 
 
 def average_precision(model, gen):
-    score = 0
-
     preds = torch.empty(0, device=const.DEVICE)
     targets = torch.empty(0, device=const.DEVICE)
     for X, (heatmap, y) in gen:
-        preds = torch.cat([preds, model(X.to(const.DEVICE))[0].detach().flatten()])
-        targets = torch.cat([targets, y.to(const.DEVICE).flatten()])
+        preds = torch.cat([preds, model(X.to(const.DEVICE))[0].detach()])
+        targets = torch.cat([targets, y.to(const.DEVICE)])
 
-    return binary_auprc(preds, targets)
+    return binary_auprc(preds.flatten(), targets.flatten())
 
 
 if __name__ == '__main__':

@@ -112,6 +112,7 @@ class KLDPenaltyLoss(nn.Module):
         super().__init__()
         self.get_contrastive_cam = get_contrastive_cam_fn
         self.debug = debug
+
     def forward(self, y_pred, y):
         cc = self.get_contrastive_cam(y[1], y_pred[1])
         fg_mask = y[0].repeat((cc.shape[1], 1, 1, 1)).permute(1, 0, 2, 3)
