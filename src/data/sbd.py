@@ -28,7 +28,7 @@ def get_generators():
     const.SPLITS[1] = 'val'
 
     dataloaders = *[torch.utils.data.DataLoader(Dataset(mode='segmentation', image_set=split, device='cpu', download=not (const.DATA_DIR / 'sbd').exists()),
-                                                num_workers=2, pin_memory=True, batch_size=const.BATCH_SIZE, shuffle=True) for split in const.SPLITS[:2]], None
+                                                num_workers=const.N_WORKERS, pin_memory=True, batch_size=const.BATCH_SIZE, shuffle=True) for split in const.SPLITS[:2]], None
     const.SPLITS[1] = 'valid'
     return dataloaders
 

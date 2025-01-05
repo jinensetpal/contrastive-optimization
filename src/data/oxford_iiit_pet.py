@@ -50,7 +50,7 @@ class Dataset(torch.utils.data.Dataset):
 
 def get_generators():
     torch.multiprocessing.set_start_method('spawn', force=True)
-    return [torch.utils.data.DataLoader(Dataset(split=split, device='cpu', bbox=const.BBOX_MAP), num_workers=2,
+    return [torch.utils.data.DataLoader(Dataset(split=split, device='cpu', bbox=const.BBOX_MAP), num_workers=const.N_WORKERS,
                                         pin_memory=True, batch_size=const.BATCH_SIZE, shuffle=True) for split in const.SPLITS]
 
 

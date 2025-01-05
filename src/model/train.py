@@ -77,7 +77,7 @@ def fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=False,
         for epoch in range(init_epoch, const.EPOCHS + int(init_epoch == 0)):
             if not (epoch) % interval: print('-' * 10)
             metrics = {metric: [] for metric in [f'{split}_{report}' for report in ['contrast_loss', 'divergence_loss', 'ablated_ce_loss', 'cse_loss'] for split in const.SPLITS[:2]]}
-            for split in const.SPLITS[:2]: metrics['{split}_acc'] = BinaryAUROC() if is_multilabel else MulticlassAccuracy()
+            for split in const.SPLITS[:2]: metrics[f'{split}_acc'] = BinaryAUROC() if is_multilabel else MulticlassAccuracy()
 
             try:
                 for split, dataloader in zip(const.SPLITS[:2], (train, val)):
@@ -118,7 +118,7 @@ def fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=False,
             except KeyboardInterrupt:
                 break
 
-            for split in const.SPLITS[:2]: metrics['{split}_acc'] = sync_and_compute(metrics['{split}_acc'])
+            for split in const.SPLITS[:2]: metrics[f'{split}_acc'] = sync_and_compute(metrics[f'{split}_acc']).item()
             metrics = {metric: np.mean(metrics[metric]) for metric in metrics}
             if const.DDP:
                 store.set(f'metric_{const.DEVICE}', json.dumps(metrics))

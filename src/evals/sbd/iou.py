@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-from torcheval.metrics import BinaryAUPRC
 from torch.utils.data import DataLoader
 from src.data.sbd import Dataset
 from src.model.arch import Model
@@ -10,11 +9,18 @@ import torch
 import sys
 
 
-def average_precision(model, gen):
-    metric = BinaryAUPRC()
+def iou(model, gen):
+    tp = torch.tensor(0, device=const.DEVICE)
+    fp_fn = torch.tensor(0, device=const.DEVICE)
+
     for X, (heatmap, y) in gen:
-        metric.update(model(X.to(const.DEVICE))[0].detach().flatten(), y.to(const.DEVICE).flatten())
-    return metric.compute()
+        pred, cams = model(X)
+        pred_map = model.get_semantic_map(cams)
+
+        tp += (pred_map == heatmap).sum()
+        fp_fn += (pred_map != heatmap).sum()
+
+    return tp / (tp + fp_fn)
 
 
 if __name__ == '__main__':
@@ -26,4 +32,4 @@ if __name__ == '__main__':
     model.name = name
 
     torch.multiprocessing.set_start_method('spawn', force=True)
-    print(average_precision(model, DataLoader(Dataset(mode='segmentation', image_set=sys.argv[2]), batch_size=const.BATCH_SIZE, num_workers=const.N_WORKERS, shuffle=False)))
+    print(iou(model, DataLoader(Dataset(mode='segmentation', image_set=sys.argv[2]), batch_size=const.BATCH_SIZE, num_workers=const.N_WORKERS, shuffle=False)))

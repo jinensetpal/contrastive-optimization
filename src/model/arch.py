@@ -14,6 +14,7 @@ class Model(nn.Module):
         self.device = device
         self.is_contrastive = is_contrastive
         self.randomized_flatten = const.RANDOMIZED_FLATTEN
+        self.segmentation_threshold = const.SEGMENTATION_THRESHOLD
         self.backbone = torchvision.models.resnet50(weights=torchvision.models.ResNet50_Weights.IMAGENET1K_V2 if const.PRETRAINED_BACKBONE else None)
 
         if downsampling_level >= 1:
@@ -57,6 +58,10 @@ class Model(nn.Module):
 
         if self.training: return logits, self._bp_free_hi_res_cams()
         else: return self.probabilities(logits), self._hi_res_cams(logits)
+
+    def get_semantic_map(self, cams):
+        segmentation_map = cams.max(1)
+        return (segmentation_map.values > self.segmentation_threshold).to(torch.int) * (segmentation_map.indices + 1)
 
     def get_contrastive_cams(self, y, cams):
         return torch.index_select(cams.view(-1, *cams.shape[2:]), 0, y.argmax(1) + (torch.arange(cams.size(0), device=const.DEVICE) * cams.size(1))).repeat(1, cams.size(1), 1).view(*cams.shape) - cams
