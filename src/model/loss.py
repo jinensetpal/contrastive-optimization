@@ -7,10 +7,10 @@ import torch
 
 
 class ContrastiveLoss(nn.Module):
-    def __init__(self, get_contrastive_cams_fn, debug=False, is_label_mask=False, multilabel=False, divergence=False):
+    def __init__(self, get_contrastive_cams_fn, debug=False, is_label_mask=False, multilabel=False, divergence=False, pos_weight=None):
         super().__init__()
 
-        self.ce = nn.BCEWithLogitsLoss(reduction='none') if multilabel else nn.CrossEntropyLoss(label_smoothing=const.LABEL_SMOOTHING)
+        self.ce = nn.BCEWithLogitsLoss(pos_weight=pos_weight) if multilabel else nn.CrossEntropyLoss(label_smoothing=const.LABEL_SMOOTHING)
         self.get_contrastive_cams = get_contrastive_cams_fn
         self.is_label_mask = is_label_mask
         self.multilabel = multilabel
@@ -41,19 +41,24 @@ class ContrastiveLoss(nn.Module):
             ablation = (-cc * fg_mask + cc.abs() * (1 - fg_mask)).sum(dim=[2, 3])
 
         ace = self.ce(ablation, y[1])
-        if self.multilabel: ace = (ace[y[1] == 0].mean() + ace[y[1] == 1].mean()) / 2
+        # if self.multilabel: ace = (ace[y[1] == 0].mean() + ace[y[1] == 1].mean()) / 2
 
         if self.divergence:
-            cam_log_probs = ((y_pred[1] if self.multilabel else cc) * const.LAMBDAS[0]).view(*y_pred[1].shape[:2], -1).softmax(dim=2).clamp(min=1E-6).view(*y_pred[1].shape).log()
-            fg_mask_probs = (fg_mask * const.LAMBDAS[1]).view(*y_pred[1].shape[:2], -1).to(torch.float).softmax(dim=2).view(y_pred[1].shape)
+            if self.multilabel:
+                target_idx = y[1].flatten().nonzero()
+                cc = y_pred[1].view(-1, *y_pred[1].shape[-2:])[target_idx][:, 0]
+                fg_mask = fg_mask.view(-1, *fg_mask.shape[-2:])[target_idx][:, 0]
+
+            cam_log_probs = (cc * const.LAMBDAS[0]).view(*cc.shape[:-2], -1).softmax(dim=-1).clamp(min=1E-6).view(cc.shape).log()
+            fg_mask_probs = (fg_mask * const.LAMBDAS[1]).view(*cc.shape[:-2], -1).to(torch.float).softmax(dim=-1).view(cc.shape)
             fg_mask_log_probs = fg_mask_probs.log()
             fg_mask_log_probs[fg_mask != 0] = 0
 
             kld = fg_mask_probs * (fg_mask_log_probs - cam_log_probs)
         else: kld = torch.tensor(0)
 
-        self.prev = (ace.item(), (kld.sum() / y[0].size(0)).item())
-        return const.LAMBDAS[2] * ace + const.LAMBDAS[3] * kld.sum() / y[0].size(0)
+        self.prev = (ace.item(), (kld.sum() / kld.size(0)).item())
+        return const.LAMBDAS[2] * ace + const.LAMBDAS[3] * kld.sum() / kld.size(0)
 
 
 class ACEKLDLoss(nn.Module):
