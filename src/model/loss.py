@@ -41,7 +41,7 @@ class ContrastiveLoss(nn.Module):
             ablation = (-cc * fg_mask + cc.abs() * (1 - fg_mask)).sum(dim=[2, 3])
 
         ace = self.ce(ablation, y[1])
-        # if self.multilabel: ace = (ace[y[1] == 0].mean() + ace[y[1] == 1].mean()) / 2
+        if self.multilabel and self.ce.pos_weight is None: ace = (ace[y[1] == 0].mean() + ace[y[1] == 1].mean()) / 2
 
         if self.divergence:
             if self.multilabel:

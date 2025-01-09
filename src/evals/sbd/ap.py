@@ -24,6 +24,7 @@ if __name__ == '__main__':
     model = Model(input_shape=const.IMAGE_SHAPE, is_contrastive='default' not in name)
     model.load_state_dict(torch.load(const.MODELS_DIR / f'{name}.pt', map_location=const.DEVICE, weights_only=True))
     model.name = name
+    model.eval()
 
     torch.multiprocessing.set_start_method('spawn', force=True)
     print(average_precision(model, DataLoader(Dataset(mode='segmentation', image_set=sys.argv[2]), batch_size=const.BATCH_SIZE, num_workers=const.N_WORKERS, shuffle=False)))
