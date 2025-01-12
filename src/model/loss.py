@@ -11,7 +11,7 @@ class ContrastiveLoss(nn.Module):
     def __init__(self, get_contrastive_cams_fn, debug=False, is_label_mask=False, multilabel=False, divergence=None, pos_weight=None):
         super().__init__()
 
-        self.ce = nn.BCEWithLogitsLoss(pos_weight=pos_weight) if multilabel else nn.CrossEntropyLoss(label_smoothing=const.LABEL_SMOOTHING)
+        self.ce = nn.BCEWithLogitsLoss(pos_weight=pos_weight, reduction='none' if not pos_weight else 'mean') if multilabel else nn.CrossEntropyLoss(label_smoothing=const.LABEL_SMOOTHING)
         self.get_contrastive_cams = get_contrastive_cams_fn
         self.is_label_mask = is_label_mask
         self.multilabel = multilabel
@@ -52,13 +52,17 @@ class ContrastiveLoss(nn.Module):
                 cc = y_pred[1].view(-1, *y_pred[1].shape[-2:])[target_idx][:, 0]
                 fg_mask = fg_mask.view(-1, *fg_mask.shape[-2:])[target_idx][:, 0]
 
-            cam_log_probs = (cc * const.LAMBDAS[0]).view(*cc.shape[:-2], -1).softmax(dim=-1).clamp(min=1E-6).view(cc.shape).log()
+            cam_probs = (cc * const.LAMBDAS[0]).view(*cc.shape[:-2], -1).softmax(dim=-1).clamp(min=1E-6).view(cc.shape)
             fg_mask_probs = (fg_mask * const.LAMBDAS[1]).view(*cc.shape[:-2], -1).to(torch.float).softmax(dim=-1).view(cc.shape)
-            fg_mask_log_probs = fg_mask_probs.log()
-            fg_mask_log_probs[fg_mask != 0] = 0
 
-            if self.divergence == 'wasserstein': self.divergence = self.sinkhorn(cam_log_probs, fg_mask_log_probs)
-            elif self.divergence == 'kld': divergence = fg_mask_probs * (fg_mask_log_probs - cam_log_probs)
+            if self.divergence == 'wasserstein':
+                fg_mask[fg_mask != 0] = 0
+                divergence = self.sinkhorn(cam_probs, fg_mask_probs)
+            elif self.divergence == 'kld':
+                cam_log_probs = cam_probs.log()
+                fg_mask_log_probs = fg_mask_probs.log()
+                fg_mask_log_probs[fg_mask != 0] = 0
+                divergence = fg_mask_probs * (fg_mask_log_probs - cam_log_probs)
         else: divergence = torch.tensor(0)
 
         self.prev = (ace.item(), (divergence.sum() / divergence.size(0)).item())
