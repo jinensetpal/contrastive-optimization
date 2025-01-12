@@ -19,7 +19,7 @@ if __name__ == '__main__':
     data = sbd(mode='segmentation') if multilabel else oxford_iiit_pet('train')
     model = Model(const.IMAGE_SHAPE)
     optim = torch.optim.Adam(model.parameters(), lr=1E-3)
-    criterion = ContrastiveLoss(model.get_contrastive_cams, multilabel=multilabel, divergence=const.DIVERGENCE)
+    criterion = ContrastiveLoss(model.get_contrastive_cams, multilabel=multilabel, divergence=const.DIVERGENCE, pos_only=const.POS_ONLY)
 
     idx = random.randint(0, len(data) - 1)
     print(idx)
