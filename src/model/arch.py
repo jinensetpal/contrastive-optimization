@@ -8,14 +8,16 @@ import torch
 
 class Model(nn.Module):
     def __init__(self, input_shape, randomized_flatten=const.RANDOMIZED_FLATTEN, multilabel=False,
-                 device=const.DEVICE, is_contrastive=True, downsampling_level=1):
+                 xl_backbone=False, device=const.DEVICE, is_contrastive=True, downsampling_level=1):
         super().__init__()
 
         self.device = device
         self.is_contrastive = is_contrastive
         self.randomized_flatten = const.RANDOMIZED_FLATTEN
         self.segmentation_threshold = const.SEGMENTATION_THRESHOLD
-        self.backbone = torchvision.models.resnet50(weights=torchvision.models.ResNet50_Weights.IMAGENET1K_V2 if const.PRETRAINED_BACKBONE else None)
+
+        if xl_backbone: self.backbone = torchvision.models.resnet152(weights=torchvision.models.ResNet152_Weights.IMAGENET1K_V2 if const.PRETRAINED_BACKBONE else None)
+        else: self.backbone = torchvision.models.resnet50(weights=torchvision.models.ResNet50_Weights.IMAGENET1K_V2 if const.PRETRAINED_BACKBONE else None)
 
         if downsampling_level >= 1:
             self.backbone.layer4[0].conv2.stride = (1, 1)

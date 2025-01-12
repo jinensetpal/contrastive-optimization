@@ -10,27 +10,6 @@ BASE_DIR = Path(__file__).parent.parent
 DATA_DIR = BASE_DIR / 'data'
 MODELS_DIR = BASE_DIR / 'models'
 
-# training
-DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
-TRAIN_CUTOFF = 12600  # max training time in seconds
-LAMBDAS = [1, 1, 1, 1]
-DIVERGENCE = 'wasserstein' if LAMBDAS[-1] != 0 else None  # edit first string only to set divergence
-GRAD_ACCUMULATION_STEPS = 1
-PRETRAINED_BACKBONE = False
-RANDOMIZED_FLATTEN = False
-PORT = get_open_port()
-CHECKPOINTING = True
-WEIGHT_DECAY = 1E-4
-SELECT_BEST = True
-FINETUNING = False
-USE_ZERO = False
-OPTIMIZER = 'SGD'
-BATCH_SIZE = 440
-MOMENTUM = .9
-EPOCHS = 150
-DDP = os.getenv('WORLD_SIZE') is not None
-
-
 # ema
 EMA = True
 EMA_STEPS = 32
@@ -64,6 +43,30 @@ if DATASET == 'imagenet': N_CLASSES = 1000
 elif DATASET == 'soodimagenet': N_CLASSES = 56
 elif DATASET == 'sbd': N_CLASSES = 20
 else: N_CLASSES = 2 if BINARY_CLS else 37
+
+# model
+PRETRAINED_BACKBONE = False
+RANDOMIZED_FLATTEN = False
+XL_BACKBONE = False
+
+# training
+DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+TRAIN_CUTOFF = 12600  # max training time in seconds
+LAMBDAS = [1, 1, 1, 1]
+DIVERGENCE = 'wasserstein' if LAMBDAS[-1] != 0 else None  # edit first string only to set divergence
+POS_ONLY = True and DATASET == 'sbd'  # (multilabel only) restrict divergence loss to just positive classes
+GRAD_ACCUMULATION_STEPS = 1
+PORT = get_open_port()
+CHECKPOINTING = True
+WEIGHT_DECAY = 1E-4
+SELECT_BEST = True
+FINETUNING = False
+USE_ZERO = False
+OPTIMIZER = 'SGD'
+BATCH_SIZE = 440
+MOMENTUM = .9
+EPOCHS = 150
+DDP = os.getenv('WORLD_SIZE') is not None
 
 # augmentation
 AUGMENT = False

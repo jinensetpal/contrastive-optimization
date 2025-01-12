@@ -33,6 +33,7 @@ def configure(model_name):
     const.OPTIMIZER = 'Lamb' if 'lamb' in const.MODEL_NAME else const.OPTIMIZER
     const.USE_ZERO = 'zero' in const.MODEL_NAME and const.DDP
     const.EMA = 'ema' in const.MODEL_NAME
+    const.XL_BACKBONE = 'largemodel' in const.MODEL_NAME
     const.DATASET = 'imagenet' if 'imagenet' in const.MODEL_NAME else 'oxford-iiit'
     const.DATASET = 'soodimagenet' if 'soodimagenet' in const.MODEL_NAME else const.DATASET
     const.DATASET = 'sbd' if 'sbd' in const.MODEL_NAME else const.DATASET
@@ -55,6 +56,7 @@ def configure(model_name):
     elif const.DATASET == 'sbd':
         const.N_CLASSES = 20
         const.BINARY_CLS = False
+        const.POS_ONLY = 'pos_only' in const.MODEL_NAME
     else:
         const.BINARY_CLS = 'multiclass' not in const.MODEL_NAME
         const.N_CLASSES = 2 if const.BINARY_CLS else 37
@@ -195,10 +197,11 @@ if __name__ == '__main__':
     elif const.DATASET == 'sbd': train, val, _ = sbd()
     else: train, val, test = oxford_iiit_pet()
 
-    model = Model(const.IMAGE_SHAPE, is_contrastive=is_contrastive, multilabel=is_multilabel).to(const.DEVICE)
+    model = Model(const.IMAGE_SHAPE, is_contrastive=is_contrastive, multilabel=is_multilabel, xl_backbone=const.XL_BACKBONE).to(const.DEVICE)
     ema = optim.swa_utils.AveragedModel(model, device=const.DEVICE, avg_fn=optim.swa_utils.get_ema_avg_fn(1 - min(1, (1 - const.EMA_DECAY) * const.BATCH_SIZE * const.EMA_STEPS / const.EPOCHS)), use_buffers=True) if const.EMA else None
 
-    if is_contrastive: criterion = ContrastiveLoss(model.get_contrastive_cams, is_label_mask=const.USE_CUTMIX, multilabel=is_multilabel, divergence=const.DIVERGENCE, pos_weight=train.dataset.reweight)
+    if is_contrastive: criterion = ContrastiveLoss(model.get_contrastive_cams, is_label_mask=const.USE_CUTMIX, multilabel=is_multilabel, divergence=const.DIVERGENCE,
+                                                   pos_weight=train.dataset.reweight if is_multilabel else None, pos_only=const.POS_ONLY)
     elif is_multilabel: criterion = nn.BCEWithLogitsLoss(pos_weight=train.dataset.reweight)
     else: criterion = nn.CrossEntropyLoss(label_smoothing=const.LABEL_SMOOTHING)
 

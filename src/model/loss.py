@@ -8,10 +8,11 @@ import torch
 
 
 class ContrastiveLoss(nn.Module):
-    def __init__(self, get_contrastive_cams_fn, debug=False, is_label_mask=False, multilabel=False, divergence=None, pos_weight=None, pos_only=False):
+    def __init__(self, get_contrastive_cams_fn, debug=False, is_label_mask=False,
+                 multilabel=False, divergence=None, pos_weight=None, pos_only=False):
         super().__init__()
 
-        self.ce = nn.BCEWithLogitsLoss(pos_weight=pos_weight, reduction='none' if not pos_weight else 'mean') if multilabel else nn.CrossEntropyLoss(label_smoothing=const.LABEL_SMOOTHING)
+        self.ce = nn.BCEWithLogitsLoss(pos_weight=pos_weight, reduction='none' if pos_weight is not None else 'mean') if multilabel else nn.CrossEntropyLoss(label_smoothing=const.LABEL_SMOOTHING)
         self.get_contrastive_cams = get_contrastive_cams_fn
         self.is_label_mask = is_label_mask
         self.multilabel = multilabel
