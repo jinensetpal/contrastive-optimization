@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from geomloss import SamplesLoss
 import torch.nn.functional as F
 from src import const
 from torch import nn
@@ -7,7 +8,7 @@ import torch
 
 
 class ContrastiveLoss(nn.Module):
-    def __init__(self, get_contrastive_cams_fn, debug=False, is_label_mask=False, multilabel=False, divergence=False, pos_weight=None):
+    def __init__(self, get_contrastive_cams_fn, debug=False, is_label_mask=False, multilabel=False, divergence=None, pos_weight=None):
         super().__init__()
 
         self.ce = nn.BCEWithLogitsLoss(pos_weight=pos_weight) if multilabel else nn.CrossEntropyLoss(label_smoothing=const.LABEL_SMOOTHING)
@@ -15,6 +16,8 @@ class ContrastiveLoss(nn.Module):
         self.is_label_mask = is_label_mask
         self.multilabel = multilabel
         self.divergence = divergence
+
+        if self.divergence == 'wasserstein': self.sinkhorn = SamplesLoss('sinkhorn')
 
     def forward(self, y_pred, y):
         if self.multilabel:
@@ -54,11 +57,12 @@ class ContrastiveLoss(nn.Module):
             fg_mask_log_probs = fg_mask_probs.log()
             fg_mask_log_probs[fg_mask != 0] = 0
 
-            kld = fg_mask_probs * (fg_mask_log_probs - cam_log_probs)
-        else: kld = torch.tensor(0)
+            if self.divergence == 'wasserstein': self.divergence = self.sinkhorn(cam_log_probs, fg_mask_log_probs)
+            elif self.divergence == 'kld': divergence = fg_mask_probs * (fg_mask_log_probs - cam_log_probs)
+        else: divergence = torch.tensor(0)
 
-        self.prev = (ace.item(), (kld.sum() / kld.size(0)).item())
-        return const.LAMBDAS[2] * ace + const.LAMBDAS[3] * kld.sum() / kld.size(0)
+        self.prev = (ace.item(), (divergence.sum() / divergence.size(0)).item())
+        return const.LAMBDAS[2] * ace + const.LAMBDAS[3] * divergence.sum() / divergence.size(0)
 
 
 class ACEKLDLoss(nn.Module):

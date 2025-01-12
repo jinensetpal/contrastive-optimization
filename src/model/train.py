@@ -38,6 +38,8 @@ def configure(model_name):
     const.DATASET = 'sbd' if 'sbd' in const.MODEL_NAME else const.DATASET
     const.PRETRAINED_BACKBONE = 'pretrained' in const.MODEL_NAME
     if 'ablated_only' in const.MODEL_NAME: const.LAMBDAS[-1] = 0
+    elif 'wasserstein' in const.MODEL_NAME: const.DIVERGENCE = 'wasserstein'
+    elif 'kld' in const.MODEL_NAME: const.DIVERGENCE = 'kld'
     if 'label_smoothing' not in const.MODEL_NAME: const.LABEL_SMOOTHING = 0
 
     if const.DATASET == 'imagenet':
@@ -196,7 +198,7 @@ if __name__ == '__main__':
     model = Model(const.IMAGE_SHAPE, is_contrastive=is_contrastive, multilabel=is_multilabel).to(const.DEVICE)
     ema = optim.swa_utils.AveragedModel(model, device=const.DEVICE, avg_fn=optim.swa_utils.get_ema_avg_fn(1 - min(1, (1 - const.EMA_DECAY) * const.BATCH_SIZE * const.EMA_STEPS / const.EPOCHS)), use_buffers=True) if const.EMA else None
 
-    if is_contrastive: criterion = ContrastiveLoss(model.get_contrastive_cams, is_label_mask=const.USE_CUTMIX, multilabel=is_multilabel, divergence=bool(const.LAMBDAS[-1]), pos_weight=train.dataset.reweight)
+    if is_contrastive: criterion = ContrastiveLoss(model.get_contrastive_cams, is_label_mask=const.USE_CUTMIX, multilabel=is_multilabel, divergence=const.DIVERGENCE, pos_weight=train.dataset.reweight)
     elif is_multilabel: criterion = nn.BCEWithLogitsLoss(pos_weight=train.dataset.reweight)
     else: criterion = nn.CrossEntropyLoss(label_smoothing=const.LABEL_SMOOTHING)
 
