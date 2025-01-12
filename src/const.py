@@ -13,7 +13,7 @@ MODELS_DIR = BASE_DIR / 'models'
 # training
 DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 TRAIN_CUTOFF = 12600  # max training time in seconds
-LAMBDAS = [1E1, 5E1, 1, 1E3]
+LAMBDAS = [1, 1, 1, 1]
 DIVERGENCE = 'wasserstein' if LAMBDAS[-1] != 0 else None  # edit first string only to set divergence
 GRAD_ACCUMULATION_STEPS = 1
 PRETRAINED_BACKBONE = False
