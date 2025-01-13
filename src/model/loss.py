@@ -19,7 +19,7 @@ class ContrastiveLoss(nn.Module):
         self.divergence = divergence
         self.pos_only = pos_only
 
-        if self.divergence == 'wasserstein': self.sinkhorn = SamplesLoss('sinkhorn', p=1, blur=.2)
+        if self.divergence == 'wasserstein': self.sinkhorn = SamplesLoss('sinkhorn', p=2, blur=.2)
 
     def forward(self, y_pred, y):
         if self.multilabel:

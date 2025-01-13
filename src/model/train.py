@@ -85,6 +85,10 @@ def fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=False,
 
             try:
                 for split, dataloader in zip(const.SPLITS[:2], (train, val)):
+                    update_weights = split == 'train' and epoch > 0
+                    if update_weights: model.train()
+                    else: model.eval()
+
                     for batch_idx, (X, y) in enumerate(dataloader):
                         if not (batch_idx+1) % const.GRAD_ACCUMULATION_STEPS: optimizer.zero_grad()
                         X = X.to(const.DEVICE)
@@ -107,7 +111,7 @@ def fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=False,
                         if criterion._get_name() == 'ContrastiveLoss':
                             metrics[f'{split}_ablated_ce_loss'].append(criterion.prev[0])
                             metrics[f'{split}_divergence_loss'].append(criterion.prev[1])
-                        if split == 'train' and epoch > 0:  # epoch 0 is for evaluating performance on initalization
+                        if update_weights:  # epoch 0 is for evaluating performance on initalization
                             batch_loss.backward(inputs=optimizer.param_groups[0]['params'])
                             if is_primary_rank and const.LOG_BATCHWISE: mlflow.log_metric(f'{split}_batchwise_loss', batch_loss.item(), synchronous=False, step=(epoch-1) * len(dataloader) + batch_idx)
 

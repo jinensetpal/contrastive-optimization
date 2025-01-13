@@ -10,7 +10,12 @@ class Dataset(torchvision.datasets.SBDataset):
     def __init__(self, *args, device=const.DEVICE, **kwargs):
         super().__init__(const.DATA_DIR / 'sbd', *args, **kwargs)
         self.device = device
-        self.reweight = torch.tensor([9.2773, 10.5697, 7.1412, 11.5777, 7.8395, 12.8758, 4.8783, 5.3312, 5.1691, 19.1396, 10.7298, 4.6035, 12.0710, 11.0651, 1.4098, 10.8117, 16.9283, 11.3914, 10.7028, 9.8814], device=const.DEVICE)  # computed over train to establish a .5 prior of detection for each class
+        self.reweight = torch.tensor([17.5546, 20.1393, 13.2824, 22.1553, 14.6790, 24.7515, 8.7566, 9.6625, 9.3382, 37.2793, 20.4596, 8.2069, 23.1420, 21.1302, 1.8195, 20.6234, 32.8566, 21.7828, 20.4055, 18.7628], device=const.DEVICE)  # computed over train to establish a .5 prior of detection for each class
+
+    def compute_reweight_tensor(self):
+        n_pos = torch.zeros(const.N_CLASSES, device=const.DEVICE)
+        for datapoint in self: n_pos += datapoint[1][1]
+        return (len(self) - n_pos) / n_pos
 
     def __getitem__(self, idx):
         X, heatmap = super().__getitem__(idx)
@@ -34,4 +39,4 @@ def get_generators():
 
 
 if __name__ == '__main__':
-    print(Dataset(const.DATA_DIR / 'sbd', mode='segmentation')[0])
+    print(Dataset(mode='segmentation', image_set='train')[0])
