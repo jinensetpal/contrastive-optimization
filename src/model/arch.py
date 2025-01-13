@@ -71,7 +71,7 @@ class Model(nn.Module):
     def _bp_free_hi_res_cams(self):  # required to obtain gradients on self.linear.weight
         return (self.linear.weight @ self.feature_rect.flatten(2)).unflatten(2, self.feature_rect.shape[2:]) / self.feature_rect.shape[-1]**2
 
-    def _hi_res_cams(self, logits):
+    def _hi_res_cams(self, logits):  # inefficient but more general; not restricted to single dense layer
         cams = torch.zeros(*logits.shape, *self.feature_rect.shape[2:], device=self.device)
         for img_idx in range(logits.shape[0]):
             for class_idx in range(logits.shape[1]):

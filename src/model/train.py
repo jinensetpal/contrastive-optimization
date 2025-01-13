@@ -66,7 +66,6 @@ def configure(model_name):
 
 def fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=False,
         ema=None, selected=None, init_epoch=0, mlflow_run_id=None):
-    model.train()
     start_time = time.time()
     selected = selected or {'last': model.state_dict(),
                             'epoch': init_epoch,

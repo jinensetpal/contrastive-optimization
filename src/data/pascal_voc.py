@@ -17,7 +17,8 @@ class Dataset(torch.utils.data.Dataset):
         return len(self.images)
 
     def __getitem__(self, idx):
-        return resize(torchvision.io.read_image(self.images[idx]).to(self.device), const.IMAGE_SIZE, antialias=True) / 255
+        img = torchvision.io.read_image(self.images[idx]).to(self.device)
+        return resize(img, const.IMAGE_SIZE, antialias=True) / 255, list(img.shape[1:])
 
 
 def get_generator():

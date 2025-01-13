@@ -5,7 +5,6 @@ from torch.utils.data import DataLoader
 from src.data.sbd import Dataset
 from src.model.arch import Model
 from src import const
-import random
 import torch
 import sys
 
@@ -19,9 +18,8 @@ def average_precision(model, gen):
 
 if __name__ == '__main__':
     name = sys.argv[1]
-    random.seed(const.SEED)
 
-    model = Model(input_shape=const.IMAGE_SHAPE, is_contrastive='default' not in name)
+    model = Model(input_shape=const.IMAGE_SHAPE, is_contrastive='default' not in name, multilabel=True, xl_backbone=False)
     model.load_state_dict(torch.load(const.MODELS_DIR / f'{name}.pt', map_location=const.DEVICE, weights_only=True))
     model.name = name
     model.eval()
