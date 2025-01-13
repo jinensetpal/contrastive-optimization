@@ -19,7 +19,7 @@ class ContrastiveLoss(nn.Module):
         self.divergence = divergence
         self.pos_only = pos_only
 
-        if self.divergence == 'wasserstein': self.sinkhorn = SamplesLoss('sinkhorn')
+        if self.divergence == 'wasserstein': self.sinkhorn = SamplesLoss('sinkhorn', p=1, blur=.2)
 
     def forward(self, y_pred, y):
         if self.multilabel:
@@ -60,8 +60,8 @@ class ContrastiveLoss(nn.Module):
 
             if self.divergence == 'wasserstein':
                 fg_mask = fg_mask.to(torch.float)
-                fg_mask[fg_mask == 0] = -1E-1
-                divergence = self.sinkhorn(cc, fg_mask * 20)
+                fg_mask[fg_mask == 0] = -1
+                divergence = self.sinkhorn(cc, fg_mask) + 1E-1 * y_pred[0].abs().mean()  # second term for regularization; sinkhorn underpenalizes activation map being off in scale but this explodes entropy
             elif self.divergence == 'kld':
                 fg_mask_probs = (fg_mask * const.LAMBDAS[1]).view(*cc.shape[:-2], -1).to(torch.float).softmax(dim=-1).view(cc.shape)
                 cam_log_probs = (cc * const.LAMBDAS[0]).view(*cc.shape[:-2], -1).softmax(dim=-1).clamp(min=1E-6).view(cc.shape).log()
