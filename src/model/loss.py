@@ -60,18 +60,23 @@ class ContrastiveLoss(nn.Module):
 
             if self.divergence == 'wasserstein':
                 fg_mask = fg_mask.to(torch.float)
-                if not self.pos_only: fg_mask[(y[1].flatten() - 1).nonzero()] = -1E-3
-                divergence = self.sinkhorn(cc, fg_mask) + 1E-1 * y_pred[0].abs().mean()  # second term for regularization; sinkhorn underpenalizes activation map being off in scale but this explodes entropy
+                if not self.pos_only: fg_mask[(y[1].flatten() - 1).nonzero()] = const.LAMBDAS[0]
+
+                divergence = self.sinkhorn(cc, fg_mask)
+                divergence = (divergence[y[1].flatten() == 0].mean() + divergence[y[1].flatten() == 1].mean()) / 2
+                divergence += const.LAMBDAS[1] * y_pred[0].abs().mean()  # term added for regularization; sinkhorn underpenalizes activation map being off in scale but this explodes entropy
             elif self.divergence == 'kld':
                 fg_mask_probs = (fg_mask * const.LAMBDAS[1]).view(*cc.shape[:-2], -1).to(torch.float).softmax(dim=-1).view(cc.shape)
                 cam_log_probs = (cc * const.LAMBDAS[0]).view(*cc.shape[:-2], -1).softmax(dim=-1).clamp(min=1E-6).view(cc.shape).log()
                 fg_mask_log_probs = fg_mask_probs.log()
                 fg_mask_log_probs[fg_mask != 0] = 0
+
                 divergence = fg_mask_probs * (fg_mask_log_probs - cam_log_probs)
+                divergence = divergence.sum() / divergence.size(0)
         else: divergence = torch.tensor(0)
 
-        self.prev = (ace.item(), (divergence.sum() / divergence.size(0)).item())
-        return const.LAMBDAS[2] * ace + const.LAMBDAS[3] * divergence.sum() / divergence.size(0)
+        self.prev = (ace.item(), divergence.item())
+        return const.LAMBDAS[2] * ace + const.LAMBDAS[3] * divergence
 
 
 class ACEKLDLoss(nn.Module):

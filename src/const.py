@@ -26,7 +26,7 @@ SEGMENTATION_THRESHOLD = 1E-2
 
 # dataset
 SEED = 1024
-N_WORKERS = 2
+N_WORKERS = 3
 N_CHANNELS = 3
 BBOX_MAP = False
 BINARY_CLS = True
@@ -52,9 +52,9 @@ XL_BACKBONE = False
 # training
 DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 TRAIN_CUTOFF = 12600  # max training time in seconds
-LAMBDAS = [1, 1, 1, 1]
+LAMBDAS = [-1, .5, 1, 1]  # means different things for different approaches
 DIVERGENCE = 'wasserstein' if LAMBDAS[-1] != 0 else None  # edit first string only to set divergence
-POS_ONLY = True and DATASET == 'sbd'  # (multilabel only) restrict divergence loss to just positive classes
+POS_ONLY = False and DATASET == 'sbd'  # (multilabel only) restrict divergence loss to just positive classes
 GRAD_ACCUMULATION_STEPS = 1
 PORT = get_open_port()
 CHECKPOINTING = True
