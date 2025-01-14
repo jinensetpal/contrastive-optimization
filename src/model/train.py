@@ -122,7 +122,7 @@ def fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=False,
 
                         del batch_loss
                         torch.cuda.empty_cache()
-            except KeyboardInterrupt:
+            except (KeyboardInterrupt, torch.OutOfMemoryError):
                 break
 
             for split in const.SPLITS[:2]: metrics[f'{split}_acc'] = sync_and_compute(metrics[f'{split}_acc']).item()
