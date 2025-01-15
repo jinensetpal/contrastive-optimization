@@ -19,7 +19,7 @@ if __name__ == '__main__':
     data = sbd(mode='segmentation') if multilabel else oxford_iiit_pet('train')
     model = Model(const.IMAGE_SHAPE)
     optim = torch.optim.Adam(model.parameters(), lr=1E-3)
-    criterion = ContrastiveLoss(model.get_contrastive_cams, multilabel=multilabel, divergence=const.DIVERGENCE, pos_only=const.POS_ONLY)
+    criterion = ContrastiveLoss(model.get_contrastive_cams, multilabel=multilabel, divergence=const.DIVERGENCE, pos_only=const.POS_ONLY, pos_weight=data.reweight)
 
     idx = random.randint(0, len(data) - 1)
     print(idx)
@@ -42,7 +42,8 @@ if __name__ == '__main__':
             cc = model.get_contrastive_cams(y[1], y_pred[1])
             frames.append([plt.imshow(F.interpolate(y[0][None], const.IMAGE_SIZE, mode='bilinear')[0][0].cpu(), cmap='jet', alpha=0.5, animated=True),
                            plt.imshow(F.interpolate(cc[:, y[1].argmin(1)], const.IMAGE_SIZE, mode='bilinear')[0, 0].detach().cpu(), cmap='jet', alpha=0.5, animated=True)])
-        print(loss.item(), F.cross_entropy(y_pred[0], y[1]).detach().item())
+            print(loss.item(), F.cross_entropy(y_pred[0], y[1]).detach().item())
+        else: print(loss.item(), F.binary_cross_entropy_with_logits(y_pred[0], y[1], pos_weight=data.reweight).detach().item())
 
         optim.step()
 
