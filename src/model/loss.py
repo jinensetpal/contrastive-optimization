@@ -63,8 +63,8 @@ class ContrastiveLoss(nn.Module):
                 if not self.pos_only: fg_mask[(y[1].flatten() - 1).nonzero()] = const.LAMBDAS[0]
 
                 divergence = self.sinkhorn(cc, fg_mask)
-                divergence = (divergence[y[1].flatten() == 0].mean() + divergence[y[1].flatten() == 1].mean()) / 2
-                divergence += const.LAMBDAS[1] * y_pred[0].abs().mean()  # term added for regularization; sinkhorn underpenalizes activation map being off in scale but this explodes entropy
+                divergence = (divergence[y[1].flatten() == 0].mean() + divergence[y[1].flatten() == 1].mean()).mean()
+                divergence += const.LAMBDAS[1] * (y_pred[0][y[1] == 0].abs().mean() + y_pred[0][y[1] == 0].abs().mean()).mean()  # term added for regularization; sinkhorn underpenalizes activation map being off in scale but this explodes entropy
             elif self.divergence == 'kld':
                 fg_mask_probs = (fg_mask * const.LAMBDAS[1]).view(*cc.shape[:-2], -1).to(torch.float).softmax(dim=-1).view(cc.shape)
                 cam_log_probs = (cc * const.LAMBDAS[0]).view(*cc.shape[:-2], -1).softmax(dim=-1).clamp(min=1E-6).view(cc.shape).log()

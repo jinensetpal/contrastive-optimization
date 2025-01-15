@@ -9,3 +9,4 @@ torch-optimizer==0.3.0
 torcheval==0.0.7
 git+https://github.com/bach05/SOODImageNet.git@main
 geomloss==0.2.6
+ipython==8.12.3
