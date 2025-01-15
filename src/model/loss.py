@@ -25,7 +25,7 @@ class ContrastiveLoss(nn.Module):
         if self.multilabel:
             labels = ((torch.arange(const.N_CLASSES) + 1) * torch.ones(*const.CAM_SIZE, const.N_CLASSES)).T[None,].repeat(y[0].size(0), 1, 1, 1).to(const.DEVICE)
             fg_mask = (labels == y[0].repeat(1, const.N_CLASSES, 1).view(y[0].size(0), -1, *y[0].shape[1:])).to(torch.int)
-            ablation = (fg_mask * y_pred[1] - (1 - fg_mask) * y_pred[1].abs()).sum(dim=[2, 3]) * y[1] + y_pred[1].sum(dim=[2, 3]) * (1 - y[1])
+            ablation = (fg_mask * y_pred[1] - (1 - fg_mask) * y_pred[1].pow(2)).sum(dim=[2, 3]) * y[1] + y_pred[1].sum(dim=[2, 3]) * (1 - y[1])
         elif self.is_label_mask:
             cc = self.get_contrastive_cams(y[1], y_pred[1]).to(const.DEVICE)
 
@@ -38,12 +38,12 @@ class ContrastiveLoss(nn.Module):
             mixup_sparse_mask = torch.zeros(cc.shape, device=const.DEVICE, dtype=torch.int)
             mixup_sparse_mask.view(-1, *const.CAM_SIZE)[mixed_idx[mixed_idx.nonzero().flatten()] - 1 + mixed_idx.nonzero().flatten() * const.N_CLASSES] = mixup_mask[mixed_idx.nonzero().flatten()]
 
-            ablation = (-cc * fg_mask + cc.abs() * (1 - fg_mask) + (-cc.abs() + cc) * mixup_sparse_mask).sum(dim=[2, 3])
+            ablation = (-cc * fg_mask + cc.pow(2) * (1 - fg_mask) + (-cc.pow(2) + cc) * mixup_sparse_mask).sum(dim=[2, 3])
         else:
             cc = self.get_contrastive_cams(y[1], y_pred[1]).to(const.DEVICE)
 
             fg_mask = y[0].repeat(1, const.N_CLASSES, 1).view(y[0].size(0), -1, *y[0].shape[1:]).to(torch.int).to(const.DEVICE)
-            ablation = (-cc * fg_mask + cc.abs() * (1 - fg_mask)).sum(dim=[2, 3])
+            ablation = (-cc * fg_mask + cc.pow(2) * (1 - fg_mask)).sum(dim=[2, 3])
 
         ace = self.ce(ablation, y[1])
         if self.multilabel and self.ce.pos_weight is None: ace = (ace[y[1] == 0].mean() + ace[y[1] == 1].mean()) / 2
@@ -64,7 +64,7 @@ class ContrastiveLoss(nn.Module):
 
                 divergence = self.sinkhorn(cc, fg_mask)
                 divergence = (divergence[y[1].flatten() == 0].mean() + divergence[y[1].flatten() == 1].mean()).mean()
-                divergence += const.LAMBDAS[1] * (y_pred[0][y[1] == 0].abs().mean() + y_pred[0][y[1] == 0].abs().mean()).mean()  # term added for regularization; sinkhorn underpenalizes activation map being off in scale but this explodes entropy
+                divergence += const.LAMBDAS[1] * (y_pred[0][y[1] == 0].pow(2).mean() + y_pred[0][y[1] == 0].pow(2).mean()).mean()  # term added for regularization; sinkhorn underpenalizes activation map being off in scale but this explodes entropy
             elif self.divergence == 'kld':
                 fg_mask_probs = (fg_mask * const.LAMBDAS[1]).view(*cc.shape[:-2], -1).to(torch.float).softmax(dim=-1).view(cc.shape)
                 cam_log_probs = (cc * const.LAMBDAS[0]).view(*cc.shape[:-2], -1).softmax(dim=-1).clamp(min=1E-6).view(cc.shape).log()

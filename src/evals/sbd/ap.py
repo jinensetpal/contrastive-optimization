@@ -8,12 +8,13 @@ from src import const
 import torch
 import sys
 
+
 # debug imports
 from src.model.loss import ContrastiveLoss
 from matplotlib.colors import Normalize
-import torch.nn.functional as F
 import matplotlib.pyplot as plt
 from IPython import embed
+
 
 def visualize(cams, heatmap, y, dataidx=0):
     cams = cams.detach().cpu()
@@ -30,12 +31,12 @@ def visualize(cams, heatmap, y, dataidx=0):
 
 
 def average_precision(model, gen, debug=False):
-    criterion = ContrastiveLoss(model.get_contrastive_cams, is_label_mask=const.USE_CUTMIX, multilabel=True, divergence=const.DIVERGENCE)
     metric = BinaryAUPRC()
     for X, (heatmap, y) in gen:
         metric.update(model(X)[0].detach().flatten(), y.flatten())
         if debug:
-            y_pred = model(X)
+            criterion = ContrastiveLoss(model.get_contrastive_cams, is_label_mask=const.USE_CUTMIX, multilabel=True, divergence=const.DIVERGENCE)  # noqa: F841
+            y_pred = model(X)  # noqa: F841
             embed()
     return metric.compute()
 
