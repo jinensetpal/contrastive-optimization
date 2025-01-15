@@ -42,7 +42,7 @@ XL_BACKBONE = False
 # training
 DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 TRAIN_CUTOFF = 12600  # max training time in seconds
-LAMBDAS = [-1E-2, 1E-3, 1, .5]  # means different things for different approaches
+LAMBDAS = [-3 / (CAM_SIZE[0] * CAM_SIZE[1]), 0, 1, 1]  # means different things for different approaches
 POS_ONLY = False and DATASET == 'sbd'  # (multilabel only) restrict divergence loss to just positive classes
 GRAD_ACCUMULATION_STEPS = 1
 PORT = get_open_port()
@@ -60,8 +60,8 @@ DDP = os.getenv('WORLD_SIZE') is not None
 # divergence
 DIVERGENCE = 'wasserstein' if LAMBDAS[-1] != 0 else None  # edit first string only to set divergence
 WASSERSTEIN_COST_POW = 2
-WASSERSTEIN_BLUR = .01
-WASSERSTEIN_REACH = 10
+WASSERSTEIN_BLUR = .1
+WASSERSTEIN_REACH = 15
 
 # ema
 EMA = True
