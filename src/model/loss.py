@@ -60,7 +60,8 @@ class ContrastiveLoss(nn.Module):
 
             if self.divergence == 'wasserstein':
                 fg_mask = fg_mask.to(torch.float)
-                if not self.pos_only: fg_mask[(y[1].flatten() - 1).nonzero()] = const.LAMBDAS[0]
+                if not self.pos_only: fg_mask[(y[1].flatten() - 1).nonzero()] = -1 / (const.CAM_SIZE[0] * const.CAM_SIZE[1])
+                fg_mask = const.LAMBDAS[0] * (fg_mask.T / (y[1] * fg_mask.sum(1).sum(1) + 1 - y[1])).T
 
                 divergence = self.sinkhorn(cc, fg_mask)
                 divergence = (divergence[y[1].flatten() == 0].mean() + divergence[y[1].flatten() == 1].mean()).mean()
