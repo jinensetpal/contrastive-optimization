@@ -23,16 +23,18 @@ class ContrastiveLoss(nn.Module):
 
     # code heavily adapted from: https://github.com/tchambon/A-Sliced-Wasserstein-Loss-for-Neural-Texture-Synthesis/blob/main/texture_optimization_slicing.py
     def sliced_wasserstein(self, cc, fg_mask, y):
-        cam_pixels = const.CAM_SIZE[0] * const.CAM_SIZE[1]
+        n_cam_pixels = const.CAM_SIZE[0] * const.CAM_SIZE[1]
+        spatial_map = y[0].flatten(1)[None,] * 10
 
         fg_mask = fg_mask.to(torch.float)
-        if not self.pos_only: fg_mask[(y[1].flatten() - 1).nonzero()] = -1 / cam_pixels
-        fg_mask = const.LAMBDAS[0] * (fg_mask.T / (y[1].flatten() * fg_mask.sum(1).sum(1) + 1 - y[1].flatten())).T.view(1, cam_pixels, -1)
+        fg_mask.view(-1, n_cam_pixels)[(y[1].flatten() - 1).nonzero()] = -1 / n_cam_pixels
+        fg_mask = const.LAMBDAS[0] * (fg_mask.T / (y[1] * fg_mask.sum(2).sum(2) + 1 - y[1]).T).T.view(*fg_mask.shape[:2], n_cam_pixels)
+        fg_mask = torch.hstack((fg_mask, spatial_map))
 
-        cc = cc.view(1, cam_pixels, -1)
-        fg_mask = fg_mask
+        cc = cc.view(*cc.shape[:2], n_cam_pixels)
+        cc = torch.hstack((cc, spatial_map))
 
-        directions = torch.randn(cam_pixels, cam_pixels, device=const.DEVICE)
+        directions = torch.randn(cc.size(1), cc.size(1), device=const.DEVICE)
         directions /= directions.pow(2).sum(1, keepdim=True).sqrt()
 
         return (torch.einsum('bdn,md->bmn', fg_mask, directions).sort(2)[0] - torch.einsum('bdn,md->bmn', cc, directions).sort(2)[0]).pow(2).mean()
@@ -85,18 +87,19 @@ class ContrastiveLoss(nn.Module):
         if self.multilabel and self.ce.pos_weight is None: ace = (ace[y[1] == 0].mean() + ace[y[1] == 1].mean()) / 2
 
         if self.divergence:
-            if self.multilabel:
-                if self.pos_only:
-                    target_idx = y[1].flatten().nonzero()
-                    cc = y_pred[1].view(-1, *y_pred[1].shape[-2:])[target_idx][:, 0]
-                    fg_mask = fg_mask.view(-1, *fg_mask.shape[-2:])[target_idx][:, 0]
-                else:
-                    cc = y_pred[1].view(-1, *const.CAM_SIZE).clone()
-                    fg_mask = fg_mask.view(-1, *const.CAM_SIZE).clone()
+            if self.divergence == 'sliced_wasserstein': divergence = self.sliced_wasserstein(y_pred[1] if self.multilabel else cc, fg_mask, y)
+            else:
+                if self.multilabel:
+                    if self.pos_only:
+                        target_idx = y[1].flatten().nonzero()
+                        cc = y_pred[1].view(-1, *y_pred[1].shape[-2:])[target_idx][:, 0]
+                        fg_mask = fg_mask.view(-1, *fg_mask.shape[-2:])[target_idx][:, 0]
+                    else:
+                        cc = y_pred[1].view(-1, *const.CAM_SIZE).clone()
+                        fg_mask = fg_mask.view(-1, *const.CAM_SIZE).clone()
 
-            if self.divergence == 'wasserstein': divergence = self.wasserstein(cc, fg_mask, y, y_pred)
-            elif self.divergence == 'sliced_wasserstein': divergence = self.sliced_wasserstein(cc, fg_mask, y)
-            elif self.divergence == 'kld': divergence = self.kld(cc, fg_mask)
+                if self.divergence == 'wasserstein': divergence = self.wasserstein(cc, fg_mask, y, y_pred)
+                elif self.divergence == 'kld': divergence = self.kld(cc, fg_mask)
         else: divergence = torch.tensor(0)
 
         self.prev = (ace.item(), divergence.item())
