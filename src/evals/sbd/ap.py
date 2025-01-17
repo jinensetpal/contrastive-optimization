@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 from IPython import embed
 
 
-def visualize(cams, heatmap, y, dataidx=0):
+def visualize(cams, heatmap, y, y_pred, dataidx=0):
     cams = cams.detach().cpu()
     heatmap = heatmap.detach().cpu()
     plt.imshow(heatmap[dataidx])
@@ -26,7 +26,7 @@ def visualize(cams, heatmap, y, dataidx=0):
         fig.add_subplot(4, 5, idx+1)
         plt.imshow(cam.detach().cpu(), norm=Normalize(vmin=cams[0].min(), vmax=cams[0].max()))
 
-    print(y[dataidx].nonzero())
+    print(y[dataidx].nonzero(), (y_pred[dataidx] > 0).nonzero())
     plt.show()
 
 

@@ -58,7 +58,7 @@ class ContrastiveLoss(nn.Module):
         divergence = fg_mask_probs * (fg_mask_log_probs - cam_log_probs)
         return divergence.sum() / divergence.size(0)
 
-    def forward(self, y_pred, y, pause=False):
+    def forward(self, y_pred, y):
         if self.multilabel:
             labels = ((torch.arange(const.N_CLASSES) + 1) * torch.ones(*const.CAM_SIZE, const.N_CLASSES)).T[None,].repeat(y[0].size(0), 1, 1, 1).to(const.DEVICE)
             fg_mask = (labels == y[0].repeat(1, const.N_CLASSES, 1).view(y[0].size(0), -1, *y[0].shape[1:])).to(torch.int)
