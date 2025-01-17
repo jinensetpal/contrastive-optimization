@@ -39,6 +39,7 @@ def configure(model_name):
     const.DATASET = 'sbd' if 'sbd' in const.MODEL_NAME else const.DATASET
     const.PRETRAINED_BACKBONE = 'pretrained' in const.MODEL_NAME
     if 'ablated_only' in const.MODEL_NAME: const.LAMBDAS[-1] = 0
+    elif 'sliced_wasserstein' in const.MODEL_NAME: const.DIVERGENCE = 'sliced_wasserstein'
     elif 'wasserstein' in const.MODEL_NAME: const.DIVERGENCE = 'wasserstein'
     elif 'kld' in const.MODEL_NAME: const.DIVERGENCE = 'kld'
     if 'label_smoothing' not in const.MODEL_NAME: const.LABEL_SMOOTHING = 0

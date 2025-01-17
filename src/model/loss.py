@@ -19,12 +19,48 @@ class ContrastiveLoss(nn.Module):
         self.divergence = divergence
         self.pos_only = pos_only
 
-        if self.divergence == 'wasserstein': self.sinkhorn = SamplesLoss('sinkhorn', p=const.WASSERSTEIN_COST_POW, blur=const.WASSERSTEIN_BLUR, reach=const.WASSERSTEIN_REACH)
+        self.sinkhorn = SamplesLoss('sinkhorn', p=const.WASSERSTEIN_COST_POW, blur=const.WASSERSTEIN_BLUR)
 
-    def forward(self, y_pred, y):
+    # code heavily adapted from: https://github.com/tchambon/A-Sliced-Wasserstein-Loss-for-Neural-Texture-Synthesis/blob/main/texture_optimization_slicing.py
+    def sliced_wasserstein(self, cc, fg_mask, y):
+        cam_pixels = const.CAM_SIZE[0] * const.CAM_SIZE[1]
+
+        fg_mask = fg_mask.to(torch.float)
+        if not self.pos_only: fg_mask[(y[1].flatten() - 1).nonzero()] = -1 / cam_pixels
+        fg_mask = const.LAMBDAS[0] * (fg_mask.T / (y[1].flatten() * fg_mask.sum(1).sum(1) + 1 - y[1].flatten())).T.view(1, cam_pixels, -1)
+
+        cc = cc.view(1, cam_pixels, -1)
+        fg_mask = fg_mask
+
+        directions = torch.randn(cam_pixels, cam_pixels, device=const.DEVICE)
+        directions /= directions.pow(2).sum(1, keepdim=True).sqrt()
+
+        return (torch.einsum('bdn,md->bmn', fg_mask, directions).sort(2)[0] - torch.einsum('bdn,md->bmn', cc, directions).sort(2)[0]).pow(2).mean()
+
+    def wasserstein(self, cc, fg_mask, y, y_pred):
+        fg_mask = fg_mask.to(torch.float)
+        if not self.pos_only: fg_mask[(y[1].flatten() - 1).nonzero()] = -1 / (const.CAM_SIZE[0] * const.CAM_SIZE[1])
+        fg_mask = const.LAMBDAS[0] * (fg_mask.T / (y[1].flatten() * fg_mask.sum(1).sum(1) + 1 - y[1].flatten())).T
+
+        divergence = self.sinkhorn(cc, fg_mask)
+        divergence = (divergence[y[1].flatten() == 0].mean() + divergence[y[1].flatten() == 1].mean()).mean()
+        return divergence + const.LAMBDAS[1] * (y_pred[0][y[1] == 0].pow(2).mean() + y_pred[0][y[1] == 0].pow(2).mean()).mean()  # term added for regularization; sinkhorn underpenalizes activation map being off in scale but this explodes entropy
+
+    @staticmethod
+    def kld(cc, fg_mask):
+        fg_mask_probs = (fg_mask * const.LAMBDAS[1]).view(*cc.shape[:-2], -1).to(torch.float).softmax(dim=-1).view(cc.shape)
+        cam_log_probs = (cc * const.LAMBDAS[0]).view(*cc.shape[:-2], -1).softmax(dim=-1).clamp(min=1E-6).view(cc.shape).log()
+        fg_mask_log_probs = fg_mask_probs.log()
+        fg_mask_log_probs[fg_mask != 0] = 0
+
+        divergence = fg_mask_probs * (fg_mask_log_probs - cam_log_probs)
+        return divergence.sum() / divergence.size(0)
+
+    def forward(self, y_pred, y, pause=False):
         if self.multilabel:
             labels = ((torch.arange(const.N_CLASSES) + 1) * torch.ones(*const.CAM_SIZE, const.N_CLASSES)).T[None,].repeat(y[0].size(0), 1, 1, 1).to(const.DEVICE)
             fg_mask = (labels == y[0].repeat(1, const.N_CLASSES, 1).view(y[0].size(0), -1, *y[0].shape[1:])).to(torch.int)
+            fg_mask[(fg_mask.sum(2).sum(2) == 0) & y[1].to(torch.bool)] = 1
             ablation = (fg_mask * y_pred[1] - (1 - fg_mask) * y_pred[1].pow(2)).sum(dim=[2, 3]) * y[1] + y_pred[1].sum(dim=[2, 3]) * (1 - y[1])
         elif self.is_label_mask:
             cc = self.get_contrastive_cams(y[1], y_pred[1]).to(const.DEVICE)
@@ -58,22 +94,9 @@ class ContrastiveLoss(nn.Module):
                     cc = y_pred[1].view(-1, *const.CAM_SIZE).clone()
                     fg_mask = fg_mask.view(-1, *const.CAM_SIZE).clone()
 
-            if self.divergence == 'wasserstein':
-                fg_mask = fg_mask.to(torch.float)
-                if not self.pos_only: fg_mask[(y[1].flatten() - 1).nonzero()] = -1 / (const.CAM_SIZE[0] * const.CAM_SIZE[1])
-                fg_mask = const.LAMBDAS[0] * (fg_mask.T / (y[1] * fg_mask.sum(1).sum(1) + 1 - y[1])).T
-
-                divergence = self.sinkhorn(cc, fg_mask)
-                divergence = (divergence[y[1].flatten() == 0].mean() + divergence[y[1].flatten() == 1].mean()).mean()
-                divergence += const.LAMBDAS[1] * (y_pred[0][y[1] == 0].pow(2).mean() + y_pred[0][y[1] == 0].pow(2).mean()).mean()  # term added for regularization; sinkhorn underpenalizes activation map being off in scale but this explodes entropy
-            elif self.divergence == 'kld':
-                fg_mask_probs = (fg_mask * const.LAMBDAS[1]).view(*cc.shape[:-2], -1).to(torch.float).softmax(dim=-1).view(cc.shape)
-                cam_log_probs = (cc * const.LAMBDAS[0]).view(*cc.shape[:-2], -1).softmax(dim=-1).clamp(min=1E-6).view(cc.shape).log()
-                fg_mask_log_probs = fg_mask_probs.log()
-                fg_mask_log_probs[fg_mask != 0] = 0
-
-                divergence = fg_mask_probs * (fg_mask_log_probs - cam_log_probs)
-                divergence = divergence.sum() / divergence.size(0)
+            if self.divergence == 'wasserstein': divergence = self.wasserstein(cc, fg_mask, y, y_pred)
+            elif self.divergence == 'sliced_wasserstein': divergence = self.sliced_wasserstein(cc, fg_mask, y)
+            elif self.divergence == 'kld': divergence = self.kld(cc, fg_mask)
         else: divergence = torch.tensor(0)
 
         self.prev = (ace.item(), divergence.item())
