@@ -19,12 +19,12 @@ class ContrastiveLoss(nn.Module):
         self.divergence = divergence
         self.pos_only = pos_only
 
-        self.sinkhorn = SamplesLoss('sinkhorn', p=const.WASSERSTEIN_COST_POW, blur=const.WASSERSTEIN_BLUR)
+        self.sinkhorn = SamplesLoss('sinkhorn', p=const.SINKHORN_COST_POW, blur=const.SINKHORN_BLUR)
 
     # code heavily adapted from: https://github.com/tchambon/A-Sliced-Wasserstein-Loss-for-Neural-Texture-Synthesis/blob/main/texture_optimization_slicing.py
     def sliced_wasserstein(self, cc, fg_mask, y):
         n_cam_pixels = const.CAM_SIZE[0] * const.CAM_SIZE[1]
-        spatial_map = y[0].flatten(1)[None,] * 10
+        spatial_map = y[0].flatten(1).unsqueeze(1) * 10
 
         fg_mask = fg_mask.to(torch.float)
         fg_mask.view(-1, n_cam_pixels)[(y[1].flatten() - 1).nonzero()] = -1 / n_cam_pixels
@@ -34,10 +34,12 @@ class ContrastiveLoss(nn.Module):
         cc = cc.view(*cc.shape[:2], n_cam_pixels)
         cc = torch.hstack((cc, spatial_map))
 
-        directions = torch.randn(cc.size(1), cc.size(1), device=const.DEVICE)
+        directions = torch.randn(cc.size(1)-1, cc.size(1)-1, device=const.DEVICE)
         directions /= directions.pow(2).sum(1, keepdim=True).sqrt()
+        directions = torch.hstack((directions, torch.ones(cc.size(1)-1, 1, device=const.DEVICE)))
 
-        return (torch.einsum('bdn,md->bmn', fg_mask, directions).sort(2)[0] - torch.einsum('bdn,md->bmn', cc, directions).sort(2)[0]).pow(2).mean()
+        divergence = (torch.einsum('bdn,md->bmn', fg_mask, directions).sort(2)[0] - torch.einsum('bdn,md->bmn', cc, directions).sort(2)[0]).pow(2)
+        return (divergence[y[1] == 1].mean() + divergence[y[1] == 0].mean()).mean()
 
     def wasserstein(self, cc, fg_mask, y, y_pred):
         fg_mask = fg_mask.to(torch.float)

@@ -59,9 +59,8 @@ DDP = os.getenv('WORLD_SIZE') is not None
 
 # divergence
 DIVERGENCE = 'sliced_wasserstein' if LAMBDAS[-1] != 0 else None  # edit first string only to set divergence
-WASSERSTEIN_COST_POW = 2
-WASSERSTEIN_BLUR = .1
-WASSERSTEIN_REACH = 15
+SINKHORN_COST_POW = 2
+SINKHORN_BLUR = .1
 
 # ema
 EMA = True
