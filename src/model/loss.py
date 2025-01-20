@@ -21,25 +21,34 @@ class ContrastiveLoss(nn.Module):
 
         self.sinkhorn = SamplesLoss('sinkhorn', p=const.SINKHORN_COST_POW, blur=const.SINKHORN_BLUR)
 
-    # code heavily adapted from: https://github.com/tchambon/A-Sliced-Wasserstein-Loss-for-Neural-Texture-Synthesis/blob/main/texture_optimization_slicing.py
-    def sliced_wasserstein(self, cc, fg_mask, y):
+    # code adapted from: https://github.com/tchambon/A-Sliced-Wasserstein-Loss-for-Neural-Texture-Synthesis/blob/main/texture_optimization_slicing.py
+    def sliced_wasserstein(self, cc, fg_mask, y, n_directions=None):
         n_cam_pixels = const.CAM_SIZE[0] * const.CAM_SIZE[1]
-        spatial_map = y[0].flatten(1).unsqueeze(1) * 10
+        if n_directions is None: n_directions = cc.size(1)
 
-        fg_mask = fg_mask.to(torch.float)
-        fg_mask.view(-1, n_cam_pixels)[(y[1].flatten() - 1).nonzero()] = -1 / n_cam_pixels
-        fg_mask = const.LAMBDAS[0] * (fg_mask.T / (y[1] * fg_mask.sum(2).sum(2) + 1 - y[1]).T).T.view(*fg_mask.shape[:2], n_cam_pixels)
-        fg_mask = torch.hstack((fg_mask, spatial_map))
+        target_mask = fg_mask.to(torch.float)
+        target_mask.view(-1, n_cam_pixels)[(y[1].flatten() - 1).nonzero()] = -1 / n_cam_pixels
+        target_mask = const.LAMBDAS[0] * (target_mask.T / (y[1] * target_mask.sum(2).sum(2) + 1 - y[1]).T).T.view(*target_mask.shape[:2], n_cam_pixels)
 
         cc = cc.view(*cc.shape[:2], n_cam_pixels)
-        cc = torch.hstack((cc, spatial_map))
 
-        directions = torch.randn(cc.size(1)-1, cc.size(1)-1, device=const.DEVICE)
+        if self.pos_only:
+            spatial_maps = fg_mask[y[1].to(torch.bool)].unsqueeze(1).flatten(2) * 10
+            target_mask = target_mask[y[1].to(torch.bool)].unsqueeze(1)
+            cc = cc[y[1].to(torch.bool)].unsqueeze(1)
+
+            target_mask = torch.hstack((target_mask, spatial_maps))
+            cc = torch.hstack((cc, spatial_maps))
+        else:
+            spatial_map = y[0].flatten(1).unsqueeze(1) * 10
+            target_mask = torch.hstack((target_mask, spatial_map))
+            cc = torch.hstack((cc, spatial_map))
+
+        directions = torch.randn(n_directions, cc.size(1)-1, device=const.DEVICE)
         directions /= directions.pow(2).sum(1, keepdim=True).sqrt()
-        directions = torch.hstack((directions, torch.ones(cc.size(1)-1, 1, device=const.DEVICE)))
+        directions = torch.hstack((directions, torch.ones(n_directions, 1, device=const.DEVICE)))
 
-        divergence = (torch.einsum('bdn,md->bmn', fg_mask, directions).sort(2)[0] - torch.einsum('bdn,md->bmn', cc, directions).sort(2)[0]).pow(2)
-        return (divergence[y[1] == 1].mean() + divergence[y[1] == 0].mean()).mean()
+        return (torch.einsum('bdn,md->bmn', target_mask, directions).sort(2)[0] - torch.einsum('bdn,md->bmn', cc, directions).sort(2)[0]).pow(2).mean()
 
     def wasserstein(self, cc, fg_mask, y, y_pred):
         fg_mask = fg_mask.to(torch.float)
