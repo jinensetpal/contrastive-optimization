@@ -44,11 +44,15 @@ class ContrastiveLoss(nn.Module):
             target_mask = torch.hstack((target_mask, spatial_map))
             cc = torch.hstack((cc, spatial_map))
 
-        directions = torch.randn(n_directions, cc.size(1)-1, device=const.DEVICE)
+        directions = torch.randn(n_directions, cc.size(1) - 1, device=const.DEVICE)
         directions /= directions.pow(2).sum(1, keepdim=True).sqrt()
         directions = torch.hstack((directions, torch.ones(n_directions, 1, device=const.DEVICE)))
 
-        return (torch.einsum('bdn,md->bmn', target_mask, directions).sort(2)[0] - torch.einsum('bdn,md->bmn', cc, directions).sort(2)[0]).pow(2).mean()
+        sorted_mask_projections = torch.einsum('bdn,md->bmn', target_mask, directions).sort(2)[0]
+        divergence = sorted_mask_projections - torch.einsum('bdn,md->bmn', cc, directions).sort(2)[0]
+        divergence[(sorted_mask_projections != 0) & (divergence < 0)] = 0
+
+        return (divergence).pow(2).mean()
 
     def wasserstein(self, cc, fg_mask, y, y_pred):
         fg_mask = fg_mask.to(torch.float)
