@@ -22,27 +22,36 @@ class ContrastiveLoss(nn.Module):
         self.sinkhorn = SamplesLoss('sinkhorn', p=const.SINKHORN_COST_POW, blur=const.SINKHORN_BLUR)
 
     # code adapted from: https://github.com/tchambon/A-Sliced-Wasserstein-Loss-for-Neural-Texture-Synthesis/blob/main/texture_optimization_slicing.py
-    def sliced_wasserstein(self, cc, fg_mask, y, n_directions=None):
+    def sliced_wasserstein(self, cc, fg_mask, y, n_directions=None, spatial_scale_factor=10):
         n_cam_pixels = const.CAM_SIZE[0] * const.CAM_SIZE[1]
         if n_directions is None: n_directions = cc.size(1)
 
-        target_mask = fg_mask.to(torch.float)
-        target_mask.view(-1, n_cam_pixels)[(y[1].flatten() - 1).nonzero()] = -1 / n_cam_pixels
-        target_mask = const.LAMBDAS[0] * (target_mask.T / (y[1] * target_mask.sum(2).sum(2) + 1 - y[1]).T).T.view(*target_mask.shape[:2], n_cam_pixels)
+        if self.multilabel:
+            target_mask = fg_mask.to(torch.float)
+            target_mask.view(-1, n_cam_pixels)[(y[1].flatten() - 1).nonzero()] = -1 / n_cam_pixels
+            target_mask = const.LAMBDAS[0] * (target_mask.T / (y[1] * target_mask.sum(2).sum(2) + 1 - y[1]).T).T.view(*target_mask.shape[:2], n_cam_pixels)
 
-        cc = cc.view(*cc.shape[:2], n_cam_pixels)
+            cc = cc.view(*cc.shape[:2], n_cam_pixels)
 
-        if self.pos_only:
-            target_mask = target_mask[y[1].to(torch.bool)].unsqueeze(1)
-            cc = cc[y[1].to(torch.bool)].unsqueeze(1)
+            if self.pos_only:
+                target_mask = target_mask[y[1].to(torch.bool)].unsqueeze(1)
+                cc = cc[y[1].to(torch.bool)].unsqueeze(1)
 
-            spatial_maps = fg_mask[y[1].to(torch.bool)].unsqueeze(1).flatten(2) * 10
-            target_mask = torch.hstack((target_mask, spatial_maps))
-            cc = torch.hstack((cc, spatial_maps))
+                spatial_maps = fg_mask[y[1].to(torch.bool)].unsqueeze(1).flatten(2) * spatial_scale_factor
+                target_mask = torch.hstack((target_mask, spatial_maps))
+                cc = torch.hstack((cc, spatial_maps))
+            else:
+                spatial_maps = fg_mask.view(-1, *const.CAM_SIZE).unsqueeze(1).flatten(2) * spatial_scale_factor
+                target_mask = torch.hstack((target_mask.view(-1, n_cam_pixels).unsqueeze(1), spatial_maps))
+                cc = torch.hstack((cc.view(-1, n_cam_pixels).unsqueeze(1), spatial_maps))
         else:
-            spatial_maps = fg_mask.view(-1, *const.CAM_SIZE).unsqueeze(1).flatten(2)
-            target_mask = torch.hstack((target_mask.view(-1, n_cam_pixels).unsqueeze(1), spatial_maps))
-            cc = torch.hstack((cc.view(-1, n_cam_pixels).unsqueeze(1), spatial_maps))
+            spatial_maps = fg_mask[:, 0].flatten(1).unsqueeze(1).clone()
+            target_mask = (const.LAMBDAS[0] * spatial_maps / spatial_maps.sum(2, keepdim=True)).repeat(1, const.N_CLASSES - 1, 1)
+            spatial_maps *= spatial_scale_factor
+
+            cc = cc[(1 - y[1]).to(torch.bool)].view(-1, const.N_CLASSES - 1, n_cam_pixels)
+            cc = torch.hstack((cc, spatial_maps))
+            target_mask = torch.hstack((target_mask, spatial_maps))
 
         directions = torch.randn(n_directions, cc.size(1) - 1, device=const.DEVICE)
         directions /= directions.pow(2).sum(1, keepdim=True).sqrt()
@@ -51,11 +60,10 @@ class ContrastiveLoss(nn.Module):
         sorted_mask_projections = torch.einsum('bdn,md->bmn', target_mask, directions).sort(2)[0]
         divergence = sorted_mask_projections - torch.einsum('bdn,md->bmn', cc, directions).sort(2)[0]
 
-        if self.pos_only: divergence[(sorted_mask_projections != 0) & (divergence < 0)] = 0
-        else:
-            divergence[target_mask[:, 1].to(torch.bool).unsqueeze(1).repeat(1, n_directions, 1) & (sorted_mask_projections != 0) & (divergence < 0)] = 0
-            divergence[(1 - target_mask[:, 1]).to(torch.bool).unsqueeze(1).repeat(1, n_directions, 1) & (divergence > 0)] = 0
-
+        if self.multilabel and not self.pos_only:
+                divergence[target_mask[:, 1].to(torch.bool).unsqueeze(1).repeat(1, n_directions, 1) & (sorted_mask_projections != 0) & (divergence < 0)] = 0
+                divergence[(1 - target_mask[:, 1]).to(torch.bool).unsqueeze(1).repeat(1, n_directions, 1) & (divergence > 0)] = 0
+        else: divergence[(sorted_mask_projections != 0) & (divergence < 0)] = 0   # (pos_only & multilabel) | contrastive
         return (divergence).pow(2).mean()
 
     def wasserstein(self, cc, fg_mask, y, y_pred):
@@ -81,7 +89,7 @@ class ContrastiveLoss(nn.Module):
         if self.multilabel:
             labels = ((torch.arange(const.N_CLASSES) + 1) * torch.ones(*const.CAM_SIZE, const.N_CLASSES)).T[None,].repeat(y[0].size(0), 1, 1, 1).to(const.DEVICE)
             fg_mask = (labels == y[0].repeat(1, const.N_CLASSES, 1).view(y[0].size(0), -1, *y[0].shape[1:])).to(torch.int)
-            fg_mask[(fg_mask.sum(2).sum(2) == 0) & y[1].to(torch.bool)] = 1
+            fg_mask[y[1].to(torch.bool) & (fg_mask.sum(2).sum(2) == 0)] = 1
             ablation = (fg_mask * y_pred[1] - (1 - fg_mask) * y_pred[1].abs()).sum(dim=[2, 3]) * y[1] + y_pred[1].sum(dim=[2, 3]) * (1 - y[1])
         elif self.is_label_mask:
             cc = self.get_contrastive_cams(y[1], y_pred[1]).to(const.DEVICE)
@@ -99,6 +107,7 @@ class ContrastiveLoss(nn.Module):
         else:
             cc = self.get_contrastive_cams(y[1], y_pred[1]).to(const.DEVICE)
 
+            y[0][y[0].sum(1).sum(1) == 0] = 1
             fg_mask = y[0].repeat(1, const.N_CLASSES, 1).view(y[0].size(0), -1, *y[0].shape[1:]).to(torch.int).to(const.DEVICE)
             ablation = (-cc * fg_mask + cc.abs() * (1 - fg_mask)).sum(dim=[2, 3])
 

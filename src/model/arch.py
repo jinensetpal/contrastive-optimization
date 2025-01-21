@@ -7,7 +7,7 @@ import torch
 
 
 class Model(nn.Module):
-    def __init__(self, input_shape, randomized_flatten=const.RANDOMIZED_FLATTEN, multilabel=False,
+    def __init__(self, input_shape, randomized_flatten=const.RANDOMIZED_FLATTEN, multilabel=False, logits_only=False,
                  xl_backbone=False, device=const.DEVICE, is_contrastive=True, downsampling_level=1):
         super().__init__()
 
@@ -38,7 +38,7 @@ class Model(nn.Module):
         self.backbone.layer4[-1].conv3.register_forward_hook(self._hook)
 
         self.linear = nn.Linear(2048, const.N_CLASSES, bias=not is_contrastive)
-        self.probabilities = nn.Softmax(dim=1) if not multilabel else nn.Sigmoid()
+        self.probabilities = nn.Identity() if logits_only else nn.Softmax(dim=1) if not multilabel else nn.Sigmoid()
 
         if const.DATASET == 'imagenet' and const.PRETRAINED_BACKBONE:
             self.linear.weight = self.backbone.fc.weight
@@ -58,8 +58,7 @@ class Model(nn.Module):
         if self.training and self.randomized_flatten: x = x[:, torch.randperm(x.shape[1])]
         logits = self.linear(x)
 
-        if self.training: return logits, self._bp_free_hi_res_cams()
-        else: return self.probabilities(logits), self._hi_res_cams(logits)
+        return logits if self.training else self.probabilities(logits), self._bp_free_hi_res_cams()
 
     def get_semantic_map(self, cams):
         segmentation_map = cams.max(1)

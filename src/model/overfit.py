@@ -17,16 +17,17 @@ import sys
 if __name__ == '__main__':
     multilabel = len(sys.argv) == 2
     data = sbd(mode='segmentation') if multilabel else oxford_iiit_pet('train')
-    model = Model(const.IMAGE_SHAPE)
-    optim = torch.optim.Adam(model.parameters(), lr=1E-3)
-    criterion = ContrastiveLoss(model.get_contrastive_cams, multilabel=multilabel, divergence=const.DIVERGENCE, pos_only=const.POS_ONLY, pos_weight=data.reweight)
+    model = Model(const.IMAGE_SHAPE, multilabel=multilabel, logits_only=True)
+    optim = torch.optim.Adam(model.parameters(), lr=5E-4)
+    criterion = ContrastiveLoss(model.get_contrastive_cams, multilabel=multilabel, divergence=const.DIVERGENCE, pos_only=const.POS_ONLY, pos_weight=data.reweight if multilabel else None)
+    # criterion = torch.nn.BCEWithLogitsLoss(pos_weight=data.reweight)
 
     idx = random.randint(0, len(data) - 1)
     print(idx)
     X = data[idx][0].unsqueeze(0)
     y = [x.unsqueeze(0) for x in data[idx][1]]
 
-    plt.imshow(y[0][0].cpu())
+    if multilabel: plt.imshow(y[0][0].cpu())
 
     frames = []
     for i in range(50):
@@ -49,8 +50,8 @@ if __name__ == '__main__':
 
     print(y_pred[0].detach(), y[1])
 
+    fig = plt.figure(facecolor='white')
     if multilabel:
-        fig = plt.figure(facecolor='white')
         for idx, cam in enumerate(y_pred[1][0]):
             fig.add_subplot(4, 5, idx+1)
             plt.imshow(cam.detach().cpu(), norm=Normalize(vmin=y_pred[1][0].min(), vmax=y_pred[1][0].max()))
