@@ -33,16 +33,16 @@ class ContrastiveLoss(nn.Module):
         cc = cc.view(*cc.shape[:2], n_cam_pixels)
 
         if self.pos_only:
-            spatial_maps = fg_mask[y[1].to(torch.bool)].unsqueeze(1).flatten(2) * 10
             target_mask = target_mask[y[1].to(torch.bool)].unsqueeze(1)
             cc = cc[y[1].to(torch.bool)].unsqueeze(1)
 
+            spatial_maps = fg_mask[y[1].to(torch.bool)].unsqueeze(1).flatten(2) * 10
             target_mask = torch.hstack((target_mask, spatial_maps))
             cc = torch.hstack((cc, spatial_maps))
         else:
-            spatial_map = y[0].flatten(1).unsqueeze(1) * 10
-            target_mask = torch.hstack((target_mask, spatial_map))
-            cc = torch.hstack((cc, spatial_map))
+            spatial_maps = fg_mask.view(-1, *const.CAM_SIZE).unsqueeze(1).flatten(2)
+            target_mask = torch.hstack((target_mask.view(-1, n_cam_pixels).unsqueeze(1), spatial_maps))
+            cc = torch.hstack((cc.view(-1, n_cam_pixels).unsqueeze(1), spatial_maps))
 
         directions = torch.randn(n_directions, cc.size(1) - 1, device=const.DEVICE)
         directions /= directions.pow(2).sum(1, keepdim=True).sqrt()
@@ -50,7 +50,11 @@ class ContrastiveLoss(nn.Module):
 
         sorted_mask_projections = torch.einsum('bdn,md->bmn', target_mask, directions).sort(2)[0]
         divergence = sorted_mask_projections - torch.einsum('bdn,md->bmn', cc, directions).sort(2)[0]
-        divergence[(sorted_mask_projections != 0) & (divergence < 0)] = 0
+
+        if self.pos_only: divergence[(sorted_mask_projections != 0) & (divergence < 0)] = 0
+        else:
+            divergence[target_mask[:, 1].to(torch.bool).unsqueeze(1).repeat(1, n_directions, 1) & (sorted_mask_projections != 0) & (divergence < 0)] = 0
+            divergence[(1 - target_mask[:, 1]).to(torch.bool).unsqueeze(1).repeat(1, n_directions, 1) & (divergence > 0)] = 0
 
         return (divergence).pow(2).mean()
 
