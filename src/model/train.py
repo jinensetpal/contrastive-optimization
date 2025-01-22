@@ -75,7 +75,7 @@ def fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=False,
 
     with mlflow.start_run(mlflow_run_id) if is_primary_rank else nullcontext():
         # log hyperparameters
-        if is_primary_rank: mlflow.log_params({k: v for k, v in const.__dict__.items() if k == k.upper() and all(s not in k for s in ['DIR', 'PATH', 'EPOCHS', 'SELECT_BEST', 'DEVICE', 'TRAIN_CUTOFF', 'PORT'])})
+        if is_primary_rank and init_epoch == 0: mlflow.log_params({k: v for k, v in const.__dict__.items() if k == k.upper() and all(s not in k for s in ['DIR', 'PATH', 'EPOCHS', 'SELECT_BEST', 'DEVICE', 'TRAIN_CUTOFF', 'PORT'])})
 
         interval = max(1, (const.EPOCHS // 10))
         for epoch in range(init_epoch, const.EPOCHS + int(init_epoch == 0)):
@@ -247,8 +247,9 @@ if __name__ == '__main__':
 
         selected = {'best': torch.load(path / 'best.pt', map_location='cpu', weights_only=True),
                     'last': model.state_dict(),
-                    'epoch': prev_metrics['selected_epoch'],
-                    'acc': prev_metrics['selected_valid_acc']}
+                    'epoch': prev_metrics.get('selected_epoch', checkpoint_args['init_epoch']),
+                    'acc': prev_metrics.get('selected_valid_acc', prev_metrics.get('valid_acc', 0))}
+
         if ema and (path / 'ema.pt').exists():
             selected['ema'] = torch.load(path / 'ema.pt', map_location=torch.device(const.DEVICE), weights_only=True)
             ema.load_state_dict(selected['ema'])
