@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from src.utils import DataLoader
 from src import const
 from glob import glob
 import torchvision
@@ -24,7 +25,7 @@ class Dataset(torch.utils.data.Dataset):
 
 
 def get_generator():
-    return torch.utils.data.DataLoader(Dataset(), batch_size=const.BATCH_SIZE, shuffle=True)
+    return DataLoader(Dataset(), batch_size=const.BATCH_SIZE, shuffle=True)
 
 
 if __name__ == '__main__':

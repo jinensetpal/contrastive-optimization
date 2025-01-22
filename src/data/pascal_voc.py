@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from torchvision.transforms.functional import resize
+from src.utils import DataLoader
 from glob import glob
 from src import const
 import torchvision
@@ -23,7 +24,7 @@ class Dataset(torch.utils.data.Dataset):
 
 def get_generator():
     torch.multiprocessing.set_start_method('spawn', force=True)
-    return torch.utils.data.DataLoader(Dataset(device='cpu'), num_workers=const.N_WORKERS, pin_memory=True, batch_size=const.BATCH_SIZE, shuffle=False)
+    return DataLoader(Dataset(device='cpu'), num_workers=const.N_WORKERS, pin_memory=True, batch_size=const.BATCH_SIZE, shuffle=False)
 
 
 if __name__ == '__main__':

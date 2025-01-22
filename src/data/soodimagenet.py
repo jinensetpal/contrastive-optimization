@@ -2,6 +2,7 @@
 
 from torchvision.transforms.functional import resize
 from utils.SOODImageNetDataset import SOODImageNetS
+from src.utils import DataLoader
 from src import const
 import torchvision
 import random
@@ -48,7 +49,7 @@ def get_generators(split):
         datasets = torch.utils.data.random_split(dataset, [train_size, val_size])
     else: datasets = Dataset('test_easy', device='cpu'), Dataset('test_hard', device='cpu')
 
-    return *[torch.utils.data.DataLoader(dataset, num_workers=const.N_WORKERS, pin_memory=True, batch_size=const.BATCH_SIZE, shuffle=split == 'train') for dataset in datasets], None
+    return *[DataLoader(dataset, num_workers=const.N_WORKERS, pin_memory=True, batch_size=const.BATCH_SIZE, shuffle=split == 'train') for dataset in datasets], None
 
 
 if __name__ == '__main__':

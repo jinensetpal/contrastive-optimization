@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 # utils for imagenet training recipe. Code taken with modifications from:
+# https://github.com/pytorch/pytorch/issues/15849#issuecomment-573921048
 # https://stackoverflow.com/a/2838309/10671309
 # https://github.com/pytorch/vision/blob/main/references/classification/utils.py
 # https://github.com/pytorch/vision/blob/main/references/classification/presets.py
@@ -16,6 +17,29 @@ import torch.distributed as dist
 import socket
 import torch
 import math
+
+
+class _RepeatSampler(object):
+    def __init__(self, sampler):
+        self.sampler = sampler
+
+    def __iter__(self):
+        while True:
+            yield from iter(self.sampler)
+
+
+class DataLoader(torch.utils.data.dataloader.DataLoader):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        object.__setattr__(self, 'batch_sampler', _RepeatSampler(self.batch_sampler))
+        self.iterator = super().__iter__()
+
+    def __len__(self):
+        return len(self.batch_sampler.sampler)
+
+    def __iter__(self):
+        for i in range(len(self)):
+            yield next(self.iterator)
 
 
 def get_open_port():
