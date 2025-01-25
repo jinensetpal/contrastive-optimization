@@ -153,6 +153,11 @@ def fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=False,
                 print(f'epoch\t\t\t: {epoch}')
                 for key in metrics: print(f'{key}\t\t: {metrics[key]}')
 
+            if const.CHECKPOINTING:
+                torch.save(optimizer.state_dict(), path / 'optim.pt')
+                torch.save(scheduler.state_dict(), path / 'scheduler.pt')
+                torch.save(model.state_dict(), path / 'last.pt')
+
             if const.TRAIN_CUTOFF is not None and time.time() - start_time >= const.TRAIN_CUTOFF: break
 
         if is_primary_rank:
