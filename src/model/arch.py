@@ -7,14 +7,15 @@ import torch
 
 
 class Model(nn.Module):
-    def __init__(self, randomized_flatten=const.RANDOMIZED_FLATTEN, multilabel=False, logits_only=False,
-                 xl_backbone=False, device=const.DEVICE, is_contrastive=True, downsampling_level=1):
+    def __init__(self, randomized_flatten=const.RANDOMIZED_FLATTEN, multilabel=False, logits_only=False, disable_bn=const.DISABLE_BN,
+                 xl_backbone=const.XL_BACKBONE, device=const.DEVICE, is_contrastive=True, downsampling_level=1):
         super().__init__()
 
-        self.device = device
-        self.is_contrastive = is_contrastive
-        self.randomized_flatten = const.RANDOMIZED_FLATTEN
         self.segmentation_threshold = const.SEGMENTATION_THRESHOLD
+        self.randomized_flatten = const.RANDOMIZED_FLATTEN
+        self.is_contrastive = is_contrastive
+        self.disable_bn = disable_bn
+        self.device = device
 
         if xl_backbone: self.backbone = torchvision.models.resnet152(weights=torchvision.models.ResNet152_Weights.IMAGENET1K_V2 if const.PRETRAINED_BACKBONE else None)
         else: self.backbone = torchvision.models.resnet50(weights=torchvision.models.ResNet50_Weights.IMAGENET1K_V2 if const.PRETRAINED_BACKBONE else None)
@@ -46,6 +47,18 @@ class Model(nn.Module):
         self.backbone.fc = nn.Identity()
 
         self.to(self.device)
+        self.eval()
+        self.train()
+
+    def train(self, mode=True):
+        super().train(mode)
+
+        if self.disable_bn:
+            for x in self.modules():
+                if x._get_name() == 'BatchNorm2d': x.eval()
+
+        return self
+
 
     def _hook(self, model, i, o):
         def assign(grad):

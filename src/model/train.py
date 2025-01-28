@@ -33,6 +33,7 @@ def configure(model_name):
     const.OPTIMIZER = 'Lamb' if 'lamb' in const.MODEL_NAME else const.OPTIMIZER
     const.USE_ZERO = 'zero' in const.MODEL_NAME and const.DDP
     const.EMA = 'ema' in const.MODEL_NAME
+    const.DISABLE_BN = 'no_bn' in const.MODEL_NAME
     const.XL_BACKBONE = 'largemodel' in const.MODEL_NAME
     const.DATASET = 'imagenet' if 'imagenet' in const.MODEL_NAME else 'oxford-iiit'
     const.DATASET = 'soodimagenet' if 'soodimagenet' in const.MODEL_NAME else const.DATASET

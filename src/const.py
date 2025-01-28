@@ -20,7 +20,7 @@ N_WORKERS = 3
 N_CHANNELS = 3
 BBOX_MAP = False
 BINARY_CLS = True
-DATASET = 'sbd'
+DATASET = 'soodimagenet'
 CAM_SIZE = (14, 14)
 VAL_CROP_SIZE = 224
 VAL_RESIZE_SIZE = 232
@@ -38,6 +38,7 @@ else: N_CLASSES = 2 if BINARY_CLS else 37
 PRETRAINED_BACKBONE = False
 RANDOMIZED_FLATTEN = False
 XL_BACKBONE = False
+DISABLE_BN = False
 
 # training
 DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
