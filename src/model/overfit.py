@@ -17,7 +17,7 @@ import sys
 if __name__ == '__main__':
     multilabel = len(sys.argv) == 2
     data = sbd(mode='segmentation') if multilabel else oxford_iiit_pet('train')
-    model = Model(const.IMAGE_SHAPE, multilabel=multilabel, logits_only=True)
+    model = Model(multilabel=multilabel, logits_only=True)
     optim = torch.optim.Adam(model.parameters(), lr=5E-4)
     criterion = ContrastiveLoss(model.get_contrastive_cams, multilabel=multilabel, divergence=const.DIVERGENCE, pos_only=const.POS_ONLY, pos_weight=data.reweight if multilabel else None)
     # criterion = torch.nn.BCEWithLogitsLoss(pos_weight=data.reweight)

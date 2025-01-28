@@ -7,7 +7,7 @@ import torch
 
 
 class Model(nn.Module):
-    def __init__(self, input_shape, randomized_flatten=const.RANDOMIZED_FLATTEN, multilabel=False, logits_only=False,
+    def __init__(self, randomized_flatten=const.RANDOMIZED_FLATTEN, multilabel=False, logits_only=False,
                  xl_backbone=False, device=const.DEVICE, is_contrastive=True, downsampling_level=1):
         super().__init__()
 
@@ -84,7 +84,7 @@ class Model(nn.Module):
 
 
 if __name__ == '__main__':
-    model = Model(input_shape=const.IMAGE_SHAPE)
+    model = Model()
     model.eval()
 
     x = torch.rand((3, *const.IMAGE_SHAPE)).to(const.DEVICE)

@@ -26,7 +26,7 @@ if __name__ == '__main__':
     elif sys.argv[2] == 'oxford': from ..data.oxford_iiit_pet import Dataset
     else: from ..data.pet_image import Dataset
 
-    model = Model(input_shape=const.IMAGE_SHAPE, is_contrastive='default' not in name)
+    model = Model(is_contrastive='default' not in name)
     model.load_state_dict(torch.load(const.MODELS_DIR / f'{name}.pt', map_location=const.DEVICE, weights_only=True))
     model.name = name
     model.eval()

@@ -61,7 +61,7 @@ def classification(model, gen):
 if __name__ == '__main__':
     name = sys.argv[1]
 
-    model = Model(input_shape=const.IMAGE_SHAPE, is_contrastive='default' not in name, multilabel=True, xl_backbone=False)
+    model = Model(is_contrastive='default' not in name, multilabel=True, xl_backbone=False)
     model.load_state_dict(torch.load(const.MODELS_DIR / f'{name}.pt', map_location=const.DEVICE, weights_only=True))
     model.name = name
     model.eval()
