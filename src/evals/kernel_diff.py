@@ -10,7 +10,11 @@ import sys
 
 def kernel_diff(model):
     plt.plot((model.linear.weight[0] - model.linear.weight[1]).sort(descending=True).values.pow(2).detach().cpu())
-    plt.savefig(const.DATA_DIR / 'evals' / f'kerneldiff_{model.name}.png')
+    plt.savefig(const.DATA_DIR / 'evals' / f'kerneldiff_{model.name.replace("/", "_")}.png')
+    plt.show()
+
+    class_sorted = model.linear.weight.T.sort(1, descending=True)
+    plt.imshow(class_sorted.values[(class_sorted.values[:, 0] - class_sorted.values[:, 1]).sort(descending=True).indices].detach().cpu())
     plt.show()
 
 
