@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from ..data.oxford_iiit_pet import get_generators as oxford_iiit_pet
+from ..data.hard_imagenet import get_generators as hardimagenet
 from ..data.soodimagenet import get_generators as soodimagenet
 from torcheval.metrics import BinaryAUPRC, MulticlassAccuracy
 from torch.distributed.optim import ZeroRedundancyOptimizer
@@ -36,6 +37,7 @@ def configure(model_name):
     const.DISABLE_BN = 'no_bn' in const.MODEL_NAME
     const.XL_BACKBONE = 'largemodel' in const.MODEL_NAME
     const.DATASET = 'imagenet' if 'imagenet' in const.MODEL_NAME else 'oxford-iiit'
+    const.DATASET = 'hardimagenet' if 'hardimagenet' in const.MODEL_NAME else const.DATASET
     const.DATASET = 'soodimagenet' if 'soodimagenet' in const.MODEL_NAME else const.DATASET
     const.DATASET = 'sbd' if 'sbd' in const.MODEL_NAME else const.DATASET
     const.PRETRAINED_BACKBONE = 'pretrained' in const.MODEL_NAME
@@ -52,6 +54,9 @@ def configure(model_name):
         const.USE_CUTMIX = 'cutmixed' in const.MODEL_NAME
         const.AUGMENT = 'augmented' in const.MODEL_NAME
         const.FINETUNING = False
+    elif const.DATASET == 'hardimagenet':
+        const.N_CLASSES = 15
+        const.BINARY_CLS = False
     elif const.DATASET == 'soodimagenet':
         const.N_CLASSES = 56
         const.BINARY_CLS = False
@@ -204,6 +209,7 @@ if __name__ == '__main__':
 
     if const.DATASET == 'imagenet': train, val, _ = imagenet()
     elif const.DATASET == 'soodimagenet': train, val, _ = soodimagenet('train')
+    elif const.DATASET == 'hardimagenet': train, val, _ = hardimagenet()
     elif const.DATASET == 'sbd': train, val, _ = sbd()
     else: train, val, test = oxford_iiit_pet()
 

@@ -3,6 +3,7 @@
 # code adapted from: https://github.com/mmoayeri/HardImageNet/blob/main/datasets/hard_imagenet.py, https://github.com/mmoayeri/HardImageNet/blob/main/augmentations.py
 
 import torchvision.transforms.v2 as T
+from src.utils import DataLoader
 from src import const
 from PIL import Image
 import pickle
@@ -98,8 +99,8 @@ def get_generators():
     random.seed(const.SEED)
     const.SPLITS[1] = 'val'
 
-    dataloaders = *[torch.utils.data.DataLoader(Dataset(split=split, ft=True, device='cpu'), shuffle=True,
-                                                num_workers=const.N_WORKERS, pin_memory=True, batch_size=const.BATCH_SIZE) for split in const.SPLITS[:2]], None
+    dataloaders = *[DataLoader(Dataset(split=split, ft=True, device='cpu'), shuffle=True,
+                               num_workers=const.N_WORKERS, pin_memory=True, batch_size=const.BATCH_SIZE) for split in const.SPLITS[:2]], None
 
     const.SPLITS[1] = 'valid'
     return dataloaders
