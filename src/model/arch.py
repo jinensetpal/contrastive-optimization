@@ -47,18 +47,17 @@ class Model(nn.Module):
         self.backbone.fc = nn.Identity()
 
         self.to(self.device)
-        self.eval()
-        self.train()
+        self.disable_batchnorms()
 
-    def train(self, mode=True):
-        super().train(mode)
+    def disable_batchnorms(self):
+        for x in self.modules():
+            if x._get_name() == 'BatchNorm2d': x.eval()
 
-        if self.disable_bn:
-            for x in self.modules():
-                if x._get_name() == 'BatchNorm2d': x.eval()
+    def train(self, *args, **kwargs):
+        super().train(*args, **kwargs)
 
+        if self.disable_bn: self.disable_batchnorms()
         return self
-
 
     def _hook(self, model, i, o):
         def assign(grad):

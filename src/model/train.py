@@ -127,7 +127,7 @@ def fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=False,
             except (KeyboardInterrupt, torch.OutOfMemoryError):
                 break
 
-            for split in const.SPLITS[:2]: metrics[f'{split}_acc'] = sync_and_compute(metrics[f'{split}_acc']).item()
+            for split in const.SPLITS[:2]: metrics[f'{split}_acc'] = (sync_and_compute(metrics[f'{split}_acc']) if const.DDP else metrics[f'{split}_acc'].compute()).item()
             metrics = {metric: np.mean(metrics[metric]) for metric in metrics}
             if const.DDP:
                 store.set(f'metric_{const.DEVICE}', json.dumps(metrics))
