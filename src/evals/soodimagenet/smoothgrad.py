@@ -24,7 +24,7 @@ def gradient_influence(batch, model, idx=0, n_random_samples=50):
     fig.add_subplot(1, 2, 1)
     plt.imshow(influence)
     fig.add_subplot(1, 2, 2)
-    plt.imshow(batch[0][idx].permute(1,2,0).detach().cpu())
+    plt.imshow(batch[0][idx].permute(1, 2, 0).detach().cpu())
     plt.show()
 
     return influence

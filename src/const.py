@@ -20,7 +20,7 @@ N_WORKERS = 3
 N_CHANNELS = 3
 BBOX_MAP = False
 BINARY_CLS = True
-DATASET = 'soodimagenet'
+DATASET = 'hardimagenet'
 CAM_SIZE = (14, 14)
 VAL_CROP_SIZE = 224
 VAL_RESIZE_SIZE = 232
@@ -30,6 +30,7 @@ SPLITS = ['train', 'valid', 'test']
 IMAGE_SHAPE = (N_CHANNELS,) + IMAGE_SIZE
 
 if DATASET == 'imagenet': N_CLASSES = 1000
+elif DATASET == 'hardimagenet': N_CLASSES = 15
 elif DATASET == 'soodimagenet': N_CLASSES = 56
 elif DATASET == 'sbd': N_CLASSES = 20
 else: N_CLASSES = 2 if BINARY_CLS else 37

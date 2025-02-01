@@ -1,0 +1,6 @@
+outs:
+- md5: 3cd122aa7e59e187ab224de24babad69.dir
+  size: 110082895
+  nfiles: 19857
+  hash: md5
+  path: hardimagenet

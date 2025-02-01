@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 
-from ..data.oxford_iiit_pet import Dataset
+from src.data.oxford_iiit_pet import Dataset
 from matplotlib.colors import Normalize
 from torch.utils.data import DataLoader
+from src.model.arch import Model
 import matplotlib.pyplot as plt
-from ..model.arch import Model
 from src import const
 import torchvision
 import random
