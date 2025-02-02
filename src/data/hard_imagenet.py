@@ -23,7 +23,7 @@ with open(_MASK_ROOT/'meta/hard_imagenet_idx.pkl', 'rb') as f:
 
 
 class Dataset(torch.utils.data.Dataset):
-    def __init__(self, split='val', ft=False, balanced_subset=False, device=const.DEVICE):
+    def __init__(self, split='val', ft=False, balanced_subset=True, device=const.DEVICE, eval_mode=False):
         '''
         Returns original ImageNet index when ft is False, otherwise returns label between 0 and 14
         '''
@@ -33,6 +33,7 @@ class Dataset(torch.utils.data.Dataset):
         self.collect_mask_paths()
         # self.mask_paths = glob.glob(_MASK_ROOT + split+'/*')
         self.num_classes = 15
+        self.eval_mode = self.eval_mode
         self.ft = ft
 
     def standard_resize_center_crop(self, img, mask, resize_shape=const.IMAGE_SIZE):
@@ -55,13 +56,13 @@ class Dataset(torch.utils.data.Dataset):
             # hard coded for now
             self.subset_size = 100
 
-            with open(_MASK_ROOT+'paths_by_rank2.pkl', 'rb') as f:
+            with open(_MASK_ROOT / 'meta' / 'paths_by_rank.pkl', 'rb') as f:
                 ranked_paths = pickle.load(f)
             paths = []
             for c in ranked_paths:
                 cls_paths = ranked_paths[c]
                 paths += cls_paths[:self.subset_size] + cls_paths[(-1*self.subset_size):]
-            self.mask_paths = [_MASK_ROOT+'train/'+'_'.join(p.split('/')[-2:]) for p in paths]
+            self.mask_paths = [(_MASK_ROOT/'train'/'_'.join(p.split('/')[-2:])).as_posix() for p in paths]
             for p in self.mask_paths:
                 if not os.path.exists(p):
                     self.mask_paths.remove(p)
@@ -84,12 +85,14 @@ class Dataset(torch.utils.data.Dataset):
 
         class_ind = self.map_wnid_to_label(wnid)
         mask[mask > 0] = 1
-        mask = T.functional.resize(mask[0][None,], const.CAM_SIZE, interpolation=T.InterpolationMode.NEAREST)[0]
 
-        y = torch.zeros(const.N_CLASSES, device=self.device)
-        y[class_ind] = 1
+        if not self.eval_mode:
+            mask = T.functional.resize(mask[0][None,], const.CAM_SIZE, interpolation=T.InterpolationMode.NEAREST)[0]
+            y = torch.zeros(const.N_CLASSES, device=self.device)
+            y[class_ind] = 1
 
-        return img.to(self.device), (mask.to(self.device), y.to(self.device))
+            return img.to(self.device), (mask.to(self.device), y.to(self.device))
+        else: return img.to(self.device), mask.to(self.device), class_ind
 
     def __len__(self):
         return len(self.mask_paths)
@@ -107,4 +110,4 @@ def get_generators():
 
 
 if __name__ == '__main__':
-    print(Dataset(mode='train')[0])
+    print(Dataset('train')[0])

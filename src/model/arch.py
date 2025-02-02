@@ -8,12 +8,13 @@ import torch
 
 class Model(nn.Module):
     def __init__(self, randomized_flatten=const.RANDOMIZED_FLATTEN, multilabel=False, logits_only=False, disable_bn=const.DISABLE_BN,
-                 xl_backbone=const.XL_BACKBONE, device=const.DEVICE, is_contrastive=True, downsampling_level=1):
+                 hardinet_eval=False, xl_backbone=const.XL_BACKBONE, device=const.DEVICE, is_contrastive=True, downsampling_level=1):
         super().__init__()
 
         self.segmentation_threshold = const.SEGMENTATION_THRESHOLD
         self.randomized_flatten = const.RANDOMIZED_FLATTEN
         self.is_contrastive = is_contrastive
+        self.hardinet_eval = hardinet_eval
         self.disable_bn = disable_bn
         self.device = device
 
@@ -70,6 +71,7 @@ class Model(nn.Module):
         if self.training and self.randomized_flatten: x = x[:, torch.randperm(x.shape[1])]
         logits = self.linear(x)
 
+        if self.hardinet_eval: return logits
         return logits if self.training else self.probabilities(logits), self._bp_free_hi_res_cams()
 
     def get_semantic_map(self, cams):

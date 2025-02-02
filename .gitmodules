@@ -1,0 +1,3 @@
+[submodule "src/evals/hardimagenet"]
+	path = src/evals/hardimagenet
+	url = git@github.com:jinensetpal/HardImageNet.git
