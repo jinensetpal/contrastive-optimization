@@ -54,8 +54,8 @@
 \theoremstyle{remark}
 \newtheorem{remark}[theorem]{Remark}
 
-\title{Contrastive Optimization -- Preliminaries}
-
+\title{Interpretable Casual Interventions \\
+Encourage Core Risk Minimization}
 
 % The \author macro works with any number of authors. There are two commands
 % used to separate the names and addresses of multiple authors: \And and \AND.
@@ -359,7 +359,7 @@ For sigmoid-activated binary / multilabel classification tasks, we leverage simi
 		H(\theta, \mathcal{D}) &= -\left[ y_i \log (\sigma(\bm{s}_i)) + (1 - y_i) \log (1 - \sigma(\bm{s}_i)) \right] \\
 		&= -\left[ y_i \log \left(\sigma\left(\sum_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}}\right) \right) + (1 - y_i) \log \left(1 - \sigma\left(\sum_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}}\right) \right) \right]
 	\end{align}
-	Similar to Theorem \ref{ace}, we can break down each HiResCAM to foreground and background components. For a non-target HiResCAM, anything that is not the target is inherently the background. Therefore, it's definition is retrained.
+	Similar to Theorem \ref{ace}, we can break down each HiResCAM to foreground and background components. For a non-target HiResCAM, anything that is not the target is inherently the background. Therefore, it's definition is retained.
 	\begin{gather}
 		H(\theta, \mathcal{D}) = - y_i \log \left(\sigma\left(h \odot \sum_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}} - (1-h) \odot \sum_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}}\right) \right) - (1 - y_i) \log \left( \bm{s}_i \right)
 	\end{gather}
@@ -380,6 +380,9 @@ Similar to ACE, we define a divergence term for the target class to motivate lea
 	\end{split}
 \end{gather}
 
+\subsubsection{Spatial Sliced Wasserstein Loss}
+
+
 \subsection{Training Detail}
 
 % \begin{figure}
@@ -395,9 +398,18 @@ The Oxford-IIIT Pets dataset is an image dataset with a classification objective
 
 \paragraph{Removed final BatchNormalization \& ReLU} Since the HiResCAM definition for CAM architectures assumes the convolution followed by global average pooling and the final linear layer only, the current explanation does not directly explain the class score. We therefore also neutralize the final two-layers, which successfully recovers the faithfulness guarantee.
 
-\paragraph{Reproducibility.} The source code, dataset, experiments, evals, and model weights can be found at \url{https://dagshub.com/jinensetpal/contrastive-optimization}.
+\paragraph{Reproducibility.} The source code, dataset, experiments, evals, and model weights can be found at \url{https://dagshub.com/jinensetpal/contrastive-optimization.git}.
 
 \section{Results}
+
+\subsection{Overview}
+
+We present training results on the following settings:
+\begin{enumerate}
+	\item \textbf{Oxford IIIT-Pets Dataset:} Binary Classification (Cat / Dog Classification) -- OOD Evaluation without semantic-shift. Multiclass Classification on 37-class fine-grained classification task.
+	\item \textbf{Semantic Boundaries Dataset:} 20-class multilabel classification, evaluation on VOC2012 Test Set reporting AP, mIOU.
+	\item \textbf{S-OOD ImageNet:} reporting in-distribution accuracy, 
+\end{enumerate}
 
 \subsection{Benchmark: Binary Classification}
 
@@ -466,27 +478,109 @@ We can observe that the default model is unable to learn any valuable informatio
 
 The contrastive model was trained for 227 epochs with the Adam optimizer with a learning rate of $10^{-3}$ with a batch size of 20, with 4 gradient accumulation steps (effective batch size of 80) on a 32GB V100 on a randomly shuffled dataset using the original splits. The default model was only trained for 33 epochs, while the ablated cross-entropy loss was only trained for 98 epochs by which point both had converged. For posterity, we will run each setup for 227 epochs as well before publication.
 
+\subsection{Benchmark: Hard-Imagenet}
+
+\begin{table}[H]
+	\centering
+	\caption{Accuracies under various ablations, Relative Foreground Sensitivity, on FineTuned ResNet-50 models trained using varying approaches.}
+	\begin{tabular}{c|c|ccc|c}
+		\toprule
+		\textbf{Method} & \textbf{None} $(\uparrow)$ & \textbf{Gray Mask FG} $(\downarrow)$ & \textbf{Gray BBOX FG} $(\downarrow)$ & \textbf{Tile FG} $(\downarrow)$ & \textbf{RFS} $(\uparrow)$ \\
+		\midrule
+		Cross-Entropy & 94.25 & 75.94 & 69.39 & 67.38 & -0.18 \\
+		\midrule
+		CORM & 92.91 & 76.20 & 69.12 & 68.32 & -0.08 \\
+		DRF & \bf 94.39 & 73.53 & 67.51 & 66.71 & -0.27 \\
+		CORM + DFR & 91.31 & 72.59 & 63.64 & 63.90 & -0.23 \\
+		\midrule
+		ACE (Ours) & 89.20 & 47.33 & 34.27 & 34.93 & 0.21 \\
+		ACE + SWD (Ours) & 91.20 & \bf 38.27 & \bf 27.20 & \bf 33.60 & \bf 0.31 \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
 \subsection{Benchmark: Out-of-Distribution Generalization}
 
+\subsubsection{No Semantic Shift}
 To test how well the approach generalizes out of the training distribution, we evaluate the performance of the binary classification contrastive model on random samples ($n=1000$) from the \href{https://www.microsoft.com/en-us/download/details.aspx?id=54765}{Kaggle Cats and Dogs Dataset}:
 \begin{table}[h]
 	\centering
-	\begin{tabular}{c|c}
+	\begin{tabular}{c|ccc}
 		\toprule
-		\textbf{Method} & \textbf{Accuracy} \\
+		\textbf{Method} & \textbf{Accuracy} & \textbf{Avg Conf | Misclassified} & \textbf{Avg Conf} \\
 		\midrule
-		Cross-Entropy & 77.0\% \\
-		Ablated CE (Ours) & 75.7\% \\
-		Ablated CE + KLD (Ours) & \bf 83.4\% \\
+		Cross-Entropy 		& 77.0\% 	& TBR & TBR \\
+		Ablated CE (Ours) 	& 75.7\% 	& TBR & TBR \\
+		Ablated CE + KLD (Ours) & \bf 83.4\% 	& TBR & TBR \\
+		Ablated CE + SWD (Ours) & TBR & TBR & TBR \\
 		\bottomrule
 	\end{tabular}
 \end{table}
 
 The next goal is to further understand and minimize this generalization gap.
 
-\section{Upcoming / In Progress Tasks} 
+\subsubsection{With Semantic Shift}
 
-\paragraph{Scaling the Approach} Training ResNet-50 on ImageNet and PASCAL VOC can allow us to evaluate if the approach scales effectively, with the performance gain not being constrained to the Oxford-IIIT Pets Dataset.
+To evaluate the performance of the approach against semantic shifts, we can use the \citet{soodimagenet} dataset. It 
+
+The descriptors for abbreviations used in \ref{sood-wo-pretrain}, \ref{sood-w-pretrain} are as follows:
+\begin{table}[h]
+	\centering
+	\begin{tabular}{c|c}
+		\toprule
+		\textbf{Key} & \textbf{Descriptor} \\
+		\midrule
+		F1 & F-1 Score \\
+		ID & In-Distribution \\ 
+		E & Easy Test Set -- Small Semantic Shift \\
+		H & Hard Test Set -- Significant Semantic Shift \\
+		AC & Average Confidence \\
+		M & Misclassified Samples Only \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+\begin{table}[h]
+	\label{sood-wo-pretrain}
+	\caption{Without pre-training:}
+	\centering
+	\hspace*{-2.5em}
+	\begin{tabular}{c|ccccccc}
+		\toprule
+		\textbf{Method} & \textbf{F1 | ID} & \textbf{F1 | E} & \textbf{F1 | H} & \textbf{AC | M, E} & \textbf{AC | E} & \textbf{AC | M, H} & \textbf{AC | H} \\
+		\midrule
+		Cross-Entropy 		& TBR & 69.6\% & 52.9\% & .871 & .725 & .833 & .741 \\
+		Ablated CE (Ours) 	& TBR & TBR & TBR & TBR & TBR  & TBR & TBR \\
+		Ablated CE + KLD (Ours) & TBR & 72.0\% & 55.9\% & .909 & .790  & .879 & .805 \\
+		Ablated CE + SWD (Ours) & TBR & TBR & TBR & TBR & TBR  & TBR & TBR \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+\begin{table}[h]
+	\label{sood-w-pretrain}
+	\caption{With pre-training:}
+	\centering
+	\hspace*{-2.5em}
+	\begin{tabular}{c|ccccccc}
+		\toprule
+		\textbf{Method} & \textbf{F1 | ID} & \textbf{F1 | E} & \textbf{F1 | H} & \textbf{AC | M, E} & \textbf{AC | E} & \textbf{AC | M, H} & \textbf{AC | H} \\
+		\midrule
+		Cross-Entropy 		& TBR & TBR & TBR & TBR & TBR  & TBR & TBR \\
+		Ablated CE (Ours) 	& TBR & TBR & TBR & TBR & TBR  & TBR & TBR \\
+		Ablated CE + KLD (Ours) & TBR & 78.1\% & 61.7\% & .904 & .747 & .864 & .766 \\
+		Ablated CE + SWD (Ours) & TBR & TBR & TBR & TBR & TBR  & TBR & TBR \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+\subsection{Qualitative Evals}
+
+\subsubsection{Adversarial Robustness}
+
+\subsubsection{Automated Image Circuit Discovery}
+
+\section{Upcoming / In Progress Tasks} 
 
 \paragraph{Understanding the Generalization Gap} While the model for the multiclass paradigm is able to fit the training dataset excellently -- achieving $\approx 93\%$ training accuracy -- the validation accuracy is significantly behind at $\approx 51\%$. This could imply memorization of samples, which was something that this approach was intended to mitigate. Further investigation could help support or disprove this hypothesis.
 
@@ -496,7 +590,7 @@ The next goal is to further understand and minimize this generalization gap.
 
 \paragraph{Non-Reduction of Feature Maps} One step of computing HiResCAMs involves summing each attention map to create a single activation map. Could the multiple foci be useful, and something we can further optimize?
 
-\bibliographystyle{plain}
+\bibliographystyle{plainnat}
 \bibliography{references}
 
 \appendix

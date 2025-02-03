@@ -33,7 +33,7 @@ class Dataset(torch.utils.data.Dataset):
         self.collect_mask_paths()
         # self.mask_paths = glob.glob(_MASK_ROOT + split+'/*')
         self.num_classes = 15
-        self.eval_mode = self.eval_mode
+        self.eval_mode = eval_mode
         self.ft = ft
 
     def standard_resize_center_crop(self, img, mask, resize_shape=const.IMAGE_SIZE):
