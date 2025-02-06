@@ -9,9 +9,10 @@
 # https://github.com/pytorch/vision/blob/main/torchvision/transforms/v2/_augment.py
 
 from torchvision.transforms.v2._utils import is_pure_tensor, query_size
-from torchvision.transforms.functional import InterpolationMode
+from torchvision.transforms.functional import InterpolationMode, resize
 from torchvision.transforms.v2.functional._meta import get_size
 from torchvision import transforms as tv_tensors
+from torchvision.ops import masks_to_boxes
 import torchvision.transforms.v2 as T
 import torch.distributed as dist
 import socket
@@ -40,6 +41,23 @@ class DataLoader(torch.utils.data.dataloader.DataLoader):
     def __iter__(self):
         for i in range(len(self)):
             yield next(self.iterator)
+
+
+def trim_mask(mask, cam_size, reduce_factor=4, center_bias=1):
+    small_mask = resize(mask[None,], [x // reduce_factor for x in mask.shape], interpolation=T.InterpolationMode.NEAREST_EXACT)
+    if small_mask.min() == small_mask.max(): return resize(mask[None,], cam_size, interpolation=T.InterpolationMode.NEAREST_EXACT)[0]
+    x_1, y_1, x_2, y_2 = masks_to_boxes(small_mask)[0]
+
+    r1 = (x_1 + center_bias) / (small_mask.size(1) - x_2 + center_bias - 1)
+    t1 = r1 + 1
+    r2 = (y_1 + center_bias) / (small_mask.size(2) - y_2 + center_bias - 1)
+    t2 = r2 + 1
+
+    target_pad = cam_size[0] - small_mask.size(1)
+    return T.functional.pad(small_mask, (int((target_pad * r1 / t1).round()),
+                                         int((target_pad * r2 / t2).round()),
+                                         int((target_pad * (1 - r1 / t1)).round()),
+                                         int((target_pad * (1 - r2 / t2)).round())))[0]
 
 
 def get_open_port():

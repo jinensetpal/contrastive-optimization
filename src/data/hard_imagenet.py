@@ -2,8 +2,8 @@
 
 # code adapted from: https://github.com/mmoayeri/HardImageNet/blob/main/datasets/hard_imagenet.py, https://github.com/mmoayeri/HardImageNet/blob/main/augmentations.py
 
+from src.utils import DataLoader, trim_mask
 import torchvision.transforms.v2 as T
-from src.utils import DataLoader
 from src import const
 from PIL import Image
 import pickle
@@ -23,7 +23,7 @@ with open(_MASK_ROOT/'meta/hard_imagenet_idx.pkl', 'rb') as f:
 
 
 class Dataset(torch.utils.data.Dataset):
-    def __init__(self, split='val', ft=False, balanced_subset=True, device=const.DEVICE, eval_mode=False):
+    def __init__(self, split='val', ft=False, balanced_subset=True, device=const.DEVICE, eval_mode=False, trim_masks=False):
         '''
         Returns original ImageNet index when ft is False, otherwise returns label between 0 and 14
         '''
@@ -31,6 +31,7 @@ class Dataset(torch.utils.data.Dataset):
         self.device = device
         self.balanced_subset = balanced_subset
         self.collect_mask_paths()
+        self.trim_masks = trim_masks
         # self.mask_paths = glob.glob(_MASK_ROOT + split+'/*')
         self.num_classes = 15
         self.eval_mode = eval_mode
@@ -87,7 +88,7 @@ class Dataset(torch.utils.data.Dataset):
         mask[mask > 0] = 1
 
         if not self.eval_mode:
-            mask = T.functional.resize(mask[0][None,], const.CAM_SIZE, interpolation=T.InterpolationMode.NEAREST)[0]
+            mask = trim_mask(mask[0], const.CAM_SIZE, reduce_factor=30, center_bias=2) if self.trim_masks else T.functional.resize(mask, const.CAM_SIZE, interpolation=T.InterpolationMode.NEAREST_EXACT)[0]
             y = torch.zeros(const.N_CLASSES, device=self.device)
             y[class_ind] = 1
 
@@ -110,4 +111,4 @@ def get_generators():
 
 
 if __name__ == '__main__':
-    print(Dataset('train')[0])
+    print(Dataset('train', ft=True)[0])

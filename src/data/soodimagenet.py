@@ -29,7 +29,7 @@ class Dataset(SOODImageNetS):
     def __getitem__(self, idx):
         X, heatmap, label_idx, class_name, synset = super().__getitem__(idx)
         heatmap[heatmap.nonzero()] = 1
-        heatmap = resize(heatmap[None,], const.CAM_SIZE, interpolation=torchvision.transforms.InterpolationMode.NEAREST)[0]
+        heatmap = resize(heatmap[None,], const.CAM_SIZE, interpolation=torchvision.transforms.InterpolationMode.NEAREST_EXACT)[0]
 
         y = torch.zeros(const.N_CLASSES)
         y[int(label_idx) - 1] = 1

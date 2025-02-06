@@ -8,7 +8,7 @@ import torch
 
 class Model(nn.Module):
     def __init__(self, randomized_flatten=const.RANDOMIZED_FLATTEN, multilabel=False, logits_only=False, disable_bn=const.DISABLE_BN,
-                 hardinet_eval=False, xl_backbone=const.XL_BACKBONE, device=const.DEVICE, is_contrastive=True, downsampling_level=1):
+                 hardinet_eval=False, xl_backbone=const.XL_BACKBONE, device=const.DEVICE, is_contrastive=True, upsampling_level=1):
         super().__init__()
 
         self.segmentation_threshold = const.SEGMENTATION_THRESHOLD
@@ -21,18 +21,18 @@ class Model(nn.Module):
         if xl_backbone: self.backbone = torchvision.models.resnet152(weights=torchvision.models.ResNet152_Weights.IMAGENET1K_V2 if const.PRETRAINED_BACKBONE else None)
         else: self.backbone = torchvision.models.resnet50(weights=torchvision.models.ResNet50_Weights.IMAGENET1K_V2 if const.PRETRAINED_BACKBONE else None)
 
-        if downsampling_level >= 1:
+        if upsampling_level >= 1:
             self.backbone.layer4[0].conv2.stride = (1, 1)
             self.backbone.layer4[0].downsample[0].stride = (1, 1)
-        if downsampling_level >= 2:
-            self.backbone.conv1.stride = (1, 1)
-            self.backbone.maxpool.stride = 1
-
-            self.backbone.layer2[0].conv2.stride = (1, 1)
-            self.backbone.layer2[0].downsample[0].stride = (1, 1)
-
+        if upsampling_level >= 2:
             self.backbone.layer3[0].conv2.stride = (1, 1)
             self.backbone.layer3[0].downsample[0].stride = (1, 1)
+        if upsampling_level >= 3:
+            self.backbone.layer2[0].conv2.stride = (1, 1)
+            self.backbone.layer2[0].downsample[0].stride = (1, 1)
+        if upsampling_level >= 4:
+            self.backbone.conv1.stride = (1, 1)
+            self.backbone.maxpool.stride = 1
 
         if is_contrastive:
             self.backbone.layer4[-1].bn3 = nn.Identity()
@@ -48,7 +48,7 @@ class Model(nn.Module):
         self.backbone.fc = nn.Identity()
 
         self.to(self.device)
-        self.disable_batchnorms()
+        if disable_bn: self.disable_batchnorms()
 
     def disable_batchnorms(self):
         for x in self.modules():
@@ -98,9 +98,18 @@ class Model(nn.Module):
 
 
 if __name__ == '__main__':
-    model = Model()
-    model.eval()
+    import matplotlib.pyplot as plt
 
-    x = torch.rand((3, *const.IMAGE_SHAPE)).to(const.DEVICE)
+    model = Model(disable_bn=True, upsampling_level=3)
+    # model.backbone.maxpool = nn.Identity()
+    print(model)
+
+    x = torch.rand(1, *const.IMAGE_SHAPE, device=const.DEVICE, requires_grad=True)
     y, cam = model(x)
     print(cam.shape)
+
+    for i in range(cam.size(1)):
+        cam[0][i][cam.size(2) // 2, cam.size(3) // 2].backward(inputs=x, retain_graph=True)
+
+    plt.imshow(x.grad[0].abs().sum(0).detach().cpu())
+    plt.show()

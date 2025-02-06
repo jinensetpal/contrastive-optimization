@@ -24,7 +24,7 @@ class Dataset(torchvision.datasets.SBDataset):
 
         heatmap = pil_to_tensor(heatmap)
         y[heatmap.flatten().bincount()[1:].nonzero()] = 1
-        heatmap = resize(heatmap, const.CAM_SIZE, interpolation=torchvision.transforms.InterpolationMode.NEAREST)[0]
+        heatmap = resize(heatmap, const.CAM_SIZE, interpolation=torchvision.transforms.InterpolationMode.NEAREST_EXACT)[0]
 
         return pil_to_tensor(resize(X, const.IMAGE_SIZE)).to(self.device) / 255, (heatmap.to(self.device), y.to(self.device))
 
