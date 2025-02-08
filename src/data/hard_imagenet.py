@@ -88,7 +88,7 @@ class Dataset(torch.utils.data.Dataset):
         mask[mask > 0] = 1
 
         if not self.eval_mode:
-            mask = trim_mask(mask[0], const.CAM_SIZE, reduce_factor=14, center_bias=2) if self.trim_masks else T.functional.resize(mask, const.CAM_SIZE, interpolation=T.InterpolationMode.NEAREST_EXACT)[0]
+            mask = trim_mask(mask[0], const.CAM_SIZE, reduce_factor=const.HARD_INET_TRIM_FACTOR, center_bias=const.HARD_INET_CENTER_BIAS) if self.trim_masks else T.functional.resize(mask, const.CAM_SIZE, interpolation=T.InterpolationMode.NEAREST_EXACT)[0]
             y = torch.zeros(const.N_CLASSES, device=self.device)
             y[class_ind] = 1
 
@@ -103,7 +103,7 @@ def get_generators():
     random.seed(const.SEED)
     const.SPLITS[1] = 'val'
 
-    dataloaders = *[DataLoader(Dataset(split=split, ft=True, trim_masks=True, device='cpu'), shuffle=True,
+    dataloaders = *[DataLoader(Dataset(split=split, ft=True, trim_masks=const.HARD_INET_TRIM_MASKS, device='cpu'), shuffle=True,
                                num_workers=const.N_WORKERS, pin_memory=True, batch_size=const.BATCH_SIZE) for split in const.SPLITS[:2]], None
 
     const.SPLITS[1] = 'valid'

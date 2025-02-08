@@ -30,22 +30,29 @@ import os
 # overrides by model name; schedule multiple jobs w/o reconfiguration overhead
 def configure(model_name):
     const.MODEL_NAME = model_name
-    const.OPTIMIZER = 'Adam' if 'adam' in const.MODEL_NAME else 'SGD'
-    const.OPTIMIZER = 'Lamb' if 'lamb' in const.MODEL_NAME else const.OPTIMIZER
+
+    if 'adam' in const.MODEL_NAME: const.OPTIMIZER = 'Adam'
+    elif 'sgd' in const.MODEL_NAME: const.OPTIMIZER = 'SGD'
+    elif 'lamb' in const.MODEL_NAME: const.OPTIMIZER = 'Lamb'
+
+    if 'hardimagenet' in const.MODEL_NAME: const.DATASET = 'hardimagenet'
+    elif 'soodimagenet' in const.MODEL_NAME: const.DATASET = 'soodimagenet'
+    elif 'imagenet' in const.MODEL_NAME: const.DATASET = 'imagenet'
+    elif 'sbd' in const.MODEL_NAME: const.DATASET = 'sbd'
+    elif 'oxford' in const.MODEL_NAME: const.DATASET = 'oxford'
+
     const.USE_ZERO = 'zero' in const.MODEL_NAME and const.DDP
     const.EMA = 'ema' in const.MODEL_NAME
     const.DISABLE_BN = 'no_bn' in const.MODEL_NAME
     const.XL_BACKBONE = 'largemodel' in const.MODEL_NAME
-    const.DATASET = 'imagenet' if 'imagenet' in const.MODEL_NAME else 'oxford-iiit'
-    const.DATASET = 'hardimagenet' if 'hardimagenet' in const.MODEL_NAME else const.DATASET
-    const.DATASET = 'soodimagenet' if 'soodimagenet' in const.MODEL_NAME else const.DATASET
-    const.DATASET = 'sbd' if 'sbd' in const.MODEL_NAME else const.DATASET
     const.PRETRAINED_BACKBONE = 'pretrained' in const.MODEL_NAME
+
+    if 'label_smoothing' not in const.MODEL_NAME: const.LABEL_SMOOTHING = 0
+
     if 'ablated_only' in const.MODEL_NAME: const.LAMBDAS[-1] = 0
     elif 'sliced_wasserstein' in const.MODEL_NAME: const.DIVERGENCE = 'sliced_wasserstein'
     elif 'wasserstein' in const.MODEL_NAME: const.DIVERGENCE = 'wasserstein'
     elif 'kld' in const.MODEL_NAME: const.DIVERGENCE = 'kld'
-    if 'label_smoothing' not in const.MODEL_NAME: const.LABEL_SMOOTHING = 0
 
     if const.DATASET == 'imagenet':
         const.N_CLASSES = 1000
@@ -57,6 +64,8 @@ def configure(model_name):
     elif const.DATASET == 'hardimagenet':
         const.N_CLASSES = 15
         const.BINARY_CLS = False
+        const.HARD_INET_TRIM_MASKS = 'trim_masks' in const.MODEL_NAME
+        const.HARD_INET_BALANCED_SUBSET = 'bsubset' in const.MODEL_NAME
     elif const.DATASET == 'soodimagenet':
         const.N_CLASSES = 56
         const.BINARY_CLS = False
