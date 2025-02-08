@@ -30,7 +30,6 @@ class Dataset(torchvision.datasets.SBDataset):
 
 
 def get_generators():
-    torch.multiprocessing.set_start_method('spawn', force=True)
     const.SPLITS[1] = 'val'
 
     dataloaders = *[DataLoader(Dataset(mode='segmentation', image_set=split, device='cpu', download=not (const.DATA_DIR / 'sbd').exists()),

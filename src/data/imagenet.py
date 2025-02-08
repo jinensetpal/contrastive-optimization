@@ -71,7 +71,6 @@ def collate_fn(batch):
 
 
 def get_generators():
-    torch.multiprocessing.set_start_method('spawn', force=True)
     const.SPLITS[1] = 'val'
 
     datasets = [Dataset(split=split, bbox=const.BBOX_MAP, device='cpu') for split in const.SPLITS[:2]]

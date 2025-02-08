@@ -38,7 +38,6 @@ class Dataset(SOODImageNetS):
 
 
 def get_generators(split):
-    torch.multiprocessing.set_start_method('spawn', force=True)
     random.seed(const.SEED)
 
     if split == 'train':

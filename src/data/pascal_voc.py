@@ -23,7 +23,6 @@ class Dataset(torch.utils.data.Dataset):
 
 
 def get_generator():
-    torch.multiprocessing.set_start_method('spawn', force=True)
     return DataLoader(Dataset(device='cpu'), num_workers=const.N_WORKERS, pin_memory=True, batch_size=const.BATCH_SIZE, shuffle=False)
 
 
