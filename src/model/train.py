@@ -109,7 +109,8 @@ def fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=False,
                         X = X.to(const.DEVICE)
                         y = [y_i.to(const.DEVICE) for y_i in y]
 
-                        y_pred = model(X)
+                        with torch.no_grad() if not update_weights and not model.register_backward_hook else nullcontext():
+                            y_pred = model(X)
                         batch_loss = criterion(y_pred, y) if criterion._get_name() == 'ContrastiveLoss' else criterion(y_pred[0], y[1])
 
                         if is_multilabel:
@@ -153,7 +154,7 @@ def fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=False,
 
             if const.DDP:
                 dist_metrics = [json.loads(store.get(f'metric_{rank}')) for rank in range(int(os.environ['WORLD_SIZE']))]
-                metrics = {key: np.mean([metric[key] for metric in dist_metrics]) for key in metrics.keys()}
+                metrics = {key: np.mean([metric[key] for metric in dist_metrics]) for key in metrics}
 
             metrics['lr'] = scheduler.get_last_lr()[-1]
             mlflow.log_metrics(metrics, synchronous=False, step=epoch-1)

@@ -8,11 +8,13 @@ import torch
 
 class Model(nn.Module):
     def __init__(self, randomized_flatten=const.RANDOMIZED_FLATTEN, multilabel=False, logits_only=False, disable_bn=const.DISABLE_BN,
-                 hardinet_eval=False, xl_backbone=const.XL_BACKBONE, device=const.DEVICE, is_contrastive=True, upsampling_level=1):
+                 register_backward_hook=False, hardinet_eval=False, xl_backbone=const.XL_BACKBONE, device=const.DEVICE, is_contrastive=True,
+                 segmentation_threshold=const.SEGMENTATION_THRESHOLD, upsampling_level=1):
         super().__init__()
 
-        self.segmentation_threshold = const.SEGMENTATION_THRESHOLD
-        self.randomized_flatten = const.RANDOMIZED_FLATTEN
+        self.segmentation_threshold = segmentation_threshold
+        self.register_backward_hook = register_backward_hook
+        self.randomized_flatten = randomized_flatten
         self.is_contrastive = is_contrastive
         self.hardinet_eval = hardinet_eval
         self.disable_bn = disable_bn
@@ -65,7 +67,7 @@ class Model(nn.Module):
         def assign(grad):
             self.feature_grad = grad
         self.feature_rect = o
-        o.register_hook(assign)
+        if self.register_backward_hook: o.register_hook(assign)
 
     def forward(self, x):
         x = self.backbone(x)

@@ -57,17 +57,17 @@ class ContrastiveLoss(nn.Module):
         directions /= directions.pow(2).sum(1, keepdim=True).sqrt()
         directions = torch.hstack((directions, torch.ones(n_directions, 1, device=const.DEVICE)))
 
-        mask_projections = torch.einsum('bdn,md->bmn', target_mask, directions)
-        divergence = mask_projections - torch.einsum('bdn,md->bmn', cc, directions)
+        sorted_mask_projections = torch.einsum('bdn,md->bmn', target_mask, directions).sort(2)[0]
+        divergence = sorted_mask_projections - torch.einsum('bdn,md->bmn', cc, directions).sort(2)[0]
 
         if self.multilabel and not self.pos_only:
-            divergence[target_mask[:, 1].to(torch.bool).unsqueeze(1).repeat(1, n_directions, 1) & (mask_projections != 0) & (divergence < 0)] = 0
+            divergence[target_mask[:, 1].to(torch.bool).unsqueeze(1).repeat(1, n_directions, 1) & (sorted_mask_projections != 0) & (divergence < 0)] = 0
             divergence[(1 - target_mask[:, 1]).to(torch.bool).unsqueeze(1).repeat(1, n_directions, 1) & (divergence > 0)] = 0
             divergence = divergence.abs()
         else:   # (pos_only & multilabel) | contrastive
-            overactivations_mask = (mask_projections != 0) & (divergence < 0)
+            overactivations_mask = (sorted_mask_projections != 0) & (divergence < 0)
             divergence[overactivations_mask] = -(divergence[overactivations_mask] / 1E1).pow(2)
-            divergence[(mask_projections == 0) & (divergence < 0)] *= -1
+            divergence[(sorted_mask_projections == 0) & (divergence < 0)] *= -1
         return (divergence).mean()
 
     def wasserstein(self, cc, fg_mask, y, y_pred):

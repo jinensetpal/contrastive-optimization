@@ -23,7 +23,7 @@ with open(_MASK_ROOT/'meta/hard_imagenet_idx.pkl', 'rb') as f:
 
 
 class Dataset(torch.utils.data.Dataset):
-    def __init__(self, split='val', ft=False, balanced_subset=True, device=const.DEVICE, eval_mode=False, trim_masks=False):
+    def __init__(self, split='val', ft=False, balanced_subset=False, device=const.DEVICE, eval_mode=False, trim_masks=False):
         '''
         Returns original ImageNet index when ft is False, otherwise returns label between 0 and 14
         '''

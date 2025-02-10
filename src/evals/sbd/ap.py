@@ -5,6 +5,7 @@ from torch.utils.data import DataLoader
 from src.data.sbd import Dataset
 from src.model.arch import Model
 from src import const
+import random
 import torch
 import sys
 
@@ -42,12 +43,15 @@ def average_precision(model, gen, debug=False):
 
 
 if __name__ == '__main__':
+    random.seed(const.SEED)
     name = sys.argv[1]
 
     model = Model(is_contrastive='default' not in name, multilabel=True, xl_backbone=False, logits_only=True)
     model.load_state_dict(torch.load(const.MODELS_DIR / f'{name}.pt', map_location=const.DEVICE, weights_only=True))
     model.name = name
+
+    model.disable_batchnorms()
     model.eval()
 
     torch.multiprocessing.set_start_method('spawn', force=True)
-    print(average_precision(model, DataLoader(Dataset(mode='segmentation', image_set=sys.argv[2]), batch_size=const.BATCH_SIZE, num_workers=const.N_WORKERS, shuffle=False), debug=len(sys.argv) == 4))
+    print(average_precision(model, DataLoader(Dataset(mode='segmentation', image_set=sys.argv[2]), batch_size=const.BATCH_SIZE, num_workers=const.N_WORKERS, shuffle=True), debug=len(sys.argv) == 4))

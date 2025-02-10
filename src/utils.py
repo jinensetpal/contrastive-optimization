@@ -54,10 +54,10 @@ def trim_mask(mask, cam_size, reduce_factor=4, center_bias=1):
     t2 = r2 + 1
 
     target_pad = cam_size[0] - small_mask.size(1)
-    return T.functional.pad(small_mask, (int((target_pad * r1 / t1).round()),
-                                         int((target_pad * r2 / t2).round()),
-                                         int((target_pad * (1 - r1 / t1)).round()),
-                                         int((target_pad * (1 - r2 / t2)).round())))[0]
+    return T.functional.pad(small_mask, (int((target_pad * r1 / t1 + 1E-4).round()),
+                                         int((target_pad * r2 / t2 + 1E-4).round()),
+                                         int((target_pad * (1 - r1 / t1) - 1E-4).round()),
+                                         int((target_pad * (1 - r2 / t2) - 1E-4).round())))[0]
 
 
 def get_open_port():
