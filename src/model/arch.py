@@ -21,17 +21,18 @@ class Model(nn.Module):
         if xl_backbone: self.backbone = torchvision.models.resnet152(weights=torchvision.models.ResNet152_Weights.IMAGENET1K_V2 if const.PRETRAINED_BACKBONE else None)
         else: self.backbone = torchvision.models.resnet50(weights=torchvision.models.ResNet50_Weights.IMAGENET1K_V2 if const.PRETRAINED_BACKBONE else None)
 
-        if upsampling_level >= 1:
+        if upsampling_level >= 1 or upsampling_level <= -5:
             self.backbone.layer4[0].conv2.stride = (1, 1)
             self.backbone.layer4[0].downsample[0].stride = (1, 1)
-        if upsampling_level >= 2:
+        if upsampling_level >= 2 or upsampling_level <= -4:
             self.backbone.layer3[0].conv2.stride = (1, 1)
             self.backbone.layer3[0].downsample[0].stride = (1, 1)
-        if upsampling_level >= 3:
+        if upsampling_level >= 3 or upsampling_level <= -3:
             self.backbone.layer2[0].conv2.stride = (1, 1)
             self.backbone.layer2[0].downsample[0].stride = (1, 1)
-        if upsampling_level >= 4:
+        if upsampling_level >= 4 or upsampling_level <= -2:
             self.backbone.conv1.stride = (1, 1)
+        if upsampling_level >= 5 or upsampling_level <= -1:
             self.backbone.maxpool.stride = 1
 
         if is_contrastive:
@@ -100,8 +101,7 @@ class Model(nn.Module):
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
 
-    model = Model(disable_bn=True, upsampling_level=3)
-    # model.backbone.maxpool = nn.Identity()
+    model = Model(disable_bn=True, upsampling_level=const.UPSAMPLING_LEVEL)
     print(model)
 
     x = torch.rand(1, *const.IMAGE_SHAPE, device=const.DEVICE, requires_grad=True)

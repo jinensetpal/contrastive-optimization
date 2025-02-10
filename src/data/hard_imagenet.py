@@ -103,7 +103,8 @@ def get_generators():
     random.seed(const.SEED)
     const.SPLITS[1] = 'val'
 
-    dataloaders = *[DataLoader(Dataset(split=split, ft=True, trim_masks=const.HARD_INET_TRIM_MASKS, device='cpu'), shuffle=True,
+    dataloaders = *[DataLoader(Dataset(split=split, ft=True, balanced_subset=const.HARD_INET_BALANCED_SUBSET,
+                                       trim_masks=const.HARD_INET_TRIM_MASKS, device='cpu'), shuffle=True,
                                num_workers=const.N_WORKERS, pin_memory=True, batch_size=const.BATCH_SIZE) for split in const.SPLITS[:2]], None
 
     const.SPLITS[1] = 'valid'
