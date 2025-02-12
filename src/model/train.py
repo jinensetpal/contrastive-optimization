@@ -44,6 +44,7 @@ def configure(model_name):
     const.USE_ZERO = 'zero' in const.MODEL_NAME and const.DDP
     const.EMA = 'ema' in const.MODEL_NAME
     const.DISABLE_BN = 'no_bn' in const.MODEL_NAME
+    const.MODIFY_BN = 'mod_bn' in const.MODEL_NAME
     const.XL_BACKBONE = 'largemodel' in const.MODEL_NAME
     const.PRETRAINED_BACKBONE = 'pretrained' in const.MODEL_NAME
 

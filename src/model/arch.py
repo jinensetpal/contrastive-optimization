@@ -6,10 +6,52 @@ import torchvision
 import torch
 
 
+# modified from: https://github.com/ptrblck/pytorch_misc/blob/master/batch_norm_manual.py
+class ModifiedBN2d(torch.nn.modules.batchnorm._BatchNorm):
+    def __init__(self, num_features, eps=1e-5, momentum=0.1, affine=True, track_running_stats=True):
+        super(ModifiedBN2d, self).__init__(num_features, eps, momentum, affine, track_running_stats)
+
+    def _check_input_dim(self, input):
+        if input.dim() != 4:
+            raise ValueError(f"expected 4D input (got {input.dim()}D input)")
+
+    def forward(self, input):
+        self._check_input_dim(input)
+
+        exponential_average_factor = 0.0
+
+        if self.training and self.track_running_stats:
+            if self.num_batches_tracked is not None:
+                self.num_batches_tracked += 1
+                if self.momentum is None:  # use cumulative moving average
+                    exponential_average_factor = 1.0 / float(self.num_batches_tracked)
+                else:  # use exponential moving average
+                    exponential_average_factor = self.momentum
+
+        input = (input - self.running_mean[None, :, None, None]) / (torch.sqrt(self.running_var[None, :, None, None] + self.eps))
+        if self.affine:
+            input = input * self.weight[None, :, None, None] + self.bias[None, :, None, None]
+
+        # calculate running estimates
+        if self.training:
+            mean = input.mean([0, 2, 3])
+            # use biased var in train
+            var = input.var([0, 2, 3], unbiased=False)
+            n = input.numel() / input.size(1)
+            with torch.no_grad():
+                self.running_mean = exponential_average_factor * mean\
+                    + (1 - exponential_average_factor) * self.running_mean
+                # update running_var with unbiased var
+                self.running_var = exponential_average_factor * var * n / (n - 1)\
+                    + (1 - exponential_average_factor) * self.running_var
+
+        return input
+
+
 class Model(nn.Module):
-    def __init__(self, randomized_flatten=const.RANDOMIZED_FLATTEN, multilabel=False, logits_only=False, disable_bn=const.DISABLE_BN,
-                 register_backward_hook=False, hardinet_eval=False, xl_backbone=const.XL_BACKBONE, device=const.DEVICE, is_contrastive=True,
-                 segmentation_threshold=const.SEGMENTATION_THRESHOLD, upsampling_level=1):
+    def __init__(self, randomized_flatten=const.RANDOMIZED_FLATTEN, multilabel=False, logits_only=False,
+                 disable_bn=const.DISABLE_BN, modified_bn=const.MODIFY_BN, register_backward_hook=False, hardinet_eval=False, xl_backbone=const.XL_BACKBONE,
+                 device=const.DEVICE, is_contrastive=True, segmentation_threshold=const.SEGMENTATION_THRESHOLD, upsampling_level=1):
         super().__init__()
 
         self.segmentation_threshold = segmentation_threshold
@@ -20,8 +62,13 @@ class Model(nn.Module):
         self.disable_bn = disable_bn
         self.device = device
 
+        self._orig_bn = nn.BatchNorm2d
+        if modified_bn: nn.BatchNorm2d = ModifiedBN2d
+
         if xl_backbone: self.backbone = torchvision.models.resnet152(weights=torchvision.models.ResNet152_Weights.IMAGENET1K_V2 if const.PRETRAINED_BACKBONE else None)
         else: self.backbone = torchvision.models.resnet50(weights=torchvision.models.ResNet50_Weights.IMAGENET1K_V2 if const.PRETRAINED_BACKBONE else None)
+
+        nn.BatchNorm2d = self._orig_bn
 
         if upsampling_level >= 1 or upsampling_level <= -5:
             self.backbone.layer4[0].conv2.stride = (1, 1)
@@ -103,7 +150,7 @@ class Model(nn.Module):
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
 
-    model = Model(disable_bn=True, upsampling_level=const.UPSAMPLING_LEVEL)
+    model = Model(disable_bn=False, upsampling_level=const.UPSAMPLING_LEVEL)
     print(model)
 
     x = torch.rand(1, *const.IMAGE_SHAPE, device=const.DEVICE, requires_grad=True)

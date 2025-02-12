@@ -46,6 +46,7 @@ RANDOMIZED_FLATTEN = False
 UPSAMPLING_LEVEL = -2  # -ve changes direction not magnitude
 XL_BACKBONE = False
 DISABLE_BN = False
+MODIFY_BN = True
 
 # training
 DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
