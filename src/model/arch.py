@@ -28,9 +28,8 @@ class ModifiedBN2d(torch.nn.modules.batchnorm._BatchNorm):
                 else:  # use exponential moving average
                     exponential_average_factor = self.momentum
 
-        input = (input - self.running_mean[None, :, None, None]) / (torch.sqrt(self.running_var[None, :, None, None] + self.eps))
-        if self.affine:
-            input = input * self.weight[None, :, None, None] + self.bias[None, :, None, None]
+        mean = self.running_mean.clone()
+        var = self.running_var.clone()
 
         # calculate running estimates
         if self.training:
@@ -44,6 +43,10 @@ class ModifiedBN2d(torch.nn.modules.batchnorm._BatchNorm):
                 # update running_var with unbiased var
                 self.running_var = exponential_average_factor * var * n / (n - 1)\
                     + (1 - exponential_average_factor) * self.running_var
+
+        input = (input - mean[None, :, None, None]) / (torch.sqrt(var[None, :, None, None] + self.eps))
+        if self.affine:
+            input = input * self.weight[None, :, None, None] + self.bias[None, :, None, None]
 
         return input
 

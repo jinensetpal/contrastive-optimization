@@ -110,7 +110,7 @@ def fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=False,
                         X = X.to(const.DEVICE)
                         y = [y_i.to(const.DEVICE) for y_i in y]
 
-                        with torch.no_grad() if not update_weights and not model.register_backward_hook else nullcontext():
+                        with torch.no_grad() if not update_weights and not (model.module.register_backward_hook if const.DDP else model.register_backward_hook) else nullcontext():
                             y_pred = model(X)
                         batch_loss = criterion(y_pred, y) if criterion._get_name() == 'ContrastiveLoss' else criterion(y_pred[0], y[1])
 
@@ -224,7 +224,7 @@ if __name__ == '__main__':
     elif const.DATASET == 'sbd': train, val, _ = sbd()
     else: train, val, test = oxford_iiit_pet()
 
-    model = Model(is_contrastive=is_contrastive, multilabel=is_multilabel, xl_backbone=const.XL_BACKBONE, upsampling_level=const.UPSAMPLING_LEVEL, logits_only=True).to(const.DEVICE)
+    model = Model(is_contrastive=is_contrastive, multilabel=is_multilabel, xl_backbone=const.XL_BACKBONE, upsampling_level=const.UPSAMPLING_LEVEL, logits_only=True, disable_bn=const.DISABLE_BN, modified_bn=const.MODIFY_BN).to(const.DEVICE)
     ema = optim.swa_utils.AveragedModel(model, device=const.DEVICE, avg_fn=optim.swa_utils.get_ema_avg_fn(1 - min(1, (1 - const.EMA_DECAY) * const.BATCH_SIZE * const.EMA_STEPS / const.EPOCHS)), use_buffers=True) if const.EMA else None
 
     if is_contrastive: criterion = ContrastiveLoss(model.get_contrastive_cams, is_label_mask=const.USE_CUTMIX, multilabel=is_multilabel, divergence=const.DIVERGENCE,
