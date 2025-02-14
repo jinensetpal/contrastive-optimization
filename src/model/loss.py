@@ -63,12 +63,9 @@ class ContrastiveLoss(nn.Module):
         if self.multilabel and not self.pos_only:
             divergence[target_mask[:, 1].to(torch.bool).unsqueeze(1).repeat(1, n_directions, 1) & (sorted_mask_projections != 0) & (divergence < 0)] = 0
             divergence[(1 - target_mask[:, 1]).to(torch.bool).unsqueeze(1).repeat(1, n_directions, 1) & (divergence > 0)] = 0
-            divergence = divergence.abs()
         else:   # (pos_only & multilabel) | contrastive
-            overactivations_mask = (sorted_mask_projections != 0) & (divergence < 0)
-            divergence[overactivations_mask] = -(divergence[overactivations_mask] / 1E1).pow(2)
-            divergence[(sorted_mask_projections == 0) & (divergence < 0)] *= -1
-        return (divergence).mean()
+            divergence[(sorted_mask_projections != 0) & (divergence < 0)] = 0
+        return divergence.pow(2).mean()
 
     def wasserstein(self, cc, fg_mask, y, y_pred):
         fg_mask = fg_mask.to(torch.float)
