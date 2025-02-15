@@ -20,7 +20,7 @@ N_WORKERS = 3
 N_CHANNELS = 3
 BBOX_MAP = False
 BINARY_CLS = True
-DATASET = 'hardimagenet'
+DATASET = 'salientimagenet'
 CAM_SIZE = (28, 28)
 VAL_CROP_SIZE = 224
 VAL_RESIZE_SIZE = 232
@@ -29,12 +29,14 @@ IMAGE_SIZE = (224, 224)
 SPLITS = ['train', 'valid', 'test']
 IMAGE_SHAPE = (N_CHANNELS,) + IMAGE_SIZE
 
+SAL_INET_MASK_THRESHOLD = .75
 HARD_INET_BALANCED_SUBSET = False
 HARD_INET_TRIM_MASKS = False
 HARD_INET_TRIM_FACTOR = 12
 HARD_INET_CENTER_BIAS = 2
 
 if DATASET == 'imagenet': N_CLASSES = 1000
+elif DATASET == 'salientimagenet': N_CLASSES = 1000
 elif DATASET == 'hardimagenet': N_CLASSES = 15
 elif DATASET == 'soodimagenet': N_CLASSES = 56
 elif DATASET == 'sbd': N_CLASSES = 20
@@ -51,7 +53,7 @@ MODIFY_BN = True
 # training
 DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 TRAIN_CUTOFF = 12600  # max training time in seconds
-LAMBDAS = [5, 0, 1, 5]  # means different things for different approaches
+LAMBDAS = [5, 0, 0, 1]  # means different things for different approaches
 POS_ONLY = False and DATASET == 'sbd'  # (multilabel only) restrict divergence loss to just positive classes
 GRAD_ACCUMULATION_STEPS = 1
 PORT = get_open_port()

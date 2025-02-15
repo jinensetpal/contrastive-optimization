@@ -6,7 +6,7 @@ import torchvision
 import torch
 
 
-# modified from: https://github.com/ptrblck/pytorch_misc/blob/master/batch_norm_manual.py
+# code modified from: https://github.com/ptrblck/pytorch_misc/blob/master/batch_norm_manual.py
 class ModifiedBN2d(torch.nn.modules.batchnorm._BatchNorm):
     def __init__(self, num_features, eps=1e-5, momentum=0.1, affine=True, track_running_stats=True):
         super(ModifiedBN2d, self).__init__(num_features, eps, momentum, affine, track_running_stats)

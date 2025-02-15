@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from ..data.salient_imagenet import get_generators as salientimagenet
 from ..data.oxford_iiit_pet import get_generators as oxford_iiit_pet
 from ..data.hard_imagenet import get_generators as hardimagenet
 from ..data.soodimagenet import get_generators as soodimagenet
@@ -37,6 +38,7 @@ def configure(model_name):
 
     if 'hardimagenet' in const.MODEL_NAME: const.DATASET = 'hardimagenet'
     elif 'soodimagenet' in const.MODEL_NAME: const.DATASET = 'soodimagenet'
+    elif 'salientimagenet' in const.MODEL_NAME: const.DATASET = 'salientimagenet'
     elif 'imagenet' in const.MODEL_NAME: const.DATASET = 'imagenet'
     elif 'sbd' in const.MODEL_NAME: const.DATASET = 'sbd'
     elif 'oxford' in const.MODEL_NAME: const.DATASET = 'oxford'
@@ -67,6 +69,10 @@ def configure(model_name):
         const.BINARY_CLS = False
         const.HARD_INET_TRIM_MASKS = 'trim_masks' in const.MODEL_NAME
         const.HARD_INET_BALANCED_SUBSET = 'bsubset' in const.MODEL_NAME
+    elif const.DATASET == 'salientimagenet':
+        const.N_CLASSES = 1000
+        const.BINARY_CLS = False
+        const.HARD_INET_TRIM_MASKS = 'trim_masks' in const.MODEL_NAME
     elif const.DATASET == 'soodimagenet':
         const.N_CLASSES = 56
         const.BINARY_CLS = False
@@ -220,6 +226,7 @@ if __name__ == '__main__':
 
     if const.DATASET == 'imagenet': train, val, _ = imagenet()
     elif const.DATASET == 'soodimagenet': train, val, _ = soodimagenet('train')
+    elif const.DATASET == 'salientimagenet': train, val, _ = salientimagenet()
     elif const.DATASET == 'hardimagenet': train, val, _ = hardimagenet()
     elif const.DATASET == 'sbd': train, val, _ = sbd()
     else: train, val, test = oxford_iiit_pet()

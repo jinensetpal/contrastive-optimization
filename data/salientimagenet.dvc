@@ -1,0 +1,6 @@
+outs:
+- md5: 01c66d766b8667008ddf7401c311ce57.dir
+  size: 1670261680
+  nfiles: 326003
+  hash: md5
+  path: salientimagenet
