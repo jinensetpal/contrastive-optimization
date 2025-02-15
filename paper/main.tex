@@ -55,7 +55,7 @@
 \newtheorem{remark}[theorem]{Remark}
 
 \title{Interpretable Casual Interventions \\
-Encourage Core Risk Minimization}
+Discourage Spurious Learning}
 
 % The \author macro works with any number of authors. There are two commands
 % used to separate the names and addresses of multiple authors: \And and \AND.
@@ -115,15 +115,23 @@ Encourage Core Risk Minimization}
 
 \section{Background \& Motivation}
 
-The standard optimization pipeline for image classification predominantly consists of using a CNN-backbone with a fully-connected layer pointing to the classification targets.
+Neural architectures for image classification tasks predominantly consist of: a) convolutional approaches, i.e.~convolutional backbones with fully-connected layers transforming feature maps to logit space, and b) transformer based approaches \citep{alexey2020image}. Our exposition follows the first setup.
 
-This setup is vulnerable to spurious correlation caused by features like a common background, causing the model to learn `tricks', bypassing actually learning the target features. A simple example is illustrated in the second paragraph of the introduction in \cite{arjovsky2020invariantriskminimization}.
+\cite{singla2022salient} demonstrate that convolutional architectures are vulnerable to learning spurious correlations caused by features such as a common background, causing the model to learn `tricks', preventing it from actually learning the target features, a consequence of which is poor out-of-distribution generalization. A simple example of spurious learning is illustrated in the second paragraph of the introduction in \cite{arjovsky2020invariantriskminimization}.
 
-A popular post-hoc technique -- Class Activation Mappings \citep{zhou2016learning} -- helps diagnose this by generating a heatmap that visualizes the regions of the image used by the model to generate the prediction. Further research uncovered that the interpretation used by CAMs, and it's derivative GradCAMs were unfaithful as a consequence of the averaging step.
+A popular post-hoc interpretability technique -- Class Activation Mappings (CAMs) \citep{zhou2016learning} -- helps diagnose this by generating a heatmap that visualizes the regions of the image used by the model to generate the prediction. \cite{draelos2020use} uncovered that the interpretation offered by CAMs and it's derivative GradCAMs \citep{selvaraju2017grad} were unfaithful as a consequence of the averaging step.
 
-HiResCAM \citep{draelos2020use} is a variant of GradCAM \citep{selvaraju2017grad} that demonstrates that their visualization \textbf{provably recovers the input-dependent abnormality score} from the final classification. Therefore, there is a guarantee associated with the faithfulness of the visualization.
+HiResCAMs \citep{draelos2020use} is a variant of GradCAMs \citep{selvaraju2017grad} that provides an interpretation that \textbf{provably recovers the input-dependent abnormality score} from the final classification. Therefore, there is a guarantee associated with the faithfulness of the visualization.
 
-This approach derives an interpretable training objective using HiResCAMs, which replaces and outperforms cross-entropy loss to build an intrinsically interpretable, performant model.
+We demonstrate that the normalizing behavior of softmax during the forward pass introduces conditions where an interpretation obtained from HiResCAMs fails to convey the true factors that contribute towards a prediction. To correct this, we propose an interpretability technique -- \textbf{ContrastiveCAMs} -- which reconstructs provably faithful activation mappings in the multiclass setting.
+
+We prove using ContrastiveCAMs that the default training behavior of Batch Normalization \citep{ioffe2015batch} \underline{breaks the locality principle of convolutional networks}, and instead motivate the use of Running Batch Normalization \citep{jermeyhowardlesson10}, computed causally to recover locality.
+
+Using ContrastiveCAMs, we also argue that Cross-Entropy Loss \citep{cox1958regression, mao2023cross} \textbf{motivates learning spurious correlations}, especially in settings where the target represents a small portion of the image. We further introduce an interpretable training objective with ContrastiveCAMs, which is equivalent to Core Risk Minimization \citep{singla2022core}.
+
+Next, we present a ContrastiveCAM-based intervention to the model's logits, applied during training, which enables cross-entropy loss to implicitly optimize for multiple objectives. It must: a) \textbf{learn an invariance} to a user-specified non-target region \underline{despite any presence of strong spurious factors}, and b) \textbf{learn to generate contrast} within the user-specified target region to fulfill the classification task.
+
+Finally, we observe that the Cross-Entropy Loss only motivates generating contrast over regions that describe dataset-specific inter-class differences, and therefore propose distance based loss functions that outperforms Cross-Entropy Loss in both in-distribution and out-of-distribution settings.
 
 \section{Methodology}
 
@@ -494,7 +502,8 @@ The contrastive model was trained for 227 epochs with the Adam optimizer with a 
 		CORM + DFR & 91.31 & 72.59 & 63.64 & 63.90 & -0.23 \\
 		\midrule
 		ACE (Ours) & 89.20 & 47.33 & 34.27 & 34.93 & 0.21 \\
-		ACE + SWD (Ours) & 91.20 & \bf 38.27 & \bf 27.20 & \bf 33.60 & \bf 0.31 \\
+		ACE + SWD (Ours) & 91.20 & \bf 36.13 & \bf 27.20 & \bf 31.60 & \bf 0.28 \\
+		ACE + SWD + RevUPs (Ours) & 75.86 & \bf 10.40 & \bf 09.86 & \bf 13.19 & \bf 0.57 \\
 		\bottomrule
 	\end{tabular}
 \end{table}
@@ -601,14 +610,14 @@ In addition to cross-entropy, we also adapted training methodologies from \citet
 
 \subsection{Contrastive CutMix}
 
-CutMix\cite{yun2019cutmix} is a batch-wise augmentation technique that encourages better regularization by a) ``cutting'' out a randomized rectangle (randomized portion remaining consistent across the batch) of a given image and b) ``mixing'' the cut-out with it's neighbor. The corresponding labels are mixed by a randomly sampled parameter $\lambda$. For our experiments, $\lambda \sim \text{Uniform}(0,1)$.
+CutMix \citep{yun2019cutmix} is a batch-wise augmentation technique that encourages better regularization by a) ``cutting'' out a randomized rectangle (randomized portion remaining consistent across the batch) of a given image and b) ``mixing'' the cut-out with it's neighbor. The corresponding labels are mixed by a randomly sampled parameter $\lambda$. For our experiments, $\lambda \sim \text{Uniform}(0,1)$.
 
 \begin{figure}[h!]
 	\centering
 	\includegraphics[width=\textwidth]{img/cutmix}
 \end{figure}
 
-CutMix can be effectively adapted to work with our setup: given a cut-out, we motivate differential contrast; if non-target pixels are contained in the new image, irresepective of the label, contrast should be generated in favor of the non-target class for the non-target, foreground subset of pixels. This affects the downstream prediction confidence, representative of the label being shifted from one-hot encoding to a randomized affine combination.
+CutMix can be effectively adapted to work with our setup: given a cut-out, we motivate differential contrast; if non-target pixels are contained in the new image, irrespective of the label, contrast should be generated in favor of the non-target class for the non-target, foreground subset of pixels. This affects the downstream prediction confidence, representative of the label being shifted from one-hot encoding to a randomized affine combination.
 
 Let segmentation mask $h$ take the following form:
 \begin{gather*}
