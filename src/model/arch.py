@@ -28,8 +28,8 @@ class ModifiedBN2d(torch.nn.modules.batchnorm._BatchNorm):
                 else:  # use exponential moving average
                     exponential_average_factor = self.momentum
 
-        mean = self.running_mean.clone()
-        var = self.running_var.clone()
+        fp_mean = self.running_mean.clone()
+        fp_var = self.running_var.clone()
 
         # calculate running estimates
         if self.training:
@@ -44,7 +44,7 @@ class ModifiedBN2d(torch.nn.modules.batchnorm._BatchNorm):
                 self.running_var = exponential_average_factor * var * n / (n - 1)\
                     + (1 - exponential_average_factor) * self.running_var
 
-        input = (input - mean[None, :, None, None]) / (torch.sqrt(var[None, :, None, None] + self.eps))
+        input = (input - fp_mean[None, :, None, None]) / (torch.sqrt(fp_var[None, :, None, None] + self.eps))
         if self.affine:
             input = input * self.weight[None, :, None, None] + self.bias[None, :, None, None]
 
@@ -95,7 +95,7 @@ class Model(nn.Module):
         self.linear = nn.Linear(2048, const.N_CLASSES, bias=not is_contrastive)
         self.probabilities = nn.Identity() if logits_only else nn.Softmax(dim=1) if not multilabel else nn.Sigmoid()
 
-        if const.DATASET == 'imagenet' and const.PRETRAINED_BACKBONE:
+        if const.DATASET in ['imagenet', 'salientimagenet'] and const.PRETRAINED_BACKBONE:
             self.linear.weight = self.backbone.fc.weight
             if not is_contrastive: self.linear.bias = self.backbone.fc.bias
         self.backbone.fc = nn.Identity()
@@ -153,7 +153,7 @@ class Model(nn.Module):
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
 
-    model = Model(disable_bn=False, upsampling_level=const.UPSAMPLING_LEVEL)
+    model = Model(disable_bn=False, modified_bn=True, upsampling_level=const.UPSAMPLING_LEVEL)
     print(model)
 
     x = torch.rand(1, *const.IMAGE_SHAPE, device=const.DEVICE, requires_grad=True)
