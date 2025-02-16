@@ -31,18 +31,14 @@ class ModifiedBN2d(torch.nn.modules.batchnorm._BatchNorm):
         fp_mean = self.running_mean.clone()
         fp_var = self.running_var.clone()
 
-        # calculate running estimates
         if self.training:
             mean = input.mean([0, 2, 3])
-            # use biased var in train
             var = input.var([0, 2, 3], unbiased=False)
             n = input.numel() / input.size(1)
+
             with torch.no_grad():
-                self.running_mean = exponential_average_factor * mean\
-                    + (1 - exponential_average_factor) * self.running_mean
-                # update running_var with unbiased var
-                self.running_var = exponential_average_factor * var * n / (n - 1)\
-                    + (1 - exponential_average_factor) * self.running_var
+                self.running_mean = exponential_average_factor * mean + (1 - exponential_average_factor) * self.running_mean
+                self.running_var = exponential_average_factor * var * n / (n - 1) + (1 - exponential_average_factor) * self.running_var
 
         input = (input - fp_mean[None, :, None, None]) / (torch.sqrt(fp_var[None, :, None, None] + self.eps))
         if self.affine:
@@ -102,6 +98,12 @@ class Model(nn.Module):
 
         self.to(self.device)
         if disable_bn: self.disable_batchnorms()
+
+        if modified_bn:
+            for x in self.modules():
+                if x._get_name() == 'ModifiedBN2d':
+                    x.reset_parameters()
+                    x.reset_running_stats()
 
     def disable_batchnorms(self):
         for x in self.modules():
