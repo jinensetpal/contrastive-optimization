@@ -28,9 +28,6 @@ class ModifiedBN2d(torch.nn.modules.batchnorm._BatchNorm):
                 else:  # use exponential moving average
                     exponential_average_factor = self.momentum
 
-        fp_mean = self.running_mean.clone()
-        fp_var = self.running_var.clone()
-
         if self.training:
             mean = input.mean([0, 2, 3])
             var = input.var([0, 2, 3], unbiased=False)
@@ -40,7 +37,7 @@ class ModifiedBN2d(torch.nn.modules.batchnorm._BatchNorm):
                 self.running_mean = exponential_average_factor * mean + (1 - exponential_average_factor) * self.running_mean
                 self.running_var = exponential_average_factor * var * n / (n - 1) + (1 - exponential_average_factor) * self.running_var
 
-        input = (input - fp_mean[None, :, None, None]) / (torch.sqrt(fp_var[None, :, None, None] + self.eps))
+        input = (input - self.running_mean[None, :, None, None]) / (torch.sqrt(self.running_var[None, :, None, None] + self.eps))
         if self.affine:
             input = input * self.weight[None, :, None, None] + self.bias[None, :, None, None]
 
@@ -165,5 +162,5 @@ if __name__ == '__main__':
     for i in range(cam.size(1)):
         cam[0][i][cam.size(2) // 2, cam.size(3) // 2].backward(inputs=x, retain_graph=True)
 
-    plt.imshow(x.grad[0].abs().sum(0).detach().cpu())
+    plt.imshow(x.grad[0].abs().mean(0).detach().cpu())
     plt.show()

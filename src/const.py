@@ -20,7 +20,7 @@ N_WORKERS = 3
 N_CHANNELS = 3
 BBOX_MAP = False
 BINARY_CLS = True
-DATASET = 'salientimagenet'
+DATASET = 'hardimagenet'
 CAM_SIZE = (28, 28)
 VAL_CROP_SIZE = 224
 VAL_RESIZE_SIZE = 232
@@ -48,7 +48,7 @@ RANDOMIZED_FLATTEN = False
 UPSAMPLING_LEVEL = -2  # -ve changes direction not magnitude
 XL_BACKBONE = False
 DISABLE_BN = False
-MODIFY_BN = True
+MODIFY_BN = False
 
 # training
 DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
