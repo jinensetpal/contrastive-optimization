@@ -29,15 +29,18 @@ class ModifiedBN2d(torch.nn.modules.batchnorm._BatchNorm):
                     exponential_average_factor = self.momentum
 
         if self.training:
-            mean = input.mean([0, 2, 3])
-            var = input.var([0, 2, 3], unbiased=False)
-            n = input.numel() / input.size(1)
-
             with torch.no_grad():
+                mean = input.mean([0, 2, 3])
+                var = input.var([0, 2, 3], unbiased=False)
+                n = input.numel() / input.size(1)
+
                 self.running_mean = exponential_average_factor * mean + (1 - exponential_average_factor) * self.running_mean
                 self.running_var = exponential_average_factor * var * n / (n - 1) + (1 - exponential_average_factor) * self.running_var
+        else:
+            mean = self.running_mean
+            var = self.running_var
 
-        input = (input - self.running_mean[None, :, None, None]) / (torch.sqrt(self.running_var[None, :, None, None] + self.eps))
+        input = (input - mean[None, :, None, None]) / (torch.sqrt(var[None, :, None, None] + self.eps))
         if self.affine:
             input = input * self.weight[None, :, None, None] + self.bias[None, :, None, None]
 
@@ -55,6 +58,7 @@ class Model(nn.Module):
         self.randomized_flatten = randomized_flatten
         self.is_contrastive = is_contrastive
         self.hardinet_eval = hardinet_eval
+        self.modified_bn = modified_bn
         self.disable_bn = disable_bn
         self.device = device
 
@@ -93,14 +97,14 @@ class Model(nn.Module):
             if not is_contrastive: self.linear.bias = self.backbone.fc.bias
         self.backbone.fc = nn.Identity()
 
-        self.to(self.device)
         if disable_bn: self.disable_batchnorms()
-
         if modified_bn:
             for x in self.modules():
                 if x._get_name() == 'ModifiedBN2d':
                     x.reset_parameters()
                     x.reset_running_stats()
+
+        self.to(self.device)
 
     def disable_batchnorms(self):
         for x in self.modules():
@@ -147,6 +151,19 @@ class Model(nn.Module):
         self.feature_rect = None
 
         return cams
+
+    def update_tracked_statistics(self, gen):
+        for x in self.modules():
+            if x._get_name() in ['ModifiedBN2d', 'BatchNorm2d']:
+                x.momentum = None  # obtain cumulative statistics
+                x.reset_running_stats()
+
+        with torch.no_grad():
+            for X, y in gen: self(X.to(const.DEVICE))
+
+        for x in self.modules():
+            if x._get_name() in ['ModifiedBN2d', 'BatchNorm2d']: x.momentum = 0.1  # original momentum value; hardcoded for this network
+        return self.state_dict()
 
 
 if __name__ == '__main__':

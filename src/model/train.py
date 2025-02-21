@@ -147,6 +147,8 @@ def fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=False,
 
                         del batch_loss
                         torch.cuda.empty_cache()
+
+                    if split == 'train' and model.modified_bn: model.update_tracked_statistics(dataloader)
             except (KeyboardInterrupt, torch.OutOfMemoryError):
                 break
 
@@ -242,7 +244,9 @@ if __name__ == '__main__':
 
     if const.DDP:
         model = nn.parallel.DistributedDataParallel(model, device_ids=[const.DEVICE])
+        model.update_tracked_statistics = model.module.update_tracked_statistics
         model.load_state_dict = model.module.load_state_dict
+        model.modified_bn = model.module.modified_bn
         model.state_dict = model.module.state_dict
 
     if const.FINETUNING:

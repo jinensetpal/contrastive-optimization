@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+from torcheval.metrics import BinaryAccuracy, MulticlassAccuracy
+from torch.utils.data import DataLoader
 from ..model.arch import Model
 from src import const
 import random
@@ -7,15 +9,10 @@ import torch
 import sys
 
 
-def accuracy(model, gen, samples=1000):
-    score = 0
-
-    for sample in random.sample(range(len(gen)), samples):
-        X, y = gen[sample]
-        y_pred, cam = model(X.unsqueeze(0))
-        score += (y.argmax(dim=0) == y_pred.argmax(dim=1)).sum()
-
-    return score / samples
+def accuracy(model, metric, gen):
+    with torch.no_grad():
+        for X, (heatmap, y) in gen: metric.update(model(X)[0].detach().flatten(), y.flatten())
+    return metric.compute()
 
 
 if __name__ == '__main__':
@@ -26,9 +23,11 @@ if __name__ == '__main__':
     elif sys.argv[2] == 'oxford': from ..data.oxford_iiit_pet import Dataset
     else: from ..data.pet_image import Dataset
 
-    model = Model(is_contrastive='default' not in name)
+    model = Model(is_contrastive='default' not in name, modified_bn=True)
     model.load_state_dict(torch.load(const.MODELS_DIR / f'{name}.pt', map_location=const.DEVICE, weights_only=True))
     model.name = name
     model.eval()
 
-    print(accuracy(model, Dataset('test')))
+    torch.multiprocessing.set_start_method('spawn', force=True)
+    print(accuracy(model, BinaryAccuracy() if (sys.argv[2] != 'imagenet' and const.BINARY_CLS) else MulticlassAccuracy(),
+                   DataLoader(Dataset('valid'), batch_size=const.BATCH_SIZE, num_workers=const.N_WORKERS, shuffle=True)))
