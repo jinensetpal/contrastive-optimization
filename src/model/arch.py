@@ -31,11 +31,11 @@ class ModifiedBN2d(torch.nn.modules.batchnorm._BatchNorm):
         if self.training and not torch.is_grad_enabled():
             with torch.no_grad():
                 mean = input.mean([0, 2, 3])
-                var = input.var([0, 2, 3], unbiased=False)
+                var = input.var([0, 2, 3], unbiased=True)
                 n = input.numel() / input.size(1)
 
                 self.running_mean = exponential_average_factor * mean + (1 - exponential_average_factor) * self.running_mean
-                self.running_var = exponential_average_factor * var * n / (n - 1) + (1 - exponential_average_factor) * self.running_var
+                self.running_var = exponential_average_factor * var + (1 - exponential_average_factor) * self.running_var
 
         input = (input - self.running_mean[None, :, None, None]) / (torch.sqrt(self.running_var[None, :, None, None] + self.eps))
         if self.affine:
