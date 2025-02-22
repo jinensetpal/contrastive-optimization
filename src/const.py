@@ -53,19 +53,19 @@ MODIFY_BN = False
 # training
 DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 TRAIN_CUTOFF = 12600  # max training time in seconds
-LAMBDAS = [5, 0, 0, 1]  # means different things for different approaches
+LAMBDAS = [1, 0, 1, 1E4]  # means different things for different approaches
 POS_ONLY = False and DATASET == 'sbd'  # (multilabel only) restrict divergence loss to just positive classes
 GRAD_ACCUMULATION_STEPS = 1
 PORT = get_open_port()
 CHECKPOINTING = True
-WEIGHT_DECAY = 1E-3
+WEIGHT_DECAY = 1E-4
 SELECT_BEST = True
 FINETUNING = False
 USE_ZERO = False
 OPTIMIZER = 'SGD'
 BATCH_SIZE = 768
 MOMENTUM = .9
-EPOCHS = 150
+EPOCHS = 50
 DDP = os.getenv('WORLD_SIZE') is not None
 
 # divergence
@@ -79,7 +79,7 @@ EMA_STEPS = 32
 EMA_DECAY = .99998
 
 # learning rate
-LR = 1E-3
+LR = 5E-4
 LR_WARMUP_EPOCHS = 0
 LR_WARMUP_DECAY = .01
 
