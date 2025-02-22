@@ -32,7 +32,6 @@ class ModifiedBN2d(torch.nn.modules.batchnorm._BatchNorm):
             with torch.no_grad():
                 mean = input.mean([0, 2, 3])
                 var = input.var([0, 2, 3], unbiased=True)
-                n = input.numel() / input.size(1)
 
                 self.running_mean = exponential_average_factor * mean + (1 - exponential_average_factor) * self.running_mean
                 self.running_var = exponential_average_factor * var + (1 - exponential_average_factor) * self.running_var

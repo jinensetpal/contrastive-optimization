@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from torchvision.transforms.functional import resize, pil_to_tensor
+from torch.utils.data import DistributedSampler
 from src.utils import DataLoader
 from src import const
 import torchvision
@@ -32,8 +33,9 @@ class Dataset(torchvision.datasets.SBDataset):
 def get_generators():
     const.SPLITS[1] = 'val'
 
-    dataloaders = *[DataLoader(Dataset(mode='segmentation', image_set=split, device='cpu', download=not (const.DATA_DIR / 'sbd').exists()),
-                               num_workers=const.N_WORKERS, pin_memory=True, batch_size=const.BATCH_SIZE, shuffle=True) for split in const.SPLITS[:2]], None
+    datasets = [Dataset(mode='segmentation', image_set=split, device='cpu', download=not (const.DATA_DIR / 'sbd').exists()) for split in const.SPLITS[:2]]
+    dataloaders = *[DataLoader(dataset, sampler=DistributedSampler(dataset) if const.DDP else None, shuffle=None if const.DDP else True,
+                               num_workers=const.N_WORKERS, pin_memory=True, batch_size=const.BATCH_SIZE) for dataset in datasets], None
     const.SPLITS[1] = 'valid'
     return dataloaders
 

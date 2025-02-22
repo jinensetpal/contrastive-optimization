@@ -2,6 +2,7 @@
 
 # code adapted from: https://github.com/mmoayeri/HardImageNet/blob/main/datasets/hard_imagenet.py, https://github.com/mmoayeri/HardImageNet/blob/main/augmentations.py
 
+from torch.utils.data import DistributedSampler
 from src.utils import DataLoader, trim_mask
 import torchvision.transforms.v2 as T
 from src import const
@@ -103,9 +104,9 @@ def get_generators():
     random.seed(const.SEED)
     const.SPLITS[1] = 'val'
 
-    dataloaders = *[DataLoader(Dataset(split=split, ft=True, balanced_subset=const.HARD_INET_BALANCED_SUBSET,
-                                       trim_masks=const.HARD_INET_TRIM_MASKS, device='cpu'), shuffle=True,
-                               num_workers=const.N_WORKERS, pin_memory=True, batch_size=const.BATCH_SIZE) for split in const.SPLITS[:2]], None
+    datasets = [Dataset(split=split, ft=True, balanced_subset=const.HARD_INET_BALANCED_SUBSET, trim_masks=const.HARD_INET_TRIM_MASKS, device='cpu') for split in const.SPLITS[:2]]
+    dataloaders = *[DataLoader(dataset, shuffle=None if const.DDP else True, sampler=DistributedSampler(dataset) if const.DDP else None, num_workers=const.N_WORKERS,
+                               pin_memory=True, batch_size=const.BATCH_SIZE) for dataset, in datasets], None
 
     const.SPLITS[1] = 'valid'
     return dataloaders

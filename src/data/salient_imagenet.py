@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from .hard_imagenet import Dataset as hardimagenet
+from torch.utils.data import DistributedSampler
 from src.utils import DataLoader, trim_mask
 import torchvision.transforms.v2 as T
 from PIL import Image
@@ -75,9 +76,10 @@ def get_generators():
     dataset = Dataset(device='cpu')
     train_len = int(len(dataset)*.95)
     salient_subsets = torch.utils.data.random_split(dataset, [train_len, len(dataset) - train_len])
+    datasets = [torch.utils.data.ConcatDataset([hardimagenet(split=split, ft=False, balanced_subset=False, trim_masks=const.HARD_INET_TRIM_MASKS, device='cpu'), salient_subset]) for split, salient_subset in zip(const.SPLITS[:2], salient_subsets)]
 
-    dataloaders = *[DataLoader(torch.utils.data.ConcatDataset([hardimagenet(split=split, ft=False, balanced_subset=False, trim_masks=const.HARD_INET_TRIM_MASKS, device='cpu'), salient_subset]),
-                               shuffle=True, num_workers=const.N_WORKERS, pin_memory=True, batch_size=const.BATCH_SIZE) for split, salient_subset in zip(const.SPLITS[:2], salient_subsets)], None
+    dataloaders = *[DataLoader(dataset, shuffle=None if const.DDP else True, sampler=DistributedSampler(dataset) if const.DDP else None,
+                    num_workers=const.N_WORKERS, pin_memory=True, batch_size=const.BATCH_SIZE) for dataset in datasets], None
 
     const.SPLITS[1] = 'valid'
     return dataloaders

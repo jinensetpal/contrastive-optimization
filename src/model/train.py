@@ -247,6 +247,7 @@ if __name__ == '__main__':
     else: criterion = nn.CrossEntropyLoss(label_smoothing=const.LABEL_SMOOTHING)
 
     if const.DDP:
+        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
         model = nn.parallel.DistributedDataParallel(model, device_ids=[const.DEVICE])
         model.overwrite_tracked_statistics = model.module.overwrite_tracked_statistics
         model.load_state_dict = model.module.load_state_dict
