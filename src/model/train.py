@@ -117,6 +117,7 @@ def fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=False,
                         X = X.to(const.DEVICE)
                         y = [y_i.to(const.DEVICE) for y_i in y]
 
+                        model.overwrite_tracked_statistics((next(iter(dataloader)),))
                         with torch.no_grad() if not update_weights and not (model.module.register_backward_hook if const.DDP else model.register_backward_hook) else nullcontext():
                             y_pred = model(X)
                         batch_loss = criterion(y_pred, y) if criterion._get_name() == 'ContrastiveLoss' else criterion(y_pred[0], y[1])
@@ -135,7 +136,8 @@ def fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=False,
                         if criterion._get_name() == 'ContrastiveLoss':
                             metrics[f'{split}_ablated_ce_loss'].append(criterion.prev[0])
                             metrics[f'{split}_divergence_loss'].append(criterion.prev[1])
-                        if update_weights:  # epoch 0 is for evaluating performance on initalization
+
+                        if update_weights:  # epoch 0 is for evaluating performance on initialization
                             batch_loss.backward(inputs=optimizer.param_groups[0]['params'])
                             if is_primary_rank and const.LOG_BATCHWISE: mlflow.log_metric(f'{split}_batchwise_loss', batch_loss.item(), synchronous=False, step=(epoch-1) * len(dataloader) + batch_idx)
 
@@ -148,7 +150,7 @@ def fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=False,
                         del batch_loss
                         torch.cuda.empty_cache()
 
-                    if split == 'train' and model.modified_bn: model.update_tracked_statistics(dataloader)
+                    if split == 'train' and model.modified_bn: model.overwrite_tracked_statistics(dataloader)
             except (KeyboardInterrupt, torch.OutOfMemoryError):
                 break
 
@@ -244,7 +246,7 @@ if __name__ == '__main__':
 
     if const.DDP:
         model = nn.parallel.DistributedDataParallel(model, device_ids=[const.DEVICE])
-        model.update_tracked_statistics = model.module.update_tracked_statistics
+        model.overwrite_tracked_statistics = model.module.overwrite_tracked_statistics
         model.load_state_dict = model.module.load_state_dict
         model.modified_bn = model.module.modified_bn
         model.state_dict = model.module.state_dict

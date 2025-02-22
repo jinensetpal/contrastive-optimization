@@ -28,7 +28,7 @@ class ModifiedBN2d(torch.nn.modules.batchnorm._BatchNorm):
                 else:  # use exponential moving average
                     exponential_average_factor = self.momentum
 
-        if self.training:
+        if self.training and not torch.is_grad_enabled():
             with torch.no_grad():
                 mean = input.mean([0, 2, 3])
                 var = input.var([0, 2, 3], unbiased=False)
@@ -36,11 +36,8 @@ class ModifiedBN2d(torch.nn.modules.batchnorm._BatchNorm):
 
                 self.running_mean = exponential_average_factor * mean + (1 - exponential_average_factor) * self.running_mean
                 self.running_var = exponential_average_factor * var * n / (n - 1) + (1 - exponential_average_factor) * self.running_var
-        else:
-            mean = self.running_mean
-            var = self.running_var
 
-        input = (input - mean[None, :, None, None]) / (torch.sqrt(var[None, :, None, None] + self.eps))
+        input = (input - self.running_mean[None, :, None, None]) / (torch.sqrt(self.running_var[None, :, None, None] + self.eps))
         if self.affine:
             input = input * self.weight[None, :, None, None] + self.bias[None, :, None, None]
 
@@ -152,7 +149,7 @@ class Model(nn.Module):
 
         return cams
 
-    def update_tracked_statistics(self, gen):
+    def overwrite_tracked_statistics(self, gen):
         for x in self.modules():
             if x._get_name() in ['ModifiedBN2d', 'BatchNorm2d']:
                 x.momentum = None  # obtain cumulative statistics

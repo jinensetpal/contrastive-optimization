@@ -17,5 +17,5 @@ if __name__ == '__main__':
     model.train()
 
     torch.multiprocessing.set_start_method('spawn', force=True)
-    model.update_tracked_statistics(DataLoader(Dataset('train'), batch_size=const.BATCH_SIZE, num_workers=const.N_WORKERS, shuffle=True))
+    model.overwrite_tracked_statistics(DataLoader(Dataset('train'), batch_size=const.BATCH_SIZE, num_workers=const.N_WORKERS, shuffle=True))
     torch.save(model.state_dict(), const.MODELS_DIR / f'{name}_updated_tracked_statistics.pt')
