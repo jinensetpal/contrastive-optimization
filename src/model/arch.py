@@ -15,6 +15,7 @@ class ModifiedBN2d(torch.nn.modules.batchnorm._BatchNorm):
         if input.dim() != 4:
             raise ValueError(f"expected 4D input (got {input.dim()}D input)")
 
+    @torch.compile
     def forward(self, input):
         self._check_input_dim(input)
 

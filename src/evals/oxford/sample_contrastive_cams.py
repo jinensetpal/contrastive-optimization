@@ -26,7 +26,7 @@ def visualize(model, gen, norm=None):
         plt.imshow(F.interpolate(cam[None, None, :], const.IMAGE_SIZE, mode='bilinear')[0, 0].cpu(), cmap='jet', alpha=0.5, norm=norm)
 
     plt.tight_layout()
-    fig.savefig(const.DATA_DIR / 'evals' / f'{model.name}_cam.png')
+    fig.savefig(const.DATA_DIR / 'evals' / f'{model.name.replace("/", "_")}_cam.png')
     plt.show()
 
 

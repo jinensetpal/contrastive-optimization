@@ -127,9 +127,9 @@ We demonstrate that the normalizing behavior of softmax during the forward pass 
 
 We prove using ContrastiveCAMs that the default training behavior of Batch Normalization \citep{ioffe2015batch} \underline{breaks the locality principle of convolutional networks}, and instead motivate the use of Running Batch Normalization \citep{jermeyhowardlesson10}, computed causally to recover locality.
 
-Using ContrastiveCAMs, we also argue that Cross-Entropy Loss \citep{cox1958regression, mao2023cross} \textbf{motivates learning spurious correlations}, especially in settings where the target represents a small portion of the image. We further introduce an interpretable training objective with ContrastiveCAMs, which is equivalent to Core Risk Minimization \citep{singla2022core}.
+Using ContrastiveCAMs, we also argue that Cross-Entropy Loss \citep{cox1958regression, mao2023cross} \textbf{motivates learning spurious correlations}, especially in settings where the target represents a small portion of the image (Section \ref{ce-motiv-spurious}). We further introduce an interpretable training objective with ContrastiveCAMs, which is equivalent to Core Risk Minimization \citep{singla2022core}.
 
-Next, we present a ContrastiveCAM-based intervention to the model's logits, applied during training, which enables cross-entropy loss to implicitly optimize for multiple objectives. It must: a) \textbf{learn an invariance} to a user-specified non-target region \underline{despite any presence of strong spurious factors}, and b) \textbf{learn to generate contrast} within the user-specified target region to fulfill the classification task.
+Next, we present a ContrastiveCAM-based intervention to the model's logits, applied during training, which enables cross-entropy loss to implicitly optimize for multiple objectives (Theorems \ref{ace}, \ref{abce}). It must: a) \textbf{learn an invariance} to a user-specified non-target region \underline{despite any presence of strong spurious factors}, and b) \textbf{learn to generate contrast} within the user-specified target region to fulfill the classification task.
 
 Finally, we observe that the Cross-Entropy Loss only motivates generating contrast over regions that describe dataset-specific inter-class differences, and therefore propose distance based loss functions that outperforms Cross-Entropy Loss in both in-distribution and out-of-distribution settings.
 
@@ -166,7 +166,7 @@ In this setup, each class has it's own set of weights that feedforwards independ
 	\end{gather}
 	We define our logit vector in terms of the elementwise difference to a target class $c$:
 	\begin{gather}
-		d = [s_i - s_c]_i \\
+		\bm{d} = [s_i - s_c]_i \\
 		\bm{s} = [s_c + d_i]_i
 	\end{gather}
 	Based on this definition, class probabilities can now be computed as:
@@ -222,7 +222,7 @@ To ensure that the model accurately predicts the target class, each contrastive 
 	\max_{\theta} \sum^{D_1,D_2}_{j,k}\tilde{\mathcal{\bm{A}}}_{(c, c'),j,k}^{\text{contrastive}}\ \forall c' \in \mathbb{Z}_{+}(|C| - 1)
 \end{gather}
 
-\subsection{Cross-Entropy Motivates Learning from Spurious Correlations}
+\subsection{Cross-Entropy Motivates Learning from Spurious Correlations} \label{ce-motiv-spurious}
 
 \begin{theorem}\label{ce-spur-corr}
 	Cross-Entropy motivates learning from spurious correlations.
@@ -233,23 +233,32 @@ To ensure that the model accurately predicts the target class, each contrastive 
 		&= \left[\sum^{D_1,D_2}_{j,k} \tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}} - \sum^{D_1,D_2}_{j,k} \tilde{\mathcal{\bm{A}}}_{c,j,k}^{\text{HiResCAM}}\right]_i \\
 		&= \left[ -\sum^{}\tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)} \right]_i
 	\end{align}
-	As an aside: we note that when $i = c$, the contrastive map obtained is $\bm{0} \in \mathbb{R}^{D_1 \times D_2}$, and instead of $|C| - 1$ contrastive maps we now obtain $|C|$ contrastive maps. \newline \\
+	As an aside: we note that when $i = c$, the contrastive map obtained is $\bm{0} \in \mathbb{R}^{D_1 \times D_2}$, and instead of $|C| - 1$ contrastive maps we now obtain $|C|$ contrastive maps.
+
 	Using our result from Theorem~\ref{classprobdiff}, we have:
 	\begin{gather}
-		\sigma_c(\bm{s}) = \frac{1}{\sum_i e^{d_i}} = \frac{1}{\sum_i \text{exp}({-\sum^{}\tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)}})}
+		\sigma_c(\bm{s}) = \frac{1}{\sum_i e^{d_i}} = \frac{1}{\sum_i \text{exp}({-\sum \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)}})} = \sum_i \text{exp}\left({\sum \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)}}\right)
 	\end{gather}
 	For a target class $c$, cross-entropy loss is defined as:
 	\begin{gather}
-		H(\theta, \mathcal{D}) = -\log \left( \sigma_c(\bm{s}) \right) = -\log \left( \frac{1}{\sum_i \text{exp}({-\sum^{}\tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)}})} \right) \\
-		\nabla_\theta H(\theta, \mathcal{D}) = \left(\frac{\partial H}{\partial \bm{s}}\right)^T \cdot \frac{\partial \bm{s}}{\partial \theta} = (\bm{s} - \bm{y})^T \cdot \frac{\partial \bm{s}}{\partial \theta} = -\left(\sum^{D_1, D_2}_{j,k} \tilde{\mathcal{\bm{A}}}_{(c, i), j, k}^{\text{contrastive}} + \bm{y}_{i}\right)^T \cdot \frac{\partial \bm{s}}{\partial \theta}
+		H(\theta, \mathcal{D}) = -\log \left( \sigma_c(\bm{s}) \right) = -\log \left( \sum_i \text{exp}\left({\sum \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)}}\right) \right)
 	\end{gather}
-	The gradient contribution from every given pixel $(j, k)$ from the attribution map is equivalent. This \underline{holds irrespective of whether the given pixel contains the target feature}; consequently, any region within the image can contribute towards the correct class.
-
-	If the region used to contribute towards the correct class contains a spurious factor, learning said spurious factor reduces cross-entropy loss.
+	Vectorizing parameters $\theta \in \mathbb{R}^P$ as well as the contrastive attribution maps $\tilde{\mathcal{\bm{A}}}_{(c, i)}^{\text{contrastive}} \in \mathbb{R}^{D_1 D_2}$, we can use the above result to compute gradient contributions from each pixel within the attribution map:
+	\begin{align}
+		\nabla_\theta H &= \underbrace{\begin{bmatrix} \frac{\partial H}{\partial \sum \tilde{\mathcal{\bm{A}}}_{(c, i)}^{\text{contrastive}}} \end{bmatrix}_i}_{\mathbb{R}^{1 \times |C|}}
+			\cdot \underbrace{\begin{bmatrix} \begin{bmatrix} \frac{\partial \sum \tilde{\mathcal{\bm{A}}}_{(c, i)}^{\text{contrastive}}}{\partial \tilde{\mathcal{\bm{A}}}_{(c, i), j, k}^{\text{contrastive}}} \end{bmatrix}_{i}^T \end{bmatrix}_{j,k}}_{\mathbb{R}^{|C| \times D_1 D_2}}
+			\cdot \underbrace{\frac{\partial \tilde{\mathcal{\bm{A}}}_{(c, i), j, k}^{\text{contrastive}}}{\partial \theta}}_{\mathbb{R}^{D_1D_2 \times P}} \\
+		&= - \begin{bmatrix} \frac{\text{exp}\left( \sum \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)}\right)}{\sum_j \text{exp}\left({\sum \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, j)}}\right)} \end{bmatrix}_i \cdot \bm{1}_{|C| \times D_1 D_2} \cdot \frac{\partial \tilde{\mathcal{\bm{A}}}_{(c, i), j, k}^{\text{contrastive}}}{\partial \theta} \\
+			&= - \sigma\left( \begin{bmatrix} \sum \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)} \end{bmatrix}_i \right) \cdot \bm{1}_{|C| \times D_1 D_2} \cdot \frac{\partial \tilde{\mathcal{\bm{A}}}_{(c, i), j, k}^{\text{contrastive}}}{\partial \theta}
+	\end{align}
+	Each element within the second term is constant $\forall j \in \mathbb{N}(D_1),~k \in \mathbb{N}(D_2)$, indicating the gradient contribution from every given pixel $(j, k)$ from the attribution map is equivalent. This \underline{holds irrespective of whether the given pixel contains the target feature}; consequently, any region within the image can contribute towards the correct class.
 \end{proof}
+	Let $\gamma \in [0, 1]$ be the proportion of the attribution map containing the target. The so-called `valid' gradient contributions will only come from the regions containing the target, and smaller targets from images taken from far away result in a smaller $\gamma$, and as a consequence a greater proportion of non-target regions are established as new priors over which the classification is determined.
+
+	If the region used to contribute towards the correct class contains a spurious factor with a high correlation across targets, this prior will motivate learning said spurious factor, which reduces cross-entropy loss at the cost of misrepresenting the true classification target.
 
 \subsubsection{Empirical Case Study -- Oxford-IIIT Pets}
-Using contrastive activation maps, we can evaluate the attention maps generated by a \underline{well-trained} model (ImageNet weights, fine-tuned to $99.9\%$ training accuracy, $99.6\%$ validation accuracy) on Oxford-IIIT Pets:
+Using contrastive activation maps, we can evaluate the attention maps generated by a \underline{well-trained} ResNet-50 model (ImageNet weights, fine-tuned to $99.9\%$ training accuracy, $99.6\%$ validation accuracy) on Oxford-IIIT Pets:
 
 \begin{figure}[h!]
 	\centering
@@ -329,7 +338,7 @@ $\lambda_2$ \& $\lambda_3$ are hyperparameters that scale the activation maps, s
 A more mathematically rigorous approach involves performing an ablation over class logits to penalize background influence.
 
 \begin{theorem}\label{ace}
-	We can integrate backgroud invariance to the definition of cross-entropy using the following formulation:
+	We can integrate background invariance to the definition of cross-entropy using the following formulation:
 	\begin{gather}
 		\mathcal{J}(\theta, \mathcal{D}) = -\log \left( \frac{1}{\sum_i \text{exp}\left(-\sum h \odot \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)} + \sum |(1-h) \odot \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)}|\right)} \right)
 	\end{gather}
@@ -371,7 +380,7 @@ For this setting, $\bm{\lambda} = \{1, 50, 1, 10^{-3}\}$ was set for $i = \{1, \
 For sigmoid-activated binary / multilabel classification tasks, we leverage similar principles to defined an ablation to binary cross-entropy. Since we do not have a contrastive process in softmax-activation, this definitions relies only on HiResCAMs.
 
 \begin{theorem}\label{abce}
-	We can integrate backgroud invariance to the definition of binary cross-entropy using the following formulation:
+	We can integrate background invariance to the definition of binary cross-entropy using the following formulation:
 	\begin{gather}
 		\mathcal{J}(\theta, \mathcal{D}) = - y_i \log \left(\sigma\left(h \odot \sum_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}} - (1-h) \odot \sum_{j,k}|\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}}|\right) \right) - (1 - y_i) \log \left( \bm{s}_i \right)
 	\end{gather}

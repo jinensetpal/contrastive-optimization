@@ -106,7 +106,7 @@ def get_generators():
 
     datasets = [Dataset(split=split, ft=True, balanced_subset=const.HARD_INET_BALANCED_SUBSET, trim_masks=const.HARD_INET_TRIM_MASKS, device='cpu') for split in const.SPLITS[:2]]
     dataloaders = *[DataLoader(dataset, shuffle=None if const.DDP else True, sampler=DistributedSampler(dataset) if const.DDP else None, num_workers=const.N_WORKERS,
-                               pin_memory=True, batch_size=const.BATCH_SIZE) for dataset, in datasets], None
+                               pin_memory=True, batch_size=const.BATCH_SIZE) for dataset in datasets], None
 
     const.SPLITS[1] = 'valid'
     return dataloaders
