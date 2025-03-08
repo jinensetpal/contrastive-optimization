@@ -9,6 +9,7 @@ from torch.distributed.optim import ZeroRedundancyOptimizer
 from ..data.imagenet import get_generators as imagenet
 from torcheval.metrics.toolkit import sync_and_compute
 from ..data.sbd import get_generators as sbd
+from torch.utils.data import DataLoader
 from contextlib import nullcontext
 from .loss import ContrastiveLoss
 from torch_optimizer import Lamb
@@ -20,6 +21,7 @@ from .arch import Model
 from src import const
 from torch import nn
 import numpy as np
+import random
 import mlflow
 import torch
 import json
@@ -89,13 +91,14 @@ def configure(model_name):
 
 
 def fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=False,
-        ema=None, selected=None, init_epoch=0, mlflow_run_id=None):
+        ema=None, selected=None, init_epoch=0, mlflow_run_id=None, benchmark_batch=None):
     start_time = time.time()
     selected = selected or {'last': model.state_dict(),
                             'epoch': init_epoch,
                             'acc': 0.0}
     is_primary_rank = not const.DDP or (const.DDP and const.DEVICE == 0)
 
+    prev_X = benchmark_batch
     with mlflow.start_run(mlflow_run_id) if is_primary_rank else nullcontext():
         # log hyperparameters
         if is_primary_rank and init_epoch == 0: mlflow.log_params({k: v for k, v in const.__dict__.items() if k == k.upper() and all(s not in k for s in ['DIR', 'PATH', 'EPOCHS', 'SELECT_BEST', 'DEVICE', 'TRAIN_CUTOFF', 'PORT'])})
@@ -131,7 +134,7 @@ def fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=False,
                             metrics[f'{split}_cse_loss'].append(F.cross_entropy(y_pred[0], y[1]).item())
                         metrics[f'{split}_contrast_loss'].append(batch_loss.item())
 
-                        prev_X = X.detach().clone()
+                        if benchmark_batch is None and split == 'train': prev_X = X.detach().clone()
                         del y_pred, X, y
                         torch.cuda.empty_cache()
 
@@ -143,7 +146,9 @@ def fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=False,
                             batch_loss.backward(inputs=optimizer.param_groups[0]['params'])
                             if is_primary_rank and const.LOG_BATCHWISE: mlflow.log_metric(f'{split}_batchwise_loss', batch_loss.item(), synchronous=False, step=(epoch-1) * len(dataloader) + batch_idx)
 
-                            if not (batch_idx+1) % const.GRAD_ACCUMULATION_STEPS: optimizer.step()
+                            if not (batch_idx+1) % const.GRAD_ACCUMULATION_STEPS:
+                                optimizer.step()
+                                if model.modified_bn: model.overwrite_tracked_statistics(((prev_X, None),))
 
                         if ema and not (batch_idx+1) % const.EMA_STEPS:
                             ema.update_parameters(model)
@@ -215,6 +220,7 @@ def fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=False,
 if __name__ == '__main__':
     # Usage: $ python -m path.to.script model_name --nocheckpoint
     configure(sys.argv[1])
+    random.seed(const.SEED)
 
     is_contrastive = 'default' not in const.MODEL_NAME
     is_multilabel = const.DATASET == 'sbd'
@@ -237,6 +243,7 @@ if __name__ == '__main__':
     elif const.DATASET == 'hardimagenet': train, val, _ = hardimagenet()
     elif const.DATASET == 'sbd': train, val, _ = sbd()
     else: train, val, test = oxford_iiit_pet()
+    benchmark_batch = next(iter(DataLoader(train.dataset, batch_size=const.BATCH_SIZE, shuffle=True)))[0]
 
     model = Model(is_contrastive=is_contrastive, multilabel=is_multilabel, xl_backbone=const.XL_BACKBONE, upsampling_level=const.UPSAMPLING_LEVEL, logits_only=True, disable_bn=const.DISABLE_BN, modified_bn=const.MODIFY_BN).to(const.DEVICE)
     ema = optim.swa_utils.AveragedModel(model, device=const.DEVICE, avg_fn=optim.swa_utils.get_ema_avg_fn(1 - min(1, (1 - const.EMA_DECAY) * const.BATCH_SIZE * const.EMA_STEPS / const.EPOCHS)), use_buffers=True) if const.EMA else None
@@ -247,7 +254,7 @@ if __name__ == '__main__':
     else: criterion = nn.CrossEntropyLoss(label_smoothing=const.LABEL_SMOOTHING)
 
     if const.DDP:
-        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
+        if not model.modified_bn: model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
         model = nn.parallel.DistributedDataParallel(model, device_ids=[const.DEVICE])
         model.overwrite_tracked_statistics = model.module.overwrite_tracked_statistics
         model.load_state_dict = model.module.load_state_dict
@@ -294,7 +301,7 @@ if __name__ == '__main__':
             selected['ema'] = torch.load(path / 'ema.pt', map_location=torch.device(const.DEVICE), weights_only=True)
             ema.load_state_dict(selected['ema'])
 
-    completed_epochs, selected = fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=is_multilabel, ema=ema, selected=selected, **checkpoint_args)
+    completed_epochs, selected = fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=is_multilabel, ema=ema, selected=selected, benchmark_batch=benchmark_batch, **checkpoint_args)
 
     if const.DDP:
         if const.USE_ZERO: optimizer.consolidate_state_dict()
