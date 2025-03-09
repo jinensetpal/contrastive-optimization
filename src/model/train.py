@@ -115,13 +115,12 @@ def fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=False,
                     if update_weights: model.train()
                     else: model.eval()
 
-                    if split == 'train' and model.modified_bn: prev_X = next(iter(dataloader))[0]
+                    if benchmark_batch is None and split == 'train' and model.modified_bn: prev_X = next(iter(dataloader))[0]
                     for batch_idx, (X, y) in enumerate(dataloader):
                         if not (batch_idx+1) % const.GRAD_ACCUMULATION_STEPS: optimizer.zero_grad()
                         X = X.to(const.DEVICE)
                         y = [y_i.to(const.DEVICE) for y_i in y]
 
-                        if split == 'train' and model.modified_bn: model.overwrite_tracked_statistics(((prev_X, None),))
                         with torch.no_grad() if not update_weights and not (model.module.register_backward_hook if const.DDP else model.register_backward_hook) else nullcontext():
                             y_pred = model(X)
                         batch_loss = criterion(y_pred, y) if criterion._get_name() == 'ContrastiveLoss' else criterion(y_pred[0], y[1])
@@ -243,6 +242,8 @@ if __name__ == '__main__':
     elif const.DATASET == 'hardimagenet': train, val, _ = hardimagenet()
     elif const.DATASET == 'sbd': train, val, _ = sbd()
     else: train, val, test = oxford_iiit_pet()
+
+    torch.manual_seed(const.SEED)
     benchmark_batch = next(iter(DataLoader(train.dataset, batch_size=const.BATCH_SIZE, shuffle=True)))[0]
 
     model = Model(is_contrastive=is_contrastive, multilabel=is_multilabel, xl_backbone=const.XL_BACKBONE, upsampling_level=const.UPSAMPLING_LEVEL, logits_only=True, disable_bn=const.DISABLE_BN, modified_bn=const.MODIFY_BN).to(const.DEVICE)

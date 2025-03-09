@@ -25,7 +25,7 @@ class ModifiedBN2d(torch.nn.modules.batchnorm._BatchNorm):
             if self.num_batches_tracked is not None:
                 self.num_batches_tracked += 1
                 if self.momentum is None:  # use cumulative moving average
-                    exponential_average_factor = 1.0 / float(self.num_batches_tracked)
+                    exponential_average_factor = 1.0 / self.num_batches_tracked
                 else:  # use exponential moving average
                     exponential_average_factor = self.momentum
 
@@ -60,12 +60,16 @@ class Model(nn.Module):
         self.device = device
 
         self._orig_bn = nn.BatchNorm2d
-        if modified_bn: nn.BatchNorm2d = ModifiedBN2d
+        self._orig_relu = nn.ReLU
+        if modified_bn:
+            nn.BatchNorm2d = ModifiedBN2d
+            nn.ReLU = nn.LeakyReLU
 
         if xl_backbone: self.backbone = torchvision.models.resnet152(weights=torchvision.models.ResNet152_Weights.IMAGENET1K_V2 if const.PRETRAINED_BACKBONE else None)
         else: self.backbone = torchvision.models.resnet50(weights=torchvision.models.ResNet50_Weights.IMAGENET1K_V2 if const.PRETRAINED_BACKBONE else None)
 
         nn.BatchNorm2d = self._orig_bn
+        nn.ReLU = self._orig_relu
 
         if upsampling_level >= 1 or upsampling_level <= -5:
             self.backbone.layer4[0].conv2.stride = (1, 1)
@@ -105,7 +109,11 @@ class Model(nn.Module):
 
     def disable_batchnorms(self):
         for x in self.modules():
-            if x._get_name() == 'BatchNorm2d': x.eval()
+            if x._get_name() == 'BatchNorm2d':
+                x.eval()
+                x.reset_parameters()
+                x.reset_running_stats()
+                x.eps = 0
 
     def train(self, *args, **kwargs):
         super().train(*args, **kwargs)
