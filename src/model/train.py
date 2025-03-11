@@ -155,8 +155,6 @@ def fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=False,
 
                         del batch_loss
                         torch.cuda.empty_cache()
-
-                    if split == 'train' and model.modified_bn: model.overwrite_tracked_statistics(dataloader)
             except (KeyboardInterrupt, torch.OutOfMemoryError):
                 break
 
@@ -244,7 +242,9 @@ if __name__ == '__main__':
     else: train, val, test = oxford_iiit_pet()
 
     torch.manual_seed(const.SEED)
-    benchmark_batch = next(iter(DataLoader(train.dataset, batch_size=const.BATCH_SIZE, shuffle=True)))[0]
+    benchmark_batch = next(iter(DataLoader(train.dataset, batch_size=const.BATCH_SIZE, shuffle=True)))
+    n_samples = int(benchmark_batch[1][1].sum(0).min())
+    benchmark_batch = torch.vstack([benchmark_batch[0][random.sample(benchmark_batch[1][1][:, i].nonzero().flatten().tolist(), n_samples)] for i in range(benchmark_batch[1][1].size(-1))])
 
     model = Model(is_contrastive=is_contrastive, multilabel=is_multilabel, xl_backbone=const.XL_BACKBONE, upsampling_level=const.UPSAMPLING_LEVEL, logits_only=True, disable_bn=const.DISABLE_BN, modified_bn=const.MODIFY_BN).to(const.DEVICE)
     ema = optim.swa_utils.AveragedModel(model, device=const.DEVICE, avg_fn=optim.swa_utils.get_ema_avg_fn(1 - min(1, (1 - const.EMA_DECAY) * const.BATCH_SIZE * const.EMA_STEPS / const.EPOCHS)), use_buffers=True) if const.EMA else None

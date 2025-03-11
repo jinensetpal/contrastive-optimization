@@ -53,7 +53,7 @@ MODIFY_BN = False
 # training
 DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 TRAIN_CUTOFF = 12600  # max training time in seconds
-LAMBDAS = [1, 0, 1, 1E4]  # means different things for different approaches
+LAMBDAS = [10, 0, 1, 1E3]  # means different things for different approaches
 POS_ONLY = False and DATASET == 'sbd'  # (multilabel only) restrict divergence loss to just positive classes
 GRAD_ACCUMULATION_STEPS = 1
 PORT = get_open_port()
@@ -79,7 +79,7 @@ EMA_STEPS = 32
 EMA_DECAY = .99998
 
 # learning rate
-LR = 5E-4
+LR = 1E-4
 LR_WARMUP_EPOCHS = 0
 LR_WARMUP_DECAY = .01
 
