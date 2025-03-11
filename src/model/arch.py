@@ -63,7 +63,7 @@ class Model(nn.Module):
         self._orig_relu = nn.ReLU
         if modified_bn:
             nn.BatchNorm2d = ModifiedBN2d
-            nn.ReLU = nn.LeakyReLU
+            nn.ReLU = nn.ELU
 
         if xl_backbone: self.backbone = torchvision.models.resnet152(weights=torchvision.models.ResNet152_Weights.IMAGENET1K_V2 if const.PRETRAINED_BACKBONE else None)
         else: self.backbone = torchvision.models.resnet50(weights=torchvision.models.ResNet50_Weights.IMAGENET1K_V2 if const.PRETRAINED_BACKBONE else None)
