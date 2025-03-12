@@ -35,8 +35,7 @@ HARD_INET_TRIM_MASKS = False
 HARD_INET_TRIM_FACTOR = 12
 HARD_INET_CENTER_BIAS = 2
 
-if DATASET == 'imagenet': N_CLASSES = 1000
-elif DATASET == 'salientimagenet': N_CLASSES = 1000
+if DATASET in ['imagenet', 'salientimagenet']: N_CLASSES = 1000
 elif DATASET == 'hardimagenet': N_CLASSES = 15
 elif DATASET == 'soodimagenet': N_CLASSES = 56
 elif DATASET == 'sbd': N_CLASSES = 20
@@ -80,7 +79,7 @@ EMA_DECAY = .99998
 
 # learning rate
 LR = 1E-4
-LR_WARMUP_EPOCHS = 0
+LR_WARMUP_EPOCHS = 5
 LR_WARMUP_DECAY = .01
 
 # augmentation
