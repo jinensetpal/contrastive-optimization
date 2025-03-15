@@ -15,11 +15,10 @@ class ModifiedBN2d(torch.nn.modules.batchnorm._BatchNorm):
         if input.dim() != 4:
             raise ValueError(f"expected 4D input (got {input.dim()}D input)")
 
-    @torch.compile
     def forward(self, input):
         self._check_input_dim(input)
 
-        exponential_average_factor = 0.0
+        exponential_average_factor = torch.tensor(0.0)
 
         if self.training and self.track_running_stats:
             if self.num_batches_tracked is not None:
@@ -27,15 +26,14 @@ class ModifiedBN2d(torch.nn.modules.batchnorm._BatchNorm):
                 if self.momentum is None:  # use cumulative moving average
                     exponential_average_factor = 1.0 / self.num_batches_tracked
                 else:  # use exponential moving average
-                    exponential_average_factor = self.momentum
+                    exponential_average_factor = torch.tensor(self.momentum)
 
         if self.training and not torch.is_grad_enabled():
-            with torch.no_grad():
-                mean = input.mean([0, 2, 3])
-                var = input.var([0, 2, 3], unbiased=True)
+            mean = input.mean([0, 2, 3])
+            var = input.var([0, 2, 3], unbiased=True)
 
-                self.running_mean = exponential_average_factor * mean + (1 - exponential_average_factor) * self.running_mean
-                self.running_var = exponential_average_factor * var + (1 - exponential_average_factor) * self.running_var
+            self.running_mean = exponential_average_factor * mean + (1 - exponential_average_factor) * self.running_mean
+            self.running_var = exponential_average_factor * var + (1 - exponential_average_factor) * self.running_var
 
         input = (input - self.running_mean[None, :, None, None]) / (torch.sqrt(self.running_var[None, :, None, None] + self.eps))
         if self.affine:
@@ -44,8 +42,16 @@ class ModifiedBN2d(torch.nn.modules.batchnorm._BatchNorm):
         return input
 
 
+class EEU(nn.Module):
+    def __init__(self, inplace=None):
+        super().__init__()
+
+    def forward(self, x):
+        return (x < 0).to(torch.int) * (torch.exp(x)-1) + (x > 0).to(torch.int) * (-torch.exp(-x))+1
+
+
 class Model(nn.Module):
-    def __init__(self, randomized_flatten=const.RANDOMIZED_FLATTEN, multilabel=False, logits_only=False,
+    def __init__(self, randomized_flatten=const.RANDOMIZED_FLATTEN, multilabel=False, logits_only=False, elu_acts=const.USE_ELU,
                  disable_bn=const.DISABLE_BN, modified_bn=const.MODIFY_BN, register_backward_hook=False, hardinet_eval=False, xl_backbone=const.XL_BACKBONE,
                  device=const.DEVICE, is_contrastive=True, segmentation_threshold=const.SEGMENTATION_THRESHOLD, upsampling_level=1):
         super().__init__()
@@ -59,11 +65,13 @@ class Model(nn.Module):
         self.disable_bn = disable_bn
         self.device = device
 
+        self.feature_rect = torch.tensor([1.])
+
         self._orig_bn = nn.BatchNorm2d
         self._orig_relu = nn.ReLU
-        if modified_bn:
-            nn.BatchNorm2d = ModifiedBN2d
-            nn.ReLU = nn.ELU
+
+        if modified_bn: nn.BatchNorm2d = ModifiedBN2d
+        if elu_acts: nn.ReLU = nn.ELU
 
         if xl_backbone: self.backbone = torchvision.models.resnet152(weights=torchvision.models.ResNet152_Weights.IMAGENET1K_V2 if const.PRETRAINED_BACKBONE else None)
         else: self.backbone = torchvision.models.resnet50(weights=torchvision.models.ResNet50_Weights.IMAGENET1K_V2 if const.PRETRAINED_BACKBONE else None)
@@ -127,6 +135,7 @@ class Model(nn.Module):
         self.feature_rect = o
         if self.register_backward_hook: o.register_hook(assign)
 
+    @torch.compiler.disable
     def forward(self, x):
         x = self.backbone(x)
         if self.training and self.randomized_flatten: x = x[:, torch.randperm(x.shape[1])]
