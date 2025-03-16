@@ -10,44 +10,39 @@ import torch
 class ModifiedBN2d(torch.nn.modules.batchnorm._BatchNorm):
     def __init__(self, num_features, eps=1e-5, momentum=0.1, affine=True, track_running_stats=True):
         super(ModifiedBN2d, self).__init__(num_features, eps, momentum, affine, track_running_stats)
+        torch._dynamo.config.force_parameter_static_shapes = False
 
     def _check_input_dim(self, input):
         if input.dim() != 4:
             raise ValueError(f"expected 4D input (got {input.dim()}D input)")
 
+    @torch.compile(dynamic=True)
+    @staticmethod
+    def functional(input, running_mean, running_var, eps, weight, bias, affine):
+        input = (input - running_mean[None, :, None, None]) / (torch.sqrt(running_var[None, :, None, None] + eps))
+        if affine: input = input * weight[None, :, None, None] + bias[None, :, None, None]
+
+        return input
+
     def forward(self, input):
         self._check_input_dim(input)
 
-        exponential_average_factor = torch.tensor(0.0)
-
-        if self.training and self.track_running_stats:
-            if self.num_batches_tracked is not None:
-                self.num_batches_tracked += 1
-                if self.momentum is None:  # use cumulative moving average
-                    exponential_average_factor = 1.0 / self.num_batches_tracked
-                else:  # use exponential moving average
-                    exponential_average_factor = torch.tensor(self.momentum)
-
         if self.training and not torch.is_grad_enabled():
-            mean = input.mean([0, 2, 3])
-            var = input.var([0, 2, 3], unbiased=True)
+            self.running_mean = input.mean([0, 2, 3])
+            self.running_var = input.var([0, 2, 3], unbiased=False)
 
-            self.running_mean = exponential_average_factor * mean + (1 - exponential_average_factor) * self.running_mean
-            self.running_var = exponential_average_factor * var + (1 - exponential_average_factor) * self.running_var
-
-        input = (input - self.running_mean[None, :, None, None]) / (torch.sqrt(self.running_var[None, :, None, None] + self.eps))
-        if self.affine:
-            input = input * self.weight[None, :, None, None] + self.bias[None, :, None, None]
-
-        return input
+        return ModifiedBN2d.functional(input, self.running_mean, self.running_var, self.eps, self.weight, self.bias, self.affine)
 
 
 class EEU(nn.Module):
     def __init__(self, inplace=None):
         super().__init__()
+        self.sigmoid = nn.Sigmoid()
 
+    @torch.compile(dynamic=True)
     def forward(self, x):
-        return (x < 0).to(torch.int) * (torch.exp(x)-1) + (x > 0).to(torch.int) * (-torch.exp(-x))+1
+        # return (x < 0).to(torch.float) * (torch.exp(x)-1) + (x > 0).to(torch.float) * (-torch.exp(-x))+1
+        return 2 * self.sigmoid(x) - 1
 
 
 class Model(nn.Module):
@@ -112,6 +107,11 @@ class Model(nn.Module):
                 if x._get_name() == 'ModifiedBN2d':
                     x.reset_parameters()
                     x.reset_running_stats()
+
+                    if not const.AFFINE_BN:
+                        self.weight = None
+                        self.bias = None
+                        self.affine = False
 
         self.to(self.device)
 

@@ -218,7 +218,9 @@ if __name__ == '__main__':
     # Usage: $ python -m path.to.script model_name --nocheckpoint
     configure(sys.argv[1])
     random.seed(const.SEED)
+
     torch.set_float32_matmul_precision('high')  # hardware-specific flag
+    torch._dynamo.config.force_parameter_static_shapes = not const.MODIFY_BN
 
     is_contrastive = 'default' not in const.MODEL_NAME
     is_multilabel = const.DATASET == 'sbd'
@@ -247,8 +249,9 @@ if __name__ == '__main__':
     n_samples = int(benchmark_batch[1][1].sum(0).min())
     benchmark_batch = torch.vstack([benchmark_batch[0][random.sample(benchmark_batch[1][1][:, i].nonzero().flatten().tolist(), n_samples)] for i in range(benchmark_batch[1][1].size(-1))])
 
-    model = Model(is_contrastive=is_contrastive, multilabel=is_multilabel, xl_backbone=const.XL_BACKBONE, upsampling_level=const.UPSAMPLING_LEVEL, logits_only=True, disable_bn=const.DISABLE_BN, modified_bn=const.MODIFY_BN).to(const.DEVICE)
-    model = torch.compile(model)
+    model = Model(is_contrastive=is_contrastive, multilabel=is_multilabel, xl_backbone=const.XL_BACKBONE, upsampling_level=const.UPSAMPLING_LEVEL, logits_only=True, disable_bn=const.DISABLE_BN, modified_bn=const.MODIFY_BN, device='cpu')
+    model = torch.compile(model, options={"shape_padding": True}).to(const.DEVICE)
+
     ema = optim.swa_utils.AveragedModel(model, device=const.DEVICE, avg_fn=optim.swa_utils.get_ema_avg_fn(1 - min(1, (1 - const.EMA_DECAY) * const.BATCH_SIZE * const.EMA_STEPS / const.EPOCHS)), use_buffers=True) if const.EMA else None
 
     if is_contrastive: criterion = ContrastiveLoss(model.get_contrastive_cams, is_label_mask=const.USE_CUTMIX, multilabel=is_multilabel, divergence=const.DIVERGENCE,
@@ -258,7 +261,7 @@ if __name__ == '__main__':
 
     if const.DDP:
         if not model.modified_bn: model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
-        model = nn.parallel.DistributedDataParallel(model, device_ids=[const.DEVICE], find_unused_parameters=model.backbone.bn1.affine)
+        model = nn.parallel.DistributedDataParallel(model, device_ids=[const.DEVICE])
         model.overwrite_tracked_statistics = model.module.overwrite_tracked_statistics
         model.load_state_dict = model.module.load_state_dict
         model.modified_bn = model.module.modified_bn

@@ -31,6 +31,7 @@ class _RepeatSampler(object):
 
 class DataLoader(torch.utils.data.dataloader.DataLoader):
     def __init__(self, *args, **kwargs):
+        kwargs['prefetch_factor'] = 4
         super().__init__(*args, **kwargs)
         object.__setattr__(self, 'batch_sampler', _RepeatSampler(self.batch_sampler))
         self.iterator = super().__iter__()
