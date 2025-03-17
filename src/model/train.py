@@ -52,6 +52,12 @@ def configure(model_name):
     const.XL_BACKBONE = 'largemodel' in const.MODEL_NAME
     const.PRETRAINED_BACKBONE = 'pretrained' in const.MODEL_NAME
 
+    if 'elu' in const.MODEL_NAME: const.ACTIVATIONS = 'ELU'
+    elif 'eeu' in const.MODEL_NAME: const.ACTIVATIONS = 'EEU'
+    elif 'extsigmoid' in const.MODEL_NAME: const.ACTIVATIONS = 'ExtendedSigmoid'
+    elif 'dyt' in const.MODEL_NAME: const.ACTIVATIONS = 'DyT'
+    else: const.ACTIVATIONS = 'ReLU'
+
     if ('revups' in const.MODEL_NAME and const.UPSAMPLING_LEVEL > 0) or ('revups' not in const.MODEL_NAME and const.UPSAMPLING_LEVEL < 0): const.UPSAMPLING_LEVEL *= -1
     if 'label_smoothing' not in const.MODEL_NAME: const.LABEL_SMOOTHING = 0
 

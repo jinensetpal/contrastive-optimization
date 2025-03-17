@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+from .resnet import Bottleneck
+from .activations import *
 from src import const
 from torch import nn
 import torchvision
@@ -34,19 +36,8 @@ class ModifiedBN2d(torch.nn.modules.batchnorm._BatchNorm):
         return ModifiedBN2d.functional(input, self.running_mean, self.running_var, self.eps, self.weight, self.bias, self.affine)
 
 
-class EEU(nn.Module):
-    def __init__(self, inplace=None):
-        super().__init__()
-        self.sigmoid = nn.Sigmoid()
-
-    @torch.compile(dynamic=True)
-    def forward(self, x):
-        # return (x < 0).to(torch.float) * (torch.exp(x)-1) + (x > 0).to(torch.float) * (-torch.exp(-x))+1
-        return 2 * self.sigmoid(x) - 1
-
-
 class Model(nn.Module):
-    def __init__(self, randomized_flatten=const.RANDOMIZED_FLATTEN, multilabel=False, logits_only=False, elu_acts=const.USE_ELU,
+    def __init__(self, randomized_flatten=const.RANDOMIZED_FLATTEN, multilabel=False, logits_only=False, backbone_acts=const.ACTIVATIONS,
                  disable_bn=const.DISABLE_BN, modified_bn=const.MODIFY_BN, register_backward_hook=False, hardinet_eval=False, xl_backbone=const.XL_BACKBONE,
                  device=const.DEVICE, is_contrastive=True, segmentation_threshold=const.SEGMENTATION_THRESHOLD, upsampling_level=1):
         super().__init__()
@@ -60,17 +51,23 @@ class Model(nn.Module):
         self.disable_bn = disable_bn
         self.device = device
 
-        self.feature_rect = torch.tensor([1.])
-
+        self._orig_bneck = torchvision.models.resnet.Bottleneck
         self._orig_bn = nn.BatchNorm2d
         self._orig_relu = nn.ReLU
 
         if modified_bn: nn.BatchNorm2d = ModifiedBN2d
-        if elu_acts: nn.ReLU = nn.ELU
+
+        if backbone_acts == 'ELU': nn.ReLU = nn.ELU
+        elif backbone_acts == 'EEU': nn.ReLU = EEU
+        elif backbone_acts == 'ExtendedSigmoid': nn.ReLU = ExtendedSigmoid
+        elif backbone_acts == 'DyT':
+            nn.ReLU = LazyDyT
+            torchvision.models.resnet.Bottleneck = Bottleneck
 
         if xl_backbone: self.backbone = torchvision.models.resnet152(weights=torchvision.models.ResNet152_Weights.IMAGENET1K_V2 if const.PRETRAINED_BACKBONE else None)
         else: self.backbone = torchvision.models.resnet50(weights=torchvision.models.ResNet50_Weights.IMAGENET1K_V2 if const.PRETRAINED_BACKBONE else None)
 
+        torchvision.models.resnet.Bottleneck = self._orig_bneck
         nn.BatchNorm2d = self._orig_bn
         nn.ReLU = self._orig_relu
 
@@ -113,6 +110,8 @@ class Model(nn.Module):
                         self.bias = None
                         self.affine = False
 
+        with torch.no_grad():
+            self(torch.randn(1, *const.IMAGE_SHAPE))
         self.to(self.device)
 
     def disable_batchnorms(self):

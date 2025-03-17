@@ -48,7 +48,8 @@ UPSAMPLING_LEVEL = 1  # -ve changes direction not magnitude
 XL_BACKBONE = False
 DISABLE_BN = False
 MODIFY_BN = False
-USE_ELU = False
+AFFINE_BN = False
+ACTIVATIONS = 'DyT'
 
 # training
 DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
