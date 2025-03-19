@@ -49,7 +49,7 @@ XL_BACKBONE = False
 DISABLE_BN = False
 MODIFY_BN = False
 AFFINE_BN = False
-ACTIVATIONS = 'DyT'
+ACTIVATIONS = 'ReLU'
 
 # training
 DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'

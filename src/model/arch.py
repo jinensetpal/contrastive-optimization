@@ -26,6 +26,7 @@ class ModifiedBN2d(torch.nn.modules.batchnorm._BatchNorm):
 
         return input
 
+    @torch.compiler.disable
     def forward(self, input):
         self._check_input_dim(input)
 
@@ -67,9 +68,9 @@ class Model(nn.Module):
         if xl_backbone: self.backbone = torchvision.models.resnet152(weights=torchvision.models.ResNet152_Weights.IMAGENET1K_V2 if const.PRETRAINED_BACKBONE else None)
         else: self.backbone = torchvision.models.resnet50(weights=torchvision.models.ResNet50_Weights.IMAGENET1K_V2 if const.PRETRAINED_BACKBONE else None)
 
-        torchvision.models.resnet.Bottleneck = self._orig_bneck
-        nn.BatchNorm2d = self._orig_bn
-        nn.ReLU = self._orig_relu
+        if backbone_acts != 'ReLU': nn.ReLU = self._orig_relu
+        if backbone_acts == 'DyT': torchvision.models.resnet.Bottleneck = self._orig_bneck
+        if modified_bn: nn.BatchNorm2d = self._orig_bn
 
         if upsampling_level >= 1 or upsampling_level <= -5:
             self.backbone.layer4[0].conv2.stride = (1, 1)
@@ -97,6 +98,7 @@ class Model(nn.Module):
             self.linear.weight = self.backbone.fc.weight
             if not is_contrastive: self.linear.bias = self.backbone.fc.bias
         self.backbone.fc = nn.Identity()
+        if not modified_bn: self.backbone = torch.compile(self.backbone, options={"shape_padding": True})
 
         if disable_bn: self.disable_batchnorms()
         if modified_bn:
