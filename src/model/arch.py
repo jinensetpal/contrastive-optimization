@@ -13,6 +13,7 @@ class ModifiedBN2d(torch.nn.modules.batchnorm._BatchNorm):
     def __init__(self, num_features, eps=1e-5, momentum=0.1, affine=True, track_running_stats=True):
         super(ModifiedBN2d, self).__init__(num_features, eps, momentum, affine, track_running_stats)
         torch._dynamo.config.force_parameter_static_shapes = False
+        self.update_proxy_stats = False
 
     def _check_input_dim(self, input):
         if input.dim() != 4:
@@ -30,7 +31,7 @@ class ModifiedBN2d(torch.nn.modules.batchnorm._BatchNorm):
     def forward(self, input):
         self._check_input_dim(input)
 
-        if self.training and not torch.is_grad_enabled():
+        if self.update_proxy_stats:
             self.running_mean = input.mean([0, 2, 3])
             self.running_var = input.var([0, 2, 3], unbiased=False)
 
@@ -112,9 +113,8 @@ class Model(nn.Module):
                         self.bias = None
                         self.affine = False
 
-        with torch.no_grad():
-            self(torch.randn(1, *const.IMAGE_SHAPE))
         self.to(self.device)
+        self.initialize_and_verify()
 
     def disable_batchnorms(self):
         for x in self.modules():
@@ -129,6 +129,16 @@ class Model(nn.Module):
 
         if self.disable_bn: self.disable_batchnorms()
         return self
+
+    def initialize_and_verify(self):
+        with torch.no_grad():
+            logits, cam = self(torch.randn(100, *const.IMAGE_SHAPE, device=self.device))
+            cam_logits = cam.view(*cam.shape[:2], -1).sum(2)
+
+            if not self.is_contrastive: cam_logits -= self.linear.bias
+            print('Approx. cam logit err bound:', (logits - cam_logits).abs().max().item())
+
+            if self.is_contrastive: assert torch.allclose(logits, cam_logits, atol=1E-5)
 
     def _hook(self, model, i, o):
         def assign(grad):
@@ -168,23 +178,25 @@ class Model(nn.Module):
         return cams
 
     def overwrite_tracked_statistics(self, gen):
-        for x in self.modules():
-            if x._get_name() in ['ModifiedBN2d', 'BatchNorm2d']:
-                x.momentum = None  # obtain cumulative statistics
-                x.reset_running_stats()
+        for module in self.modules():
+            if module._get_name() in ['ModifiedBN2d', 'BatchNorm2d']:
+                module.momentum = None  # obtain cumulative statistics
+                module.reset_running_stats()
+                module.update_proxy_stats = True
 
-        with torch.no_grad():
-            for X, y in gen: self(X.to(const.DEVICE))
+        for X, y in gen: self(X.to(const.DEVICE))
 
-        for x in self.modules():
-            if x._get_name() in ['ModifiedBN2d', 'BatchNorm2d']: x.momentum = 0.1  # original momentum value; hardcoded for this network
+        for module in self.modules():
+            if module._get_name() in ['ModifiedBN2d', 'BatchNorm2d']:
+                module.momentum = 0.1  # original momentum value; hardcoded for this network
+                module.update_proxy_stats = False
         return self.state_dict()
 
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
 
-    model = Model(disable_bn=False, modified_bn=True, upsampling_level=const.UPSAMPLING_LEVEL)
+    model = Model(is_contrastive=True, disable_bn=False, modified_bn=False, upsampling_level=const.UPSAMPLING_LEVEL)
     print(model)
 
     x = torch.rand(1, *const.IMAGE_SHAPE, device=const.DEVICE, requires_grad=True)
