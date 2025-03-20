@@ -130,9 +130,13 @@ class Model(nn.Module):
         if self.disable_bn: self.disable_batchnorms()
         return self
 
+
     def initialize_and_verify(self):
         with torch.no_grad():
-            logits, cam = self(torch.randn(100, *const.IMAGE_SHAPE, device=self.device))
+            x = torch.randn(100, *const.IMAGE_SHAPE, device=self.device)
+            if self.modified_bn: self.overwrite_tracked_statistics(((x, None),))
+
+            logits, cam = self(x)
             cam_logits = cam.view(*cam.shape[:2], -1).sum(2)
 
             if not self.is_contrastive: cam_logits -= self.linear.bias
@@ -196,7 +200,7 @@ class Model(nn.Module):
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
 
-    model = Model(is_contrastive=True, disable_bn=False, modified_bn=False, upsampling_level=const.UPSAMPLING_LEVEL)
+    model = Model(is_contrastive=True, disable_bn=False, modified_bn=True, upsampling_level=const.UPSAMPLING_LEVEL)
     print(model)
 
     x = torch.rand(1, *const.IMAGE_SHAPE, device=const.DEVICE, requires_grad=True)

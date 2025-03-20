@@ -105,6 +105,7 @@ def fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=False,
     is_primary_rank = not const.DDP or (const.DDP and const.DEVICE == 0)
 
     prev_X = benchmark_batch
+    if model.modified_bn: model.overwrite_tracked_statistics(((prev_X, None),))
     with mlflow.start_run(mlflow_run_id) if is_primary_rank else nullcontext():
         # log hyperparameters
         if is_primary_rank and init_epoch == 0: mlflow.log_params({k: v for k, v in const.__dict__.items() if k == k.upper() and all(s not in k for s in ['DIR', 'PATH', 'EPOCHS', 'SELECT_BEST', 'DEVICE', 'TRAIN_CUTOFF', 'PORT'])})
