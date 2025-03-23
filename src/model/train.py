@@ -48,14 +48,16 @@ def configure(model_name):
     const.USE_ZERO = 'zero' in const.MODEL_NAME and const.DDP
     const.EMA = 'ema' in const.MODEL_NAME
     const.DISABLE_BN = 'no_bn' in const.MODEL_NAME
-    const.MODIFY_BN = 'mod_bn' in const.MODEL_NAME
     const.XL_BACKBONE = 'largemodel' in const.MODEL_NAME
     const.PRETRAINED_BACKBONE = 'pretrained' in const.MODEL_NAME
+
+    if 'causalbn' in const.MODEL_NAME: const.MODIFY_BN = 'Causal'
+    if 'dytbn' in const.MODEL_NAME: const.MODIFY_BN = 'DyT'
 
     if 'elu' in const.MODEL_NAME: const.ACTIVATIONS = 'ELU'
     elif 'eeu' in const.MODEL_NAME: const.ACTIVATIONS = 'EEU'
     elif 'extsigmoid' in const.MODEL_NAME: const.ACTIVATIONS = 'ExtendedSigmoid'
-    elif 'dyt' in const.MODEL_NAME: const.ACTIVATIONS = 'DyT'
+    elif 'dytacts' in const.MODEL_NAME: const.ACTIVATIONS = 'DyT'
     else: const.ACTIVATIONS = 'ReLU'
 
     if ('revups' in const.MODEL_NAME and const.UPSAMPLING_LEVEL > 0) or ('revups' not in const.MODEL_NAME and const.UPSAMPLING_LEVEL < 0): const.UPSAMPLING_LEVEL *= -1

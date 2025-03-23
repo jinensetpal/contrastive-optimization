@@ -3,44 +3,15 @@
 from .resnet import Bottleneck
 from .activations import *
 from src import const
+from .norms import *
 from torch import nn
 import torchvision
 import torch
 
 
-# code modified from: https://github.com/ptrblck/pytorch_misc/blob/master/batch_norm_manual.py
-class ModifiedBN2d(torch.nn.modules.batchnorm._BatchNorm):
-    def __init__(self, num_features, eps=1e-5, momentum=0.1, affine=True, track_running_stats=True):
-        super(ModifiedBN2d, self).__init__(num_features, eps, momentum, affine, track_running_stats)
-        torch._dynamo.config.force_parameter_static_shapes = False
-        self.update_proxy_stats = False
-
-    def _check_input_dim(self, input):
-        if input.dim() != 4:
-            raise ValueError(f"expected 4D input (got {input.dim()}D input)")
-
-    @torch.compile(dynamic=True)
-    @staticmethod
-    def functional(input, running_mean, running_var, eps, weight, bias, affine):
-        input = (input - running_mean[None, :, None, None]) / (torch.sqrt(running_var[None, :, None, None] + eps))
-        if affine: input = input * weight[None, :, None, None] + bias[None, :, None, None]
-
-        return input
-
-    @torch.compiler.disable
-    def forward(self, input):
-        self._check_input_dim(input)
-
-        if self.update_proxy_stats:
-            self.running_mean = input.mean([0, 2, 3])
-            self.running_var = input.var([0, 2, 3], unbiased=False)
-
-        return ModifiedBN2d.functional(input, self.running_mean, self.running_var, self.eps, self.weight, self.bias, self.affine)
-
-
 class Model(nn.Module):
     def __init__(self, randomized_flatten=const.RANDOMIZED_FLATTEN, multilabel=False, logits_only=False, backbone_acts=const.ACTIVATIONS,
-                 disable_bn=const.DISABLE_BN, modified_bn=const.MODIFY_BN, register_backward_hook=False, hardinet_eval=False, xl_backbone=const.XL_BACKBONE,
+                 disable_bn=const.DISABLE_BN, modified_bn=None, register_backward_hook=False, hardinet_eval=False, xl_backbone=const.XL_BACKBONE,
                  device=const.DEVICE, is_contrastive=True, segmentation_threshold=const.SEGMENTATION_THRESHOLD, upsampling_level=1):
         super().__init__()
 
@@ -57,7 +28,8 @@ class Model(nn.Module):
         self._orig_bn = nn.BatchNorm2d
         self._orig_relu = nn.ReLU
 
-        if modified_bn: nn.BatchNorm2d = ModifiedBN2d
+        if modified_bn == 'Causal': nn.BatchNorm2d = ModifiedBN2d
+        elif modified_bn == 'DyT': nn.BatchNorm2d = DynamicTanh
 
         if backbone_acts == 'ELU': nn.ReLU = nn.ELU
         elif backbone_acts == 'EEU': nn.ReLU = EEU
@@ -130,7 +102,6 @@ class Model(nn.Module):
         if self.disable_bn: self.disable_batchnorms()
         return self
 
-
     def initialize_and_verify(self):
         with torch.no_grad():
             x = torch.randn(100, *const.IMAGE_SHAPE, device=self.device)
@@ -142,7 +113,7 @@ class Model(nn.Module):
             if not self.is_contrastive: cam_logits -= self.linear.bias
             print('Approx. cam logit err bound:', (logits - cam_logits).abs().max().item())
 
-            if self.is_contrastive: assert torch.allclose(logits, cam_logits, atol=1E-5)
+            if self.is_contrastive: assert torch.allclose(logits, cam_logits, atol=1E-5 if torch.get_float32_matmul_precision() == 'highest' else 1E-2)
 
     def _hook(self, model, i, o):
         def assign(grad):
@@ -200,7 +171,8 @@ class Model(nn.Module):
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
 
-    model = Model(is_contrastive=True, disable_bn=False, modified_bn=True, upsampling_level=const.UPSAMPLING_LEVEL)
+    model = Model(is_contrastive=True, multilabel=False, xl_backbone=False, upsampling_level=const.UPSAMPLING_LEVEL,
+                  logits_only=True, disable_bn=False, modified_bn=None, backbone_acts=const.ACTIVATIONS, device=const.DEVICE)
     print(model)
 
     x = torch.rand(1, *const.IMAGE_SHAPE, device=const.DEVICE, requires_grad=True)

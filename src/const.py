@@ -20,7 +20,7 @@ N_WORKERS = 3
 N_CHANNELS = 3
 BBOX_MAP = False
 BINARY_CLS = True
-DATASET = 'hardimagenet'
+DATASET = 'imagenet'
 CAM_SIZE = (14, 14)
 VAL_CROP_SIZE = 224
 VAL_RESIZE_SIZE = 232
@@ -47,8 +47,8 @@ RANDOMIZED_FLATTEN = False
 UPSAMPLING_LEVEL = 1  # -ve changes direction not magnitude
 XL_BACKBONE = False
 DISABLE_BN = False
-MODIFY_BN = False
 AFFINE_BN = False
+MODIFY_BN = None
 ACTIVATIONS = 'ReLU'
 
 # training
