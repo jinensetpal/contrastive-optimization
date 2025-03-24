@@ -54,6 +54,10 @@
 \theoremstyle{remark}
 \newtheorem{remark}[theorem]{Remark}
 
+\newcommand{\contcam}[2]{\tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(#1, #2)}}
+\newcommand{\vectorproj}[2][]{\text{proj}_{\vect{#1}}\vect{#2}}
+\newcommand{\vect}{\mathbf}
+
 \title{Interpretable Casual Interventions \\
 Discourage Spurious Learning}
 
@@ -140,15 +144,15 @@ The experimental setup is a CNN-backbone (here, ResNet-50) with a single fully c
 \subsection{Observation: HiResCAMs Explain Class Score, Not Class Probabilites}
 
 Per \cite{draelos2020use}, a HiResCAM is defined as follows:
-\begin{gather}
+\begin{equation}
 	\tilde{\mathcal{\bm{A}}}_c^{\text{HiResCAM}} = \sum^F_{f=1} \frac{\partial s_c}{\partial \bm{A}^f} \odot \bm{A}^f
-\end{gather}
+\end{equation}
 
 Where $s_c$ denotes the logit for a single class. $\tilde{\mathcal{\bm{A}}}_c^{\text{HiResCAM}}$ generates a class-specific CAM. For the CAM architecture, \cite{draelos2020use} (section 3.6.2) shows that:
-\begin{gather}
+\begin{equation}
 	\sum^{D_1,D_2}_{i,j} \tilde{\mathcal{\bm{A}}}_{c,i,j}^{\text{HiResCAM}} = \frac{\bm{w}_c \bm{A}_F}{D_1 D_2} \\
 	s_c = \frac{\bm{w}_c \bm{A}_F}{D_1 D_2} + b_c = \sum^{D_1,D_2}_{i,j} \tilde{\mathcal{\bm{A}}}_{c,i,j}^{\text{HiResCAM}} + b_c
-\end{gather}
+\end{equation}
 Therefore, we can recreate the entire input-dependent part of the score using HiResCAMs. Doing this for each class $c$, we obtain the bias-removed logit vector $\in \mathbb{R}^{c}$.
 
 The standard interpretation of this result uses the obtained activation maps as explanations for the prediction. Popular practice is to follow this up by ReLU and normalization \citep{draelos2020use}. However, since softmax is computed over the logit vector, this interpretation is flawed.
@@ -161,14 +165,14 @@ In this setup, each class has it's own set of weights that feedforwards independ
 	Individual class probabilites $\sigma_c(\bm{s})$ depend on the difference(s) between class logits.
 \end{theorem}
 \begin{proof} Individual class probabilities for logit vector $\bm{s}$ are defined as:
-	\begin{gather}
+	\begin{equation}
 		\sigma_c(\bm{s}) = \frac{e^{s_c}}{\sum_i e^{s_i}}
-	\end{gather}
+	\end{equation}
 	We define our logit vector in terms of the elementwise difference to a target class $c$:
-	\begin{gather}
+	\begin{equation}
 		\bm{d} = [s_i - s_c]_i \\
 		\bm{s} = [s_c + d_i]_i
-	\end{gather}
+	\end{equation}
 	Based on this definition, class probabilities can now be computed as:
 	\begin{align}
 		\sigma_c(\bm{s}) &= \frac{e^{s_c}}{\sum_i e^{s_c+d_i}} \\
@@ -177,9 +181,9 @@ In this setup, each class has it's own set of weights that feedforwards independ
 	This recontextualizes softmax as a direct function of the differences of class logits.
 \end{proof}
 \begin{corollary} Since class probabilities depend on logit differences, the class probabilities are identitical for any two pairs of logit vectors with identical logit differences.
-	\begin{gather}
+	\begin{equation}
 		\frac{e^{s_c}}{\sum_i e^{s_i}} = \frac{e^{s_c+r}}{\sum_i e^{s_i+r}} \forall r \in \mathbb{R}
-	\end{gather}
+	\end{equation}
 \end{corollary}
 \begin{proof} Recontextualizing $\bm{s}$ per the previous proposition, we get:
 	\begin{align}
@@ -198,30 +202,30 @@ As an example, for logits $[1,2]$ and $[-2,-1]$, $\sigma([1,2]) = \sigma([-2,1])
 We start by \textbf{comparing the contrast} of the activation maps with respect to one another. If for a single point $\bm{A}_{i,j}$, $\bm{w}_c > \bm{w}_{c'}$, that point is more likely to represent the object belonging to class $c$, even if the absolute value of $\bm{w}_{c'}$ is high. This information is lost during the flattening, which embeds positional invariance.
 
 We therefore derive an optimization objective that attempts to maximize the contrast between the two activations maps. For the binary classification case, $(c, c')$ reflects that correct and incorrect class respectively.
-\begin{gather}
+\begin{equation}
 	\max_{\theta} s_c - s_{c'} \equiv \max_{\theta} \sum^{D_1,D_2}_{i,j} \tilde{\mathcal{\bm{A}}}_{c,i,j}^{\text{HiResCAM}} + b_c - \sum^{D_1,D_2}_{i,j} \tilde{\mathcal{\bm{A}}}_{c',i,j}^{\text{HiResCAM}} - b_{c'}
-\end{gather}
+\end{equation}
 Ignoring the bias terms, the new optimization objective becomes:
-\begin{gather}
-	\max_{\theta} \sum^{D_1,D_2}_{i,j} \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, c'), i, j} ~~\text{ where }~~ \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, c')} := \tilde{\mathcal{\bm{A}}}_{c}^{\text{HiResCAM}} - \tilde{\mathcal{\bm{A}}}_{c'}^{\text{HiResCAM}}
-\end{gather}
+\begin{equation}
+	\max_{\theta} \sum^{D_1,D_2}_{i,j} \contcam{c}{c'}{}_{, i, j} \quad \text{where} \quad \contcam{c}{c'} := \tilde{\mathcal{\bm{A}}}_{c}^{\text{HiResCAM}} - \tilde{\mathcal{\bm{A}}}_{c'}^{\text{HiResCAM}}
+\end{equation}
 This is equivalent to the original ERM optimization objective, with the difference being the resultant values preserving spatial information in the form of the activation map instead of flattening the feature map. If $\tilde{\mathcal{\bm{A}}}_{c}^{\text{HiResCAM}} - \tilde{\mathcal{\bm{A}}}_{c'}^{\text{HiResCAM}} > 0$, the classification is correct -- if not, the classification is incorrect. 
 
 We can define ContrastiveCAMs as a generalization of the binary case.
 
 \begin{definition}
 	Given a set of classes $C$ with $c_t$ being the target class and $c_{t'}$ being a sampled non-target class, we define ContrastiveCAMs as follows:
-	\begin{gather}
-		\tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c_t, c_{t'})} := \left\{\tilde{\mathcal{\bm{A}}}_{c_t}^{\text{HiResCAM}} - \tilde{\mathcal{\bm{A}}}_{c_{t'}}^{\text{HiResCAM}}\right\}^{|C|-1}_{c_{t'} \in c \setminus c_t}
-	\end{gather}
+	\begin{equation}
+		\contcam{c_t}{c_{t'}} := \left\{\tilde{\mathcal{\bm{A}}}_{c_t}^{\text{HiResCAM}} - \tilde{\mathcal{\bm{A}}}_{c_{t'}}^{\text{HiResCAM}}\right\}^{|C|-1}_{c_{t'} \in c \setminus c_t}
+	\end{equation}
 \end{definition}
 
 This enables us to evaluate ContrastiveCAMs in the multiclass setting. This is trivially a generalization of the previous case, as the same formulation applied to a binary classification task returns a set of contrastive maps containing a single element.
 
 To ensure that the model accurately predicts the target class, each contrastive comparison should yield a positive result. Therefore, the multiclass optimization objective under this construction reads:
-\begin{gather}
+\begin{equation}
 	\max_{\theta} \sum^{D_1,D_2}_{j,k}\tilde{\mathcal{\bm{A}}}_{(c, c'),j,k}^{\text{contrastive}}\ \forall c' \in \mathbb{Z}_{+}(|C| - 1)
-\end{gather}
+\end{equation}
 
 \subsection{Cross-Entropy Motivates Learning from Spurious Correlations} \label{ce-motiv-spurious}
 
@@ -232,25 +236,25 @@ To ensure that the model accurately predicts the target class, each contrastive 
 	\begin{align}
 		d &= [s_i - s_c]_i \\
 		&= \left[\sum^{D_1,D_2}_{j,k} \tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}} - \sum^{D_1,D_2}_{j,k} \tilde{\mathcal{\bm{A}}}_{c,j,k}^{\text{HiResCAM}}\right]_i \\
-		&= \left[ -\sum^{}\tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)} \right]_i
+		&= \left[ -\sum \contcam{c}{i} \right]_i
 	\end{align}
 	As an aside: we note that when $i = c$, the contrastive map obtained is $\bm{0} \in \mathbb{R}^{D_1 \times D_2}$, and instead of $|C| - 1$ contrastive maps we now obtain $|C|$ contrastive maps.
 
 	Using our result from Theorem~\ref{classprobdiff}, we have:
-	\begin{gather}
-		\sigma_c(\bm{s}) = \frac{1}{\sum_i e^{d_i}} = \frac{1}{\sum_i \text{exp}({-\sum \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)}})} = \sum_i \text{exp}\left({\sum \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)}}\right)
-	\end{gather}
+	\begin{equation}
+		\sigma_c(\bm{s}) = \frac{1}{\sum_i e^{d_i}} = \frac{1}{\sum_i \text{exp}({-\sum \contcam{c}{i}})} = \sum_i \text{exp}\left({\sum \contcam{c}{i}}\right)
+	\end{equation}
 	For a target class $c$, cross-entropy loss is defined as:
-	\begin{gather}
-		H(\theta, \mathcal{D}) = -\log \left( \sigma_c(\bm{s}) \right) = -\log \left( \sum_i \text{exp}\left({\sum \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)}}\right) \right)
-	\end{gather}
+	\begin{equation}
+		H(\theta, \mathcal{D}) = -\log \left( \sigma_c(\bm{s}) \right) = -\log \left( \sum_i \text{exp}\left({\sum \contcam{c}{i}}\right) \right)
+	\end{equation}
 	Vectorizing parameters $\theta \in \mathbb{R}^P$ as well as the contrastive attribution maps $\tilde{\mathcal{\bm{A}}}_{(c, i)}^{\text{contrastive}} \in \mathbb{R}^{D_1 D_2}$, we can use the above result to compute gradient contributions from each pixel within the attribution map:
 	\begin{align}
 		\nabla_\theta H &= \underbrace{\begin{bmatrix} \frac{\partial H}{\partial \sum \tilde{\mathcal{\bm{A}}}_{(c, i)}^{\text{contrastive}}} \end{bmatrix}_i}_{\mathbb{R}^{1 \times |C|}}
 			\cdot \underbrace{\begin{bmatrix} \begin{bmatrix} \frac{\partial \sum \tilde{\mathcal{\bm{A}}}_{(c, i)}^{\text{contrastive}}}{\partial \tilde{\mathcal{\bm{A}}}_{(c, i), j, k}^{\text{contrastive}}} \end{bmatrix}_{i}^T \end{bmatrix}_{j,k}}_{\mathbb{R}^{|C| \times D_1 D_2}}
 			\cdot \underbrace{\frac{\partial \tilde{\mathcal{\bm{A}}}_{(c, i), j, k}^{\text{contrastive}}}{\partial \theta}}_{\mathbb{R}^{D_1D_2 \times P}} \\
-		&= - \begin{bmatrix} \frac{\text{exp}\left( \sum \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)}\right)}{\sum_j \text{exp}\left({\sum \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, j)}}\right)} \end{bmatrix}_i \cdot \bm{1}_{|C| \times D_1 D_2} \cdot \frac{\partial \tilde{\mathcal{\bm{A}}}_{(c, i), j, k}^{\text{contrastive}}}{\partial \theta} \\
-			&= - \sigma\left( \begin{bmatrix} \sum \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)} \end{bmatrix}_i \right) \cdot \bm{1}_{|C| \times D_1 D_2} \cdot \frac{\partial \tilde{\mathcal{\bm{A}}}_{(c, i), j, k}^{\text{contrastive}}}{\partial \theta}
+		&= - \begin{bmatrix} \frac{\text{exp}\left( \sum \contcam{c}{i}\right)}{\sum_j \text{exp}\left({\sum \contcam{c}{j}}\right)} \end{bmatrix}_i \cdot \bm{1}_{|C| \times D_1 D_2} \cdot \frac{\partial \tilde{\mathcal{\bm{A}}}_{(c, i), j, k}^{\text{contrastive}}}{\partial \theta} \\
+			&= - \sigma\left( \begin{bmatrix} \sum \contcam{c}{i} \end{bmatrix}_i \right) \cdot \bm{1}_{|C| \times D_1 D_2} \cdot \frac{\partial \tilde{\mathcal{\bm{A}}}_{(c, i), j, k}^{\text{contrastive}}}{\partial \theta}
 	\end{align}
 	Each element within the second term is constant $\forall j \in \mathbb{N}(D_1),~k \in \mathbb{N}(D_2)$, indicating the gradient contribution from every given pixel $(j, k)$ from the attribution map is equivalent. This \underline{holds irrespective of whether the given pixel contains the target feature}; consequently, any region within the image can contribute towards the correct class.
 \end{proof}
@@ -307,15 +311,15 @@ The primary distinction between the contrastive construction over standard risk 
 
 \paragraph{Core Risk Minimization \citep{singla2022core}} proposes a generalization of Emprical Risk Minimization, the objective is to minimize prediction error while non-core regions are injected with gaussian noise:
 \begin{equation}
-	\min_\theta \mathbb{E}_{(\bm{x}, \bm{h}, y)} [ \mathbb{E}_{\bm{z} \sim \mathcal{N}(0, \sigma^2 \bm{I})} \ell(f_\theta(\bm{x} + \bm{z} \odot (1 - \bm{h})), y) ]
+	\min_\theta \mathbb{E}_{(\bm{x}, \bm{h}, y) \sim \mathcal{D}} [ \mathbb{E}_{\bm{z} \sim \mathcal{N}(0, \sigma^2 \bm{I})} \ell(f_\theta(\bm{x} + \bm{z} \odot (1 - \bm{h})), y) ]
 \end{equation}
 Here $\ell$ represents cross-entropy, $\bm{x}$ represents the input, $\bm{h}$ is the set of core features corresponding to the input encoded as a binary mask, $y$ is the label corresponding to the input and $f_\theta$ is the parameterized network.
 
 We can extend this to constrain the way optimization occurs. In principle, the objective is consistent -- we only want the model to increase the likelihood of an object belonging to a certain class by actually looking at the features of the class, and not features of spurious correlation like the environment in which the object is present.
 
-The model should, through the process of training learn to distinguish and subsequently ignore the background in determining the final prediction. Analogous to \citep{singla2022core}, we define the core-constrained optimization objective as follows:
-\begin{equation}\label{icrm}
-	\min_\theta \mathbb{E}_{(\bm{x}, \bm{h}, y)} \left[ \int_{\mathbb{R}^{C \times D_1 \times D_2}} \ell(f_\theta(\bm{x} + \bm{z} \odot (1 - \bm{h})), y)~d\bm{z} \right]
+The model should, through the process of training learn to distinguish and subsequently ignore the background in determining the final prediction. Analogous to \citep{singla2022core}, we define the contrastive-constrained optimization objective as follows:
+\begin{equation}\label{ccrm}
+	\min_\theta \mathbb{E}_{(\bm{x}, \bm{h}, y) \sim \mathcal{D}} \left[ \ell(f_\theta(\bm{x}, y) \right] \quad \text{s.t.} \quad \sum_{c' \in C} \| \contcam{c}{c'} \odot (1 - h) \| = 0
 \end{equation}
 
 For the experiments in this paper, we consider the segmentation mask of the image as a proxy for core features that causally determine the prediction. However, the same framework can be used to apply constrain learning over an arbitrary mask $\bm{h}$ (and subsequently invariance over mask $1 - \bm{h}$), which can vary depending on the task.
@@ -323,7 +327,7 @@ For the experiments in this paper, we consider the segmentation mask of the imag
 % TODO: formal analysis -- empirical performance test on scale augmentation + norm-change in feature representation.
 %In addition to learning invariances to spurious correlation, having information about the specific region containing the classification target motivates learning scale-robust representations of the target.
 
-In the following subsections, we outline cost functions designed to minimize (\ref{icrm}) using contrastive maps to directly learn invariance to spurious features while generating contrast over the target region.
+In the following subsections, we outline a family of cost functions for binary, mutliclass and mutliple-class classification, designed to minimize (\ref{ccrm}) using contrastive maps to learn invariance to spurious features while generating contrast over the target region.
 
 \subsubsection{Divergence Minimization}
 Segmentation maps describe the region over which the classification target is present. We can leverage this information to define a constrastive cost function as follows:
@@ -338,9 +342,9 @@ Segmentation maps describe the region over which the classification target is pr
 		P_{i,j} & \text{otherwise}
 	\end{cases} \label{d_kl} \\
 	\begin{split}
-		\mathcal{\bm{J}}(\theta, \mathcal{D}) := &\ \frac{1}{|C|} \sum^{|C|}_{i} \underbrace{\lambda_1 D_{KL}(\sigma_{\text{softmax}}(\lambda_3 h)\ ||\ \sigma_{\text{softmax}}(\lambda_2 \tilde{\mathcal{\bm{A}}}^{\textit{contrastive}}_{(c, i)}))}_{\text{minimize divergence from target shape}} \\
-		&+ \underbrace{\frac{\lambda_4}{(|C| - 1) \left(D_1 D_2 - \sum^{D_1,D_2}_{i,j}h_{i,j}\right)} || (1 - h) \odot \tilde{\mathcal{\bm{A}}}^{\textit{contrastive}}_{(c, i)}||^2_F}_{\text{minimize background influence}} \\
-		&- \underbrace{\frac{\lambda_5}{(|C| - 1) \sum^{D_1,D_2}_{i,j}h_{i,j}} \sum^{|C|-1,D_1,D_2}_{i,j,k} \left(\tilde{\mathcal{\bm{A}}}^{\textit{contrastive}}_{(c,i)} \odot h\right)_{j,k} }_{\text{maximize foreground influence}}
+		\mathcal{\bm{J}}(\theta, \mathcal{D}) := &\ \frac{1}{|C|} \sum^{|C|}_{i} \underbrace{\lambda_1 D_{KL}(\sigma_{\text{softmax}}(\lambda_3 h)\ ||\ \sigma_{\text{softmax}}(\lambda_2 \contcam{c}{i}))}_{\text{minimize divergence from target shape}} \\
+		&+ \underbrace{\frac{\lambda_4}{(|C| - 1) \left(D_1 D_2 - \sum^{D_1,D_2}_{i,j}h_{i,j}\right)} || (1 - h) \odot \contcam{c}{i}||^2_F}_{\text{minimize background influence}} \\
+		&- \underbrace{\frac{\lambda_5}{(|C| - 1) \sum^{D_1,D_2}_{i,j}h_{i,j}} \sum^{|C|-1,D_1,D_2}_{i,j,k} \left(\contcam{c}{i} \odot h\right)_{j,k} }_{\text{maximize foreground influence}}
 	\end{split}
 \end{gather}
 
@@ -354,22 +358,22 @@ A more mathematically rigorous approach involves performing an ablation over cla
 
 \begin{theorem}\label{ace}
 	We can integrate background invariance to the definition of cross-entropy using the following formulation:
-	\begin{gather}
-		\mathcal{J}(\theta, \mathcal{D}) = -\log \left( \frac{1}{\sum_i \text{exp}\left(-\sum h \odot \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)} + \sum |(1-h) \odot \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)}|\right)} \right)
-	\end{gather}
+	\begin{equation}
+		\mathcal{J}(\theta, \mathcal{D}) = -\log \left( \frac{1}{\sum_i \text{exp}\left(-\sum h \odot \contcam{c}{i} + \sum |(1-h) \odot \contcam{c}{i}|\right)} \right)
+	\end{equation}
 \end{theorem}
 \begin{proof} Following the setup from Theorem \ref{ce-spur-corr}, for a target class $c$, cross-entropy loss is defined as:
-	\begin{gather}
-		H(\theta, \mathcal{D}) = -\log \left( \sigma_c(\bm{s}) \right) = -\log \left( \frac{1}{\sum_i \text{exp}({-\sum^{}\tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)}})} \right)
-	\end{gather}
+	\begin{equation}
+		H(\theta, \mathcal{D}) = -\log \left( \sigma_c(\bm{s}) \right) = -\log \left( \frac{1}{\sum_i \text{exp}({-\sum \contcam{c}{i}})} \right)
+	\end{equation}
 	We can break down each contrastive map to foreground and background components:
-	\begin{gather}
-		H(\theta, \mathcal{D}) = -\log \left( \frac{1}{\sum_i \text{exp}\left({-\sum^{}h \odot \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)} - \sum (1-h) \odot \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)}}\right)} \right)
-	\end{gather}
+	\begin{equation}
+		H(\theta, \mathcal{D}) = -\log \left( \frac{1}{\sum_i \text{exp}\left({-\sum h \odot \contcam{c}{i} - \sum (1-h) \odot \contcam{c}{i}}\right)} \right)
+	\end{equation}
 	The current loss formulation motivates improving contrast using either the foreground or the background. We penalize contrast on the background, motivating learning invariance to noise in the form of the background.
-	\begin{gather}
-		\mathcal{J}(\theta, \mathcal{D}) = -\log \left( \frac{1}{\sum_i \text{exp}\left({-\sum^{}h \odot \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)} + \sum |(1-h) \odot \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)}}|\right)} \right)
-	\end{gather}
+	\begin{equation}
+		\mathcal{J}(\theta, \mathcal{D}) = -\log \left( \frac{1}{\sum_i \text{exp}\left({-\sum h \odot \contcam{c}{i} + \sum |(1-h) \odot \contcam{c}{i}}|\right)} \right)
+	\end{equation}
 	This gives us our ablated cross-entropy formulation.
 \end{proof}
 
@@ -381,12 +385,12 @@ An empirical observation from the behavior of cross-entropy loss is that it disp
 
 We therefore combined the divergence based loss with ablated cross-entropy. The ablated cross-entropy term ensures accurate predictions using only the region where the classification target is present, and the divergence term mitigates the dataset-specific contrastive setting, motivating effectively learning an implicit segmentation map.
 
-\begin{gather}
+\begin{equation}
 	\begin{split}
-		\mathcal{\bm{J}}(\theta, \mathcal{D}) := &\ \frac{1}{|C|} \sum^{|C|}_{i} \lambda_1 D_{KL}(\sigma_{\text{softmax}}(\lambda_3 h)\ ||\ \sigma_{\text{softmax}}(\lambda_2 \tilde{\mathcal{\bm{A}}}^{\textit{contrastive}}_{(c, i)})) \\
-		&- \lambda_4 \log \left( \frac{1}{\sum_i \text{exp}\left({-\sum^{}h \odot \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)} + \sum |(1-h) \odot \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)}}|\right)} \right)
+		\mathcal{\bm{J}}(\theta, \mathcal{D}) := &\ \frac{1}{|C|} \sum^{|C|}_{i} \lambda_1 D_{KL}(\sigma_{\text{softmax}}(\lambda_3 h)\ ||\ \sigma_{\text{softmax}}(\lambda_2 \contcam{c}{i})) \\
+		&- \lambda_4 \log \left( \frac{1}{\sum_i \text{exp}\left({-\sum h \odot \contcam{c}{i} + \sum |(1-h) \odot \contcam{c}{i}}|\right)} \right)
 	\end{split}
-\end{gather}
+\end{equation}
 
 For this setting, $\bm{\lambda} = \{1, 50, 1, 10^{-3}\}$ was set for $i = \{1, \ldots, 4\}$ respectively. As in the previous setting, these were identified empirically, without rigorous optimization.
 
@@ -396,9 +400,9 @@ For sigmoid-activated binary / multilabel classification tasks, we leverage simi
 
 \begin{theorem}\label{abce}
 	We can integrate background invariance to the definition of binary cross-entropy using the following formulation:
-	\begin{gather}
+	\begin{equation}
 		\mathcal{J}(\theta, \mathcal{D}) = - y_i \log \left(\sigma\left(h \odot \sum_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}} - (1-h) \odot \sum_{j,k}|\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}}|\right) \right) - (1 - y_i) \log \left( \bm{s}_i \right)
-	\end{gather}
+	\end{equation}
 \end{theorem}
 \begin{proof} For any logit $i$, binary cross-entropy loss is defined as:
 	\begin{align}
@@ -406,27 +410,38 @@ For sigmoid-activated binary / multilabel classification tasks, we leverage simi
 		&= -\left[ y_i \log \left(\sigma\left(\sum_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}}\right) \right) + (1 - y_i) \log \left(1 - \sigma\left(\sum_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}}\right) \right) \right]
 	\end{align}
 	Similar to Theorem \ref{ace}, we can break down each HiResCAM to foreground and background components. For a non-target HiResCAM, anything that is not the target is inherently the background. Therefore, it's definition is retained.
-	\begin{gather}
+	\begin{equation}
 		H(\theta, \mathcal{D}) = - y_i \log \left(\sigma\left(h \odot \sum_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}} - (1-h) \odot \sum_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}}\right) \right) - (1 - y_i) \log \left( \bm{s}_i \right)
-	\end{gather}
+	\end{equation}
 	The current formulation motivates activating either the foreground or the background for positive classification, and motivates de-activating every pixel of the non-positive class. We penalize activation on the background for the positive class only:
-	\begin{gather}
+	\begin{equation}
 		\mathcal{J}(\theta, \mathcal{D}) = - y_i \log \left(\sigma\left(h \odot \sum_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}} - (1-h) \odot \sum_{j,k}|\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}}|\right) \right) - (1 - y_i) \log \left( \bm{s}_i \right)
-	\end{gather}
+	\end{equation}
 	This gives us the ablated binary cross-entropy formulation.
 \end{proof}
 
 \subsubsection{Ablated Binary Cross-Entropy Divergence Formulation}
 
 Similar to ACE, we define a divergence term for the target class to motivate learning the foreground as part of the training process.
-\begin{gather}
+\begin{equation}
 	\begin{split}
 		\mathcal{\bm{J}}(\theta, \mathcal{D}) := &\ \frac{1}{|C|} \sum^{|C|}_{i} \lambda_1 D_{KL}(\sigma_{\text{softmax}}(\lambda_3 h)\ ||\ \sigma_{\text{softmax}}(\lambda_2 \tilde{\mathcal{\bm{A}}}_{i}^{\text{HiResCAM}})) \\
 		&- \lambda_2 \bigg[ y_i \log \left(\sigma\left(h \odot \sum_{j,k}\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}} - (1-h) \odot \sum_{j,k}|\tilde{\mathcal{\bm{A}}}_{i,j,k}^{\text{HiResCAM}}|\right) \right) + (1 - y_i) \log \left( \bm{s}_i \right) \bigg]
 	\end{split}
-\end{gather}
+\end{equation}
 
 \subsubsection{Spatial Sliced Wasserstein Loss}
+
+The application of Optimal Transport theory as a robust metric between distributions enables vast applications within image processing \citep{papadakis2015optimal}. Robust gradients in turn improve convergence, which we leverage by adapting the spatial sliced wasserstein loss proposed in \citet{heitz2021sliced} to learn the optimal contrastive map as a regularizer term over (\ref{ace}).
+\begin{equation}
+	\begin{split}
+		\mathcal{\bm{J}}(\theta, \mathcal{D}) := &\ \mathbb{E}_{\mathbf{d} \sim \mathcal{N}(0, 1)}\left[\left\| \text{sort}(\vectorproj[d]{(\text{concat}(\contcam{c}{c'}, \bm{s}}))) - \text{sort}(\vectorproj[d]{\text{concat}(h, s)}) \right\|^2 \right] \\
+		&-\log \left( \frac{1}{\sum_i \text{exp}\left(-\sum h \odot \contcam{c}{i} + \sum |(1-h) \odot \contcam{c}{i}|\right)} \right)
+	\end{split}
+\end{equation}
+Where $\mathbf{s}$ is a spatial prior that ensures learned distributions correspond to spatial regions that contain the target. In practice, we use sample $\approx 20$ directions, and exclude over-activation in target regions when computing the norm.
+
+We observe that using divergence / distance based regularization to learn segmentation maps as an implicit part of optimization improves the generalization performance of the network. We hypothesize this being a consequence of inducing contrast over regions beyond just those most relevant for classification within dataset-specific samples. We present empricial evidence to support this claim across all our benchmarks in Section \ref{results}.
 
 \subsection{Training Details}
 
@@ -446,6 +461,7 @@ The Oxford-IIIT Pets dataset is an image dataset with a classification objective
 \paragraph{Reproducibility.} The source code, dataset, experiments, evals, and model weights can be found at \url{https://dagshub.com/jinensetpal/contrastive-optimization.git}.
 
 \section{Results}
+\label{results}
 
 \subsection{Overview}
 
@@ -524,10 +540,10 @@ We can observe that the default model is unable to learn any valuable informatio
 The contrastive model was trained for 227 epochs with the Adam optimizer with a learning rate of $10^{-3}$ with a batch size of 20, with 4 gradient accumulation steps (effective batch size of 80) on a 32GB V100 on a randomly shuffled dataset using the original splits. The default model was only trained for 33 epochs, while the ablated cross-entropy loss was only trained for 98 epochs by which point both had converged. For posterity, we will run each setup for 227 epochs as well before publication.
 
 \subsection{Benchmark: Hard-Imagenet}
-
-\begin{table}[H]
-	\centering
+\begin{table}[h!]
 	\caption{Accuracies under various ablations, Relative Foreground Sensitivity, on FineTuned ResNet-50 models trained using varying approaches.}
+	\centering
+	\hspace*{-4em}
 	\begin{tabular}{c|c|ccc|c}
 		\toprule
 		\textbf{Method} & \textbf{None} $(\uparrow)$ & \textbf{Gray Mask FG} $(\downarrow)$ & \textbf{Gray BBOX FG} $(\downarrow)$ & \textbf{Tile FG} $(\downarrow)$ & \textbf{RFS} $(\uparrow)$ \\
@@ -657,17 +673,17 @@ CutMix \citep{yun2019cutmix} is a batch-wise augmentation technique that encoura
 CutMix can be effectively adapted to work with our setup: given a cut-out, we motivate differential contrast; if non-target pixels are contained in the new image, irrespective of the label, contrast should be generated in favor of the non-target class for the non-target, foreground subset of pixels. This affects the downstream prediction confidence, representative of the label being shifted from one-hot encoding to a randomized affine combination.
 
 Let segmentation mask $h$ take the following form:
-\begin{gather*}
+\begin{equation*}
 	h := \begin{cases}
 		-1 & \text{pixel does not contain any class} \\
 		c & \text{pixel contains class } c
 	\end{cases}
-\end{gather*}
+\end{equation*}
 
 Then, Ablated Cross Entropy (\ref{ace}) is formulated as follows:
-\begin{gather}
-	\mathcal{J}(\theta, \mathcal{D}) = -\log \left( \frac{1}{\sum_i \text{exp}\left(-\sum \mathbbm{1}_{c}(h) \odot \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)} + \sum |\mathbbm{1}_{-1}(h) \odot \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)}| + \sum \mathbbm{1}_{i}(h) \odot \tilde{\mathcal{\bm{A}}}^{\text{contrastive}}_{(c, i)} \right)} \right)
-\end{gather}
+\begin{equation}
+	\mathcal{J}(\theta, \mathcal{D}) = -\log \left( \frac{1}{\sum_i \text{exp}\left(-\sum \mathbbm{1}_{c}(h) \odot \contcam{c}{i} + \sum |\mathbbm{1}_{-1}(h) \odot \contcam{c}{i}| + \sum \mathbbm{1}_{i}(h) \odot \contcam{c}{i} \right)} \right)
+\end{equation}
 
 Where the third newly introduced term within the exponent expresses differential contrast.
 
