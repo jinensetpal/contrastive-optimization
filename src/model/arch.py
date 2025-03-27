@@ -86,7 +86,7 @@ class Model(nn.Module):
                         self.affine = False
 
         self.to(self.device)
-        self.initialize_and_verify()
+        if not hardinet_eval: self.initialize_and_verify()
 
     def disable_batchnorms(self):
         for x in self.modules():
@@ -135,7 +135,7 @@ class Model(nn.Module):
         return (segmentation_map.values > self.segmentation_threshold).to(torch.uint8) * (segmentation_map.indices + 1).to(torch.uint8)
 
     def get_contrastive_cams(self, y, cams):
-        return torch.index_select(cams.view(-1, *cams.shape[2:]), 0, y.argmax(1) + (torch.arange(cams.size(0), device=const.DEVICE) * cams.size(1))).repeat(1, cams.size(1), 1).view(*cams.shape) - cams
+        return torch.index_select(cams.view(-1, *cams.shape[2:]), 0, y.argmax(1) + (torch.arange(cams.size(0), device=self.device) * cams.size(1))).repeat(1, cams.size(1), 1).view(*cams.shape) - cams
 
     def _bp_free_hi_res_cams(self):  # required to obtain gradients on self.linear.weight
         return (self.linear.weight @ self.feature_rect.flatten(2)).unflatten(2, self.feature_rect.shape[2:]) / self.feature_rect.shape[-1]**2
@@ -159,7 +159,7 @@ class Model(nn.Module):
                 module.reset_running_stats()
                 module.update_proxy_stats = True
 
-        for X, y in gen: self(X.to(const.DEVICE))
+        for X, y in gen: self(X.to(self.device))
 
         for module in self.modules():
             if module._get_name() in ['ModifiedBN2d', 'BatchNorm2d']:

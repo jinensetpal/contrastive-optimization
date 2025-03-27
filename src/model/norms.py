@@ -40,7 +40,7 @@ class ModifiedBN2d(nn.modules.batchnorm._BatchNorm):
             raise ValueError(f"expected 4D input (got {input.dim()}D input)")
 
     # @torch.compile(dynamic=True)
-    @torch.compiler.disable  # use if no gradients are forwarded to running stats
+    @torch.compiler.disable  # needed if gradients are forwarded to running stats
     @staticmethod
     def functional(input, running_mean, running_var, eps, weight, bias, affine):
         input = (input - running_mean[None, :, None, None]) / (torch.sqrt(running_var[None, :, None, None] + eps))

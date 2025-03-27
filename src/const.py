@@ -45,11 +45,11 @@ else: N_CLASSES = 2 if BINARY_CLS else 37
 PRETRAINED_BACKBONE = False
 RANDOMIZED_FLATTEN = False
 UPSAMPLING_LEVEL = 1  # -ve changes direction not magnitude
+ACTIVATIONS = 'ReLU'
 XL_BACKBONE = False
 DISABLE_BN = False
 AFFINE_BN = False
 MODIFY_BN = None
-ACTIVATIONS = 'ReLU'
 
 # training
 DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'

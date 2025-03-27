@@ -58,6 +58,15 @@
 \newcommand{\vectorproj}[2][]{\text{proj}_{\vect{#1}}\vect{#2}}
 \newcommand{\vect}{\mathbf}
 
+\DeclareMathOperator{\Tr}{Tr}
+\DeclareMathOperator{\Cov}{Cov}
+\DeclareMathOperator{\Concat}{Concat}
+\DeclareMathOperator*{\argsup}{arg\,sup}
+\DeclareMathOperator*{\arginf}{arg\,inf}
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\DeclareMathOperator*{\indep}{\perp \!\!\! \perp}
+
 \title{Interpretable Casual Interventions \\
 Discourage Spurious Learning}
 
@@ -250,11 +259,11 @@ To ensure that the model accurately predicts the target class, each contrastive 
 	\end{equation}
 	Vectorizing parameters $\theta \in \mathbb{R}^P$ as well as the contrastive attribution maps $\tilde{\mathcal{\bm{A}}}_{(c, i)}^{\text{contrastive}} \in \mathbb{R}^{D_1 D_2}$, we can use the above result to compute gradient contributions from each pixel within the attribution map:
 	\begin{align}
-		\nabla_\theta H &= \underbrace{\begin{bmatrix} \frac{\partial H}{\partial \sum \tilde{\mathcal{\bm{A}}}_{(c, i)}^{\text{contrastive}}} \end{bmatrix}_i}_{\mathbb{R}^{1 \times |C|}}
-			\cdot \underbrace{\begin{bmatrix} \begin{bmatrix} \frac{\partial \sum \tilde{\mathcal{\bm{A}}}_{(c, i)}^{\text{contrastive}}}{\partial \tilde{\mathcal{\bm{A}}}_{(c, i), j, k}^{\text{contrastive}}} \end{bmatrix}_{i}^T \end{bmatrix}_{j,k}}_{\mathbb{R}^{|C| \times D_1 D_2}}
-			\cdot \underbrace{\frac{\partial \tilde{\mathcal{\bm{A}}}_{(c, i), j, k}^{\text{contrastive}}}{\partial \theta}}_{\mathbb{R}^{D_1D_2 \times P}} \\
+		\nabla_\theta H &= \begin{bmatrix} \frac{\partial H}{\partial \sum \tilde{\mathcal{\bm{A}}}_{(c, i)}^{\text{contrastive}}} \end{bmatrix}_i
+			\cdot \begin{bmatrix} \begin{bmatrix} \frac{\partial \sum \tilde{\mathcal{\bm{A}}}_{(c, i)}^{\text{contrastive}}}{\partial \tilde{\mathcal{\bm{A}}}_{(c, i), j, k}^{\text{contrastive}}} \end{bmatrix}_{i}^T \end{bmatrix}_{j,k}
+			\cdot \frac{\partial \tilde{\mathcal{\bm{A}}}_{(c, i), j, k}^{\text{contrastive}}}{\partial \theta} \\
 		&= - \begin{bmatrix} \frac{\text{exp}\left( \sum \contcam{c}{i}\right)}{\sum_j \text{exp}\left({\sum \contcam{c}{j}}\right)} \end{bmatrix}_i \cdot \bm{1}_{|C| \times D_1 D_2} \cdot \frac{\partial \tilde{\mathcal{\bm{A}}}_{(c, i), j, k}^{\text{contrastive}}}{\partial \theta} \\
-			&= - \sigma\left( \begin{bmatrix} \sum \contcam{c}{i} \end{bmatrix}_i \right) \cdot \bm{1}_{|C| \times D_1 D_2} \cdot \frac{\partial \tilde{\mathcal{\bm{A}}}_{(c, i), j, k}^{\text{contrastive}}}{\partial \theta}
+		\nabla_\theta H &= - \sigma\left( \begin{bmatrix} \sum \contcam{c}{i} \end{bmatrix}_i \right) \cdot \bm{1}_{|C| \times D_1 D_2} \cdot \frac{\partial \tilde{\mathcal{\bm{A}}}_{(c, i), j, k}^{\text{contrastive}}}{\partial \theta}
 	\end{align}
 	Each element within the second term is constant $\forall j \in \mathbb{N}(D_1),~k \in \mathbb{N}(D_2)$, indicating the gradient contribution from every given pixel $(j, k)$ from the attribution map is equivalent. This \underline{holds irrespective of whether the given pixel contains the target feature}; consequently, any region within the image can contribute towards the correct class.
 \end{proof}
@@ -310,24 +319,34 @@ This is especially concerning for cases wherein the target is far away from the 
 The primary distinction between the contrastive construction over standard risk is that it preserves spatial information. We know at a pointwise level how each feature within the contrastive map contributes to the final prediction.
 
 \paragraph{Core Risk Minimization \citep{singla2022core}} proposes a generalization of Emprical Risk Minimization, the objective is to minimize prediction error while non-core regions are injected with gaussian noise:
-\begin{equation}
-	\min_\theta \mathbb{E}_{(\bm{x}, \bm{h}, y) \sim \mathcal{D}} [ \mathbb{E}_{\bm{z} \sim \mathcal{N}(0, \sigma^2 \bm{I})} \ell(f_\theta(\bm{x} + \bm{z} \odot (1 - \bm{h})), y) ]
+\begin{equation}\label{crm}
+	\min_\theta \mathbb{E}_{(\bm{x}, \bm{h}, y) \sim \mathcal{D}} [ \mathbb{E}_{\bm{z} \sim \mathcal{N}(0, \sigma^2 \bm{I})} [ \ell(f_\theta(\bm{x} + \bm{z} \odot (1 - \bm{h})), y) ]]
 \end{equation}
 Here $\ell$ represents cross-entropy, $\bm{x}$ represents the input, $\bm{h}$ is the set of core features corresponding to the input encoded as a binary mask, $y$ is the label corresponding to the input and $f_\theta$ is the parameterized network.
 
-We can extend this to constrain the way optimization occurs. In principle, the objective is consistent -- we only want the model to increase the likelihood of an object belonging to a certain class by actually looking at the features of the class, and not features of spurious correlation like the environment in which the object is present.
+\paragraph{Contrast-Constrained Risk Minimization} We extend this notion to constrain the way optimization occurs. In principle, the objective is consistent -- we only want the model to increase the likelihood of an object belonging to a certain class by actually looking at the features of the class, and not features of spurious correlation like the environment in which the object is present.
 
-The model should, through the process of training learn to distinguish and subsequently ignore the background in determining the final prediction. Analogous to \citep{singla2022core}, we define the contrastive-constrained optimization objective as follows:
+The model should, through the process of training learn to distinguish and subsequently ignore the non-target regions in determining the final prediction. Analogous to \citep{singla2022core}, we define the contrast-constrained optimization objective as follows:
 \begin{equation}\label{ccrm}
-	\min_\theta \mathbb{E}_{(\bm{x}, \bm{h}, y) \sim \mathcal{D}} \left[ \ell(f_\theta(\bm{x}, y) \right] \quad \text{s.t.} \quad \sum_{c' \in C} \| \contcam{c}{c'} \odot (1 - h) \| = 0
+	\hat{\theta} = \argmin_\theta \mathbb{E}_{(\bm{x}, \bm{h}, y) \sim \mathcal{D}} \left[ \ell(f_\theta(\bm{x}, y) \right] \quad \text{s.t.} \quad \sum_{c' \in C} \| \contcam{c}{c'} \odot (1 - \bm{h}) \| = 0
 \end{equation}
+In comparing this objective with (\ref{crm}), notice that when the desired constraint is satisfied, obtaining invariance to the non-target regions implies invariance to ablations made to the non-target regions:
+\begin{equation}
+	f_{\hat{\theta}}(\bm{x} + \bm{z} \odot (1 - \bm{h})) = f_{\hat{\theta}}(\bm{x})~\forall z \sim \mathcal{N}(0, \sigma^2 \bm{I})
+\end{equation}
+Further, this implies that:
+\begin{equation}
+	\mathbb{E}_{(\bm{x}, \bm{h}, y) \sim \mathcal{D}} [ \mathbb{E}_{\bm{z} \sim \mathcal{N}(0, \sigma^2 \bm{I})} [\ell(f_{\hat{\theta}}(\bm{x} + \bm{z} \odot (1 - \bm{h})), y) ]] =
+	\mathbb{E}_{(\bm{x}, \bm{h}, y) \sim \mathcal{D}} [ \ell(f_{\hat{\theta}}(\bm{x}), y) ]
+\end{equation}
+Revealing Contrast-Constrained Risk Minimization as a generalization of Core Risk Minimization.
 
-For the experiments in this paper, we consider the segmentation mask of the image as a proxy for core features that causally determine the prediction. However, the same framework can be used to apply constrain learning over an arbitrary mask $\bm{h}$ (and subsequently invariance over mask $1 - \bm{h}$), which can vary depending on the task.
+For the experiments in this paper, we consider the segmentation mask of the image as a proxy for core features that causally determine the prediction. However, the same framework can be used to apply constrained learning over an arbitrary mask $\bm{h}$ (consequently, invariance over mask $1 - \bm{h}$), which can vary depending on the task.
 
 % TODO: formal analysis -- empirical performance test on scale augmentation + norm-change in feature representation.
 %In addition to learning invariances to spurious correlation, having information about the specific region containing the classification target motivates learning scale-robust representations of the target.
 
-In the following subsections, we outline a family of cost functions for binary, mutliclass and mutliple-class classification, designed to minimize (\ref{ccrm}) using contrastive maps to learn invariance to spurious features while generating contrast over the target region.
+In the following subsections, we outline a family of cost functions for binary, mutliclass and mutliple-class classification, designed to minimize (\ref{ccrm}) using contrastive maps to learn invariance to spurious features while generating contrast over the target region in favor of the correct class.
 
 \subsubsection{Divergence Minimization}
 Segmentation maps describe the region over which the classification target is present. We can leverage this information to define a constrastive cost function as follows:
@@ -343,7 +362,7 @@ Segmentation maps describe the region over which the classification target is pr
 	\end{cases} \label{d_kl} \\
 	\begin{split}
 		\mathcal{\bm{J}}(\theta, \mathcal{D}) := &\ \frac{1}{|C|} \sum^{|C|}_{i} \underbrace{\lambda_1 D_{KL}(\sigma_{\text{softmax}}(\lambda_3 h)\ ||\ \sigma_{\text{softmax}}(\lambda_2 \contcam{c}{i}))}_{\text{minimize divergence from target shape}} \\
-		&+ \underbrace{\frac{\lambda_4}{(|C| - 1) \left(D_1 D_2 - \sum^{D_1,D_2}_{i,j}h_{i,j}\right)} || (1 - h) \odot \contcam{c}{i}||^2_F}_{\text{minimize background influence}} \\
+		&+ \underbrace{\frac{\lambda_4}{(|C| - 1) \left(D_1 D_2 - \sum^{D_1,D_2}_{i,j}h_{i,j}\right)} || (1 - \bm{h}) \odot \contcam{c}{i}||^2_F}_{\text{minimize background influence}} \\
 		&- \underbrace{\frac{\lambda_5}{(|C| - 1) \sum^{D_1,D_2}_{i,j}h_{i,j}} \sum^{|C|-1,D_1,D_2}_{i,j,k} \left(\contcam{c}{i} \odot h\right)_{j,k} }_{\text{maximize foreground influence}}
 	\end{split}
 \end{gather}
