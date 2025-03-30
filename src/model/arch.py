@@ -152,6 +152,7 @@ class Model(nn.Module):
 
         return cams
 
+    @torch.no_grad
     def overwrite_tracked_statistics(self, gen):
         for module in self.modules():
             if module._get_name() in ['ModifiedBN2d', 'BatchNorm2d']:

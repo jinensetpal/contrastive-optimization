@@ -4,6 +4,7 @@ from matplotlib.colors import Normalize
 from ..data.oxford_iiit_pet import Dataset as oxford_iiit_pet
 import matplotlib.animation as animation
 from src.data.sbd import Dataset as sbd
+from torch.utils.data import DataLoader
 from .loss import ContrastiveLoss
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
@@ -17,10 +18,15 @@ import sys
 if __name__ == '__main__':
     multilabel = len(sys.argv) == 2
     data = sbd(mode='segmentation') if multilabel else oxford_iiit_pet('train')
-    model = Model(multilabel=multilabel, logits_only=True)
-    optim = torch.optim.Adam(model.parameters(), lr=5E-4)
+    model = Model(multilabel=multilabel, backbone_acts='ELU', modified_bn='Causal', logits_only=True)
+    optim = torch.optim.Adam(model.parameters(), lr=1E-4)
     criterion = ContrastiveLoss(model.get_contrastive_cams, multilabel=multilabel, divergence=const.DIVERGENCE, pos_only=const.POS_ONLY, pos_weight=data.reweight if multilabel else None)
     # criterion = torch.nn.BCEWithLogitsLoss(pos_weight=data.reweight)
+
+    torch.manual_seed(const.SEED)
+    benchmark_batch = next(iter(DataLoader(data, batch_size=const.BATCH_SIZE, shuffle=True)))
+    n_samples = int(benchmark_batch[1][1].sum(0).min())
+    benchmark_batch = torch.vstack([benchmark_batch[0][random.sample(benchmark_batch[1][1][:, i].nonzero().flatten().tolist(), n_samples)] for i in range(benchmark_batch[1][1].size(-1))])
 
     idx = random.randint(0, len(data) - 1)
     print(idx)
@@ -47,6 +53,7 @@ if __name__ == '__main__':
         else: print(loss.item(), F.binary_cross_entropy_with_logits(y_pred[0], y[1], pos_weight=data.reweight).detach().item())
 
         optim.step()
+        if model.modified_bn: model.overwrite_tracked_statistics(((benchmark_batch, None),))
 
     print(y_pred[0].detach(), y[1])
 
