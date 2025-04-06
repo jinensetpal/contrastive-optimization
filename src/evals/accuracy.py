@@ -24,7 +24,7 @@ if __name__ == '__main__':
     else: from ..data.pet_image import Dataset
 
     model = Model(is_contrastive='default' not in name, modified_bn=True)
-    model.load_state_dict(torch.load(const.MODELS_DIR / f'{name}.pt', map_location=const.DEVICE, weights_only=True))
+    model.load_state_dict(torch.load(const.DOWNSTREAM_MODELS_DIR / f'{name}.pt', map_location=const.DEVICE, weights_only=True))
     model.name = name
     model.eval()
 

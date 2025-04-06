@@ -8,7 +8,8 @@ import os
 # directories
 BASE_DIR = Path(__file__).parent.parent
 DATA_DIR = BASE_DIR / 'data'
-MODELS_DIR = BASE_DIR / 'models'
+DOWNSTREAM_MODELS_DIR = BASE_DIR / 'models' / 'downstream'
+PRETRAINED_MODELS_DIR = BASE_DIR / 'models' / 'pretrained'
 
 # evals
 CONFIDENCE_THRESHOLD = .85

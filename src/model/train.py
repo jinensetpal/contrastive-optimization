@@ -107,7 +107,7 @@ def fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=False,
     is_primary_rank = not const.DDP or (const.DDP and const.DEVICE == 0)
 
     prev_X = benchmark_batch
-    if model.modified_bn: model.overwrite_tracked_statistics(((prev_X, None),))
+    if model.modified_bn == 'Causal': model.overwrite_tracked_statistics(((prev_X, None),))
     with mlflow.start_run(mlflow_run_id) if is_primary_rank else nullcontext():
         # log hyperparameters
         if is_primary_rank and init_epoch == 0: mlflow.log_params({k: v for k, v in const.__dict__.items() if k == k.upper() and all(s not in k for s in ['DIR', 'PATH', 'EPOCHS', 'SELECT_BEST', 'DEVICE', 'TRAIN_CUTOFF', 'PORT'])})
@@ -124,7 +124,7 @@ def fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=False,
                     if update_weights: model.train()
                     else: model.eval()
 
-                    if benchmark_batch is None and split == 'train' and model.modified_bn: prev_X = next(iter(dataloader))[0]
+                    if benchmark_batch is None and split == 'train' and model.modified_bn == 'Causal': prev_X = next(iter(dataloader))[0]
                     for batch_idx, (X, y) in enumerate(dataloader):
                         if not (batch_idx+1) % const.GRAD_ACCUMULATION_STEPS: optimizer.zero_grad()
                         X = X.to(const.DEVICE)
@@ -156,7 +156,7 @@ def fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=False,
 
                             if not (batch_idx+1) % const.GRAD_ACCUMULATION_STEPS:
                                 optimizer.step()
-                                if model.modified_bn: model.overwrite_tracked_statistics(((prev_X, None),))
+                                if model.modified_bn == 'Causal': model.overwrite_tracked_statistics(((prev_X, None),))
 
                         if ema and not (batch_idx+1) % const.EMA_STEPS:
                             ema.update_parameters(model)
@@ -234,7 +234,7 @@ if __name__ == '__main__':
     is_contrastive = 'default' not in const.MODEL_NAME
     is_multilabel = const.DATASET == 'sbd'
 
-    path = const.MODELS_DIR / const.MODEL_NAME
+    path = const.DOWNSTREAM_MODELS_DIR / const.MODEL_NAME
     (path).mkdir(exist_ok=True, parents=True)
 
     if const.LOG_REMOTE: mlflow.set_tracking_uri(const.MLFLOW_TRACKING_URI)

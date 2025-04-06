@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import torch.nn.functional as F
 from torch import nn
 import torch
 
@@ -39,8 +40,7 @@ class ModifiedBN2d(nn.modules.batchnorm._BatchNorm):
         if input.dim() != 4:
             raise ValueError(f"expected 4D input (got {input.dim()}D input)")
 
-    # @torch.compile(dynamic=True)
-    @torch.compiler.disable  # needed if gradients are forwarded to running stats and training with DDP
+    @torch.compile(dynamic=True, backend='cudagraphs')
     @staticmethod
     def functional(input, running_mean, running_var, eps, weight, bias, affine):
         input = (input - running_mean[None, :, None, None]) / (torch.sqrt(running_var[None, :, None, None] + eps))
@@ -56,4 +56,7 @@ class ModifiedBN2d(nn.modules.batchnorm._BatchNorm):
             self.running_mean = input.mean([0, 2, 3])
             self.running_var = input.var([0, 2, 3], unbiased=False)
 
-        return ModifiedBN2d.functional(input, self.running_mean, self.running_var, self.eps, self.weight, self.bias, self.affine)
+        if torch.is_grad_enabled(): return ModifiedBN2d.functional(input, self.running_mean, self.running_var, self.eps, self.weight, self.bias, self.affine)
+        else:
+            if self.affine: F.batch_norm(input, self.running_mean, self.running_var, self.weight, self.bias, training=False, eps=self.eps)
+            return F.batch_norm(input, self.running_mean, self.running_var, training=False, eps=self.eps)

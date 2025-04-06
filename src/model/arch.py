@@ -11,7 +11,8 @@ import torch
 
 class Model(nn.Module):
     def __init__(self, randomized_flatten=const.RANDOMIZED_FLATTEN, multilabel=False, logits_only=False, backbone_acts=const.ACTIVATIONS,
-                 disable_bn=const.DISABLE_BN, modified_bn=None, register_backward_hook=False, hardinet_eval=False, xl_backbone=const.XL_BACKBONE,
+                 disable_bn=const.DISABLE_BN, modified_bn=None, register_backward_hook=False, hardinet_eval=False,
+                 xl_backbone=const.XL_BACKBONE, load_pretrained_weights=const.PRETRAINED_BACKBONE, n_classes=const.N_CLASSES,
                  device=const.DEVICE, is_contrastive=True, segmentation_threshold=const.SEGMENTATION_THRESHOLD, upsampling_level=1):
         super().__init__()
 
@@ -38,8 +39,9 @@ class Model(nn.Module):
             nn.ReLU = LazyDyT
             torchvision.models.resnet.Bottleneck = Bottleneck
 
-        if xl_backbone: self.backbone = torchvision.models.resnet152(weights=torchvision.models.ResNet152_Weights.IMAGENET1K_V2 if const.PRETRAINED_BACKBONE else None)
-        else: self.backbone = torchvision.models.resnet50(weights=torchvision.models.ResNet50_Weights.IMAGENET1K_V2 if const.PRETRAINED_BACKBONE else None)
+        load_from_torchvision = load_pretrained_weights and backbone_acts != 'DyT' and modified_bn != 'DyT'
+        if xl_backbone: self.backbone = torchvision.models.resnet152(weights=torchvision.models.ResNet152_Weights.IMAGENET1K_V2 if load_from_torchvision else None)
+        else: self.backbone = torchvision.models.resnet50(weights=torchvision.models.ResNet50_Weights.IMAGENET1K_V2 if load_from_torchvision else None)
 
         if backbone_acts != 'ReLU': nn.ReLU = self._orig_relu
         if backbone_acts == 'DyT': torchvision.models.resnet.Bottleneck = self._orig_bneck
@@ -64,14 +66,20 @@ class Model(nn.Module):
             self.backbone.layer4[-1].relu = nn.Identity()
         self.backbone.layer4[-1].conv3.register_forward_hook(self._hook)
 
-        self.linear = nn.Linear(2048, const.N_CLASSES, bias=not is_contrastive)
+        self.linear = nn.Linear(2048, n_classes, bias=not is_contrastive)
         self.probabilities = nn.Identity() if logits_only else nn.Softmax(dim=1) if not multilabel else nn.Sigmoid()
 
-        if const.DATASET in ['imagenet', 'salientimagenet'] and const.PRETRAINED_BACKBONE:
+        if const.DATASET in ['imagenet', 'salientimagenet'] and load_pretrained_weights:
             self.linear.weight = self.backbone.fc.weight
             if not is_contrastive: self.linear.bias = self.backbone.fc.bias
         self.backbone.fc = nn.Identity()
-        if not modified_bn: self.backbone = torch.compile(self.backbone, options={"shape_padding": True})
+
+        if load_pretrained_weights and not load_from_torchvision:
+            state_dict = torch.load(const.PRETRAINED_MODELS_DIR / 'resnet50_upsampled_dytbn_elu.pt', map_location=torch.device('cpu'), weights_only=True)
+            if n_classes != 1000: del state_dict['linear.weight']
+            self.load_state_dict(state_dict, strict=n_classes == 1000)
+
+        self.backbone = torch.compile(self.backbone, backend='cudagraphs')
 
         if disable_bn: self.disable_batchnorms()
         if modified_bn:
@@ -152,7 +160,6 @@ class Model(nn.Module):
 
         return cams
 
-    @torch.no_grad
     def overwrite_tracked_statistics(self, gen):
         for module in self.modules():
             if module._get_name() in ['ModifiedBN2d', 'BatchNorm2d']:
@@ -172,8 +179,8 @@ class Model(nn.Module):
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
 
-    model = Model(is_contrastive=True, multilabel=False, xl_backbone=False, upsampling_level=const.UPSAMPLING_LEVEL,
-                  logits_only=True, disable_bn=False, modified_bn=None, backbone_acts=const.ACTIVATIONS, device=const.DEVICE)
+    model = Model(is_contrastive=True, multilabel=False, xl_backbone=False, upsampling_level=const.UPSAMPLING_LEVEL, load_pretrained_weights=False,
+                  n_classes=1000, logits_only=True, disable_bn=False, modified_bn='DyT', backbone_acts='ELU', device=const.DEVICE)
     print(model)
 
     x = torch.rand(1, *const.IMAGE_SHAPE, device=const.DEVICE, requires_grad=True)

@@ -12,10 +12,10 @@ if __name__ == '__main__':
     name = sys.argv[1]
 
     model = Model(is_contrastive='default' not in name, modified_bn=True)
-    model.load_state_dict(torch.load(const.MODELS_DIR / f'{name}.pt', map_location=const.DEVICE, weights_only=True))
+    model.load_state_dict(torch.load(const.DOWNSTREAM_MODELS_DIR / f'{name}.pt', map_location=const.DEVICE, weights_only=True))
     model.name = name
     model.train()
 
     torch.multiprocessing.set_start_method('spawn', force=True)
     model.overwrite_tracked_statistics(DataLoader(Dataset('train'), batch_size=const.BATCH_SIZE, num_workers=const.N_WORKERS, shuffle=True))
-    torch.save(model.state_dict(), const.MODELS_DIR / f'{name}_updated_tracked_statistics.pt')
+    torch.save(model.state_dict(), const.DOWNSTREAM_MODELS_DIR / f'{name}_updated_tracked_statistics.pt')

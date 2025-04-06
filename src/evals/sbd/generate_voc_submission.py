@@ -62,7 +62,7 @@ if __name__ == '__main__':
     name = sys.argv[1]
 
     model = Model(is_contrastive='default' not in name, multilabel=True, xl_backbone=False)
-    model.load_state_dict(torch.load(const.MODELS_DIR / f'{name}.pt', map_location=const.DEVICE, weights_only=True))
+    model.load_state_dict(torch.load(const.DOWNSTREAM_MODELS_DIR / f'{name}.pt', map_location=const.DEVICE, weights_only=True))
     model.name = name
     model.eval()
 

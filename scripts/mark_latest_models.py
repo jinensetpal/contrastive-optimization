@@ -8,7 +8,7 @@ import json
 if __name__ == '__main__':
     mlflow.set_tracking_uri(const.MLFLOW_TRACKING_URI)
 
-    for checkpoint_metadata in glob((const.MODELS_DIR / '**' / 'checkpoint_metadata.json').as_posix()):
+    for checkpoint_metadata in glob((const.DOWNSTREAM_MODELS_DIR / '**' / 'checkpoint_metadata.json').as_posix()):
         try:
             with mlflow.start_run(json.load(open(checkpoint_metadata))['mlflow_run_id']):
                 mlflow.set_tag('dagshub.labels.latest', '-')
