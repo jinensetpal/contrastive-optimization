@@ -164,7 +164,8 @@ def fit(model, optimizer, scheduler, criterion, train, val, is_multilabel=False,
 
                         del batch_loss
                         torch.cuda.empty_cache()
-            except (KeyboardInterrupt, torch.OutOfMemoryError):
+            except (KeyboardInterrupt, torch.OutOfMemoryError) as exception:
+                print(exception)
                 break
 
             for split in const.SPLITS[:2]: metrics[f'{split}_acc'] = (sync_and_compute(metrics[f'{split}_acc']) if const.DDP else metrics[f'{split}_acc'].compute()).item()
@@ -261,7 +262,8 @@ if __name__ == '__main__':
         benchmark_batch = torch.vstack([benchmark_batch[0][random.sample(benchmark_batch[1][1][:, i].nonzero().flatten().tolist(), n_samples)] for i in range(benchmark_batch[1][1].size(-1))])
 
     model = Model(is_contrastive=is_contrastive, multilabel=is_multilabel, xl_backbone=const.XL_BACKBONE, upsampling_level=const.UPSAMPLING_LEVEL,
-                  logits_only=True, disable_bn=const.DISABLE_BN, modified_bn=const.MODIFY_BN, backbone_acts=const.ACTIVATIONS, device=const.DEVICE)
+                  load_pretrained_weights=const.PRETRAINED_BACKBONE, n_classes=const.N_CLASSES, logits_only=True,
+                  disable_bn=const.DISABLE_BN, modified_bn=const.MODIFY_BN, backbone_acts=const.ACTIVATIONS, device=const.DEVICE)
 
     ema = optim.swa_utils.AveragedModel(model, device=const.DEVICE, avg_fn=optim.swa_utils.get_ema_avg_fn(1 - min(1, (1 - const.EMA_DECAY) * const.BATCH_SIZE * const.EMA_STEPS / const.EPOCHS)), use_buffers=True) if const.EMA else None
 

@@ -18,7 +18,7 @@ import sys
 if __name__ == '__main__':
     multilabel = len(sys.argv) == 2
     data = sbd(mode='segmentation') if multilabel else oxford_iiit_pet('train')
-    model = Model(multilabel=multilabel, backbone_acts='ELU', modified_bn='Causal', logits_only=True)
+    model = Model(multilabel=multilabel, backbone_acts='ELU', modified_bn='DyT', load_pretrained_weights=False, logits_only=True)
     optim = torch.optim.Adam(model.parameters(), lr=1E-4)
     criterion = ContrastiveLoss(model.get_contrastive_cams, multilabel=multilabel, divergence=const.DIVERGENCE, pos_only=const.POS_ONLY, pos_weight=data.reweight if multilabel else None)
     # criterion = torch.nn.BCEWithLogitsLoss(pos_weight=data.reweight)
@@ -53,7 +53,7 @@ if __name__ == '__main__':
         else: print(loss.item(), F.binary_cross_entropy_with_logits(y_pred[0], y[1], pos_weight=data.reweight).detach().item())
 
         optim.step()
-        if model.modified_bn: model.overwrite_tracked_statistics(((benchmark_batch, None),))
+        if model.modified_bn == 'Causal': model.overwrite_tracked_statistics(((benchmark_batch, None),))
 
     print(y_pred[0].detach(), y[1])
 

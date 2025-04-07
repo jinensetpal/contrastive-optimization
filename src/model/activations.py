@@ -17,9 +17,9 @@ class LazyDyT(nn.modules.lazy.LazyModuleMixin, nn.Module):
         if self.has_uninitialized_params():
             with torch.no_grad():
                 channels = input.size(1)
-                self.alpha = nn.Parameter(torch.full((channels,), float(self.init_alpha)))
-                self.gamma = nn.Parameter(torch.ones(channels))
-                self.beta = nn.Parameter(torch.zeros(channels))
+                self.alpha = nn.Parameter(torch.full((channels,), float(self.init_alpha), device=self.device))
+                self.gamma = nn.Parameter(torch.ones(channels, device=self.device))
+                self.beta = nn.Parameter(torch.zeros(channels, device=self.device))
 
     @torch.compile(dynamic=True)
     def forward(self, x):

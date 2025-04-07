@@ -82,9 +82,11 @@ class Model(nn.Module):
         self.backbone = torch.compile(self.backbone, backend='cudagraphs')
 
         if disable_bn: self.disable_batchnorms()
-        if modified_bn:
+        if modified_bn or backbone_acts == 'DyT':
             for x in self.modules():
-                if x._get_name() == 'ModifiedBN2d':
+                if x._get_name() == 'LazyDyT':
+                    x.device = self.device
+                elif x._get_name() == 'ModifiedBN2d':
                     x.reset_parameters()
                     x.reset_running_stats()
 
@@ -113,7 +115,7 @@ class Model(nn.Module):
     def initialize_and_verify(self):
         with torch.no_grad():
             x = torch.randn(100, *const.IMAGE_SHAPE, device=self.device)
-            if self.modified_bn: self.overwrite_tracked_statistics(((x, None),))
+            if self.modified_bn == 'Causal': self.overwrite_tracked_statistics(((x, None),))
 
             logits, cam = self(x)
             cam_logits = cam.view(*cam.shape[:2], -1).sum(2)

@@ -8,7 +8,7 @@
 
 
 % ready for submission
-\usepackage{neurips_2024}
+\usepackage{neurips_2025}
 
 
 % to compile a preprint version, e.g., for submission to arXiv, add add the
@@ -573,9 +573,14 @@ The contrastive model was trained for 227 epochs with the Adam optimizer with a 
 		DFR & \bf 94.39 & 73.53 & 67.51 & 66.71 & -0.27 \\
 		CORM + DFR & 91.31 & 72.59 & 63.64 & 63.90 & -0.23 \\
 		\midrule
+		DyTBN (Baseline) & 93.07 & 76.67 & 71.73 & 68.27 & -0.22 \\
+		\midrule
 		ACE (Ours) & 89.20 & 47.33 & 34.27 & 34.93 & 0.21 \\
 		ACE + SWD (Ours) & 91.20 & \bf 36.13 & \bf 27.20 & \bf 31.60 & \bf 0.28 \\
 		ACE + SWD + RevUPs (Ours) & 75.86 & \bf 10.40 & \bf 09.86 & \bf 13.19 & \bf 0.57 \\
+		ACE + SWD + DyTBN (Ours) & 87.73 & 45.86 & 34.80 & 40.93 & 0.16 \\
+		\midrule
+		Gold Standard & 100.00 & 06.67 & 06.67 & 06.67 & 1.00 \\
 		\bottomrule
 	\end{tabular}
 \end{table}
