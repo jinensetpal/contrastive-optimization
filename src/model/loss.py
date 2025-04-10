@@ -58,23 +58,23 @@ class ContrastiveLoss(nn.Module):
         directions = torch.hstack((directions, torch.ones(n_directions, 1, device=const.DEVICE)))
 
         sorted_mask_projections = torch.einsum('bdn,md->bmn', target_mask, directions).sort(2)[0]
-        divergence = sorted_mask_projections - torch.einsum('bdn,md->bmn', cc, directions).sort(2)[0]
+        distance = sorted_mask_projections - torch.einsum('bdn,md->bmn', cc, directions).sort(2)[0]
 
         if self.multilabel and not self.pos_only:
-            divergence[target_mask[:, 1].to(torch.bool).unsqueeze(1).repeat(1, n_directions, 1) & (sorted_mask_projections != 0) & (divergence < 0)] = 0
-            divergence[(1 - target_mask[:, 1]).to(torch.bool).unsqueeze(1).repeat(1, n_directions, 1) & (divergence > 0)] = 0
+            distance[target_mask[:, 1].to(torch.bool).unsqueeze(1).repeat(1, n_directions, 1) & (sorted_mask_projections != 0) & (distance < 0)] = 0
+            distance[(1 - target_mask[:, 1]).to(torch.bool).unsqueeze(1).repeat(1, n_directions, 1) & (distance > 0)] = 0
         else:   # (pos_only & multilabel) | contrastive
-            divergence[(sorted_mask_projections != 0) & (divergence < 0)] = 0
-        return divergence.pow(2).mean()
+            distance[(sorted_mask_projections != 0) & (distance < 0)] = 0
+        return distance.pow(2).mean()
 
     def wasserstein(self, cc, fg_mask, y, y_pred):
         fg_mask = fg_mask.to(torch.float)
         if not self.pos_only: fg_mask[(y[1].flatten() - 1).nonzero()] = -1 / (const.CAM_SIZE[0] * const.CAM_SIZE[1])
         fg_mask = const.LAMBDAS[0] * (fg_mask.T / (y[1].flatten() * fg_mask.sum(1).sum(1) + 1 - y[1].flatten())).T
 
-        divergence = self.sinkhorn(cc, fg_mask)
-        divergence = (divergence[y[1].flatten() == 0].mean() + divergence[y[1].flatten() == 1].mean()).mean()
-        return divergence + const.LAMBDAS[1] * (y_pred[0][y[1] == 0].pow(2).mean() + y_pred[0][y[1] == 0].pow(2).mean()).mean()  # term added for regularization; sinkhorn underpenalizes activation map being off in scale but this explodes entropy
+        distance = self.sinkhorn(cc, fg_mask)
+        distance = (distance[y[1].flatten() == 0].mean() + distance[y[1].flatten() == 1].mean()).mean()
+        return distance + const.LAMBDAS[1] * (y_pred[0][y[1] == 0].pow(2).mean() + y_pred[0][y[1] == 0].pow(2).mean()).mean()  # term added for regularization; sinkhorn underpenalizes activation map being off in scale but this explodes entropy
 
     @staticmethod
     def kld(cc, fg_mask):

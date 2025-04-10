@@ -16,6 +16,7 @@ class Model(nn.Module):
                  device=const.DEVICE, is_contrastive=True, segmentation_threshold=const.SEGMENTATION_THRESHOLD, upsampling_level=1):
         super().__init__()
 
+        self.load_pretrained_weights = load_pretrained_weights
         self.segmentation_threshold = segmentation_threshold
         self.register_backward_hook = register_backward_hook
         self.randomized_flatten = randomized_flatten
@@ -75,11 +76,14 @@ class Model(nn.Module):
         self.backbone.fc = nn.Identity()
 
         if load_pretrained_weights and not load_from_torchvision:
-            state_dict = torch.load(const.PRETRAINED_MODELS_DIR / 'resnet50_upsampled_dytbn_elu.pt', map_location=torch.device('cpu'), weights_only=True)
+            if const.ACTIVATIONS == 'ELU' and const.MODIFY_BN == 'DyT': pretrained_model = 'resnet50_upsampled_dytbn_elu.pt'
+            elif const.ACTIVATIONS == 'ReLU' and const.MODIFY_BN == 'Causal': pretrained_model = 'resnet50_upsampled_causalbn.pt'
+            else: raise AttributeError('Pre-Trained match for configuration not found.')
+
+            state_dict = torch.load(const.PRETRAINED_MODELS_DIR / pretrained_model, map_location=torch.device('cpu'), weights_only=True)
+
             if n_classes != 1000: del state_dict['linear.weight']
             self.load_state_dict(state_dict, strict=n_classes == 1000)
-
-        self.backbone = torch.compile(self.backbone, backend='cudagraphs')
 
         if disable_bn: self.disable_batchnorms()
         if modified_bn or backbone_acts == 'DyT':
@@ -94,6 +98,8 @@ class Model(nn.Module):
                         self.weight = None
                         self.bias = None
                         self.affine = False
+
+        self.backbone = torch.compile(self.backbone, backend='cudagraphs')
 
         self.to(self.device)
         if not hardinet_eval: self.initialize_and_verify()
@@ -115,7 +121,7 @@ class Model(nn.Module):
     def initialize_and_verify(self):
         with torch.no_grad():
             x = torch.randn(100, *const.IMAGE_SHAPE, device=self.device)
-            if self.modified_bn == 'Causal': self.overwrite_tracked_statistics(((x, None),))
+            if self.modified_bn == 'Causal' and not self.load_pretrained_weights: self.overwrite_tracked_statistics(((x, None),))
 
             logits, cam = self(x)
             cam_logits = cam.view(*cam.shape[:2], -1).sum(2)

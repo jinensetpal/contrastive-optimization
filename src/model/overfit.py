@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-from matplotlib.colors import Normalize
 
 from ..data.oxford_iiit_pet import Dataset as oxford_iiit_pet
 import matplotlib.animation as animation
+from matplotlib.colors import Normalize
 from src.data.sbd import Dataset as sbd
 from torch.utils.data import DataLoader
 from .loss import ContrastiveLoss
@@ -18,7 +18,7 @@ import sys
 if __name__ == '__main__':
     multilabel = len(sys.argv) == 2
     data = sbd(mode='segmentation') if multilabel else oxford_iiit_pet('train')
-    model = Model(multilabel=multilabel, backbone_acts='ELU', modified_bn='DyT', load_pretrained_weights=False, logits_only=True)
+    model = Model(multilabel=multilabel, backbone_acts='ELU', modified_bn='DyT', load_pretrained_weights=True, logits_only=True)
     optim = torch.optim.Adam(model.parameters(), lr=1E-4)
     criterion = ContrastiveLoss(model.get_contrastive_cams, multilabel=multilabel, divergence=const.DIVERGENCE, pos_only=const.POS_ONLY, pos_weight=data.reweight if multilabel else None)
     # criterion = torch.nn.BCEWithLogitsLoss(pos_weight=data.reweight)
