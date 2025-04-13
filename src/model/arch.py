@@ -76,8 +76,8 @@ class Model(nn.Module):
         self.backbone.fc = nn.Identity()
 
         if load_pretrained_weights and not load_from_torchvision:
-            if const.ACTIVATIONS == 'ELU' and const.MODIFY_BN == 'DyT': pretrained_model = 'resnet50_upsampled_dytbn_elu.pt'
-            elif const.ACTIVATIONS == 'ReLU' and const.MODIFY_BN == 'Causal': pretrained_model = 'resnet50_upsampled_causalbn.pt'
+            if backbone_acts == 'ELU' and self.modified_bn == 'DyT': pretrained_model = 'resnet50_upsampled_dytbn_elu.pt'
+            elif backbone_acts == 'ReLU' and self.modified_bn == 'Causal': pretrained_model = 'resnet50_upsampled_causalbn.pt'
             else: raise AttributeError('Pre-Trained match for configuration not found.')
 
             state_dict = torch.load(const.PRETRAINED_MODELS_DIR / pretrained_model, map_location=torch.device('cpu'), weights_only=True)

@@ -55,11 +55,11 @@ MODIFY_BN = None
 # training
 DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 TRAIN_CUTOFF = 12600  # max training time in seconds
-LAMBDAS = [10 * N_CLASSES, 0, 1, 1]  # means different things for different approaches
+LAMBDAS = [.95, 0, 1, 1E3]  # means different things for different approaches
 POS_ONLY = False and DATASET == 'sbd'  # (multilabel only) restrict divergence loss to just positive classes
 GRAD_ACCUMULATION_STEPS = 1
 PORT = get_open_port()
-SWD_N_DIRECTIONS = 50
+SWD_N_DIRECTIONS = 512
 CHECKPOINTING = True
 WEIGHT_DECAY = 1E-4
 SELECT_BEST = True

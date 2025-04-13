@@ -3,17 +3,19 @@
 from geomloss import SamplesLoss
 import torch.nn.functional as F
 from src import const
+from math import log
 from torch import nn
 import torch
 
 
 class ContrastiveLoss(nn.Module):
-    def __init__(self, get_contrastive_cams_fn, debug=False, is_label_mask=False,
+    def __init__(self, get_contrastive_cams_fn, debug=False, is_label_mask=False, target_probability_swd=const.LAMBDAS[0],
                  multilabel=False, divergence=None, pos_weight=None, pos_only=False):
         super().__init__()
 
         self.ce = nn.BCEWithLogitsLoss(pos_weight=pos_weight, reduction='none' if pos_weight is None else 'mean') if multilabel else nn.CrossEntropyLoss(label_smoothing=const.LABEL_SMOOTHING)
         self.get_contrastive_cams = get_contrastive_cams_fn
+        self.target_logit = -log((1 - target_probability_swd) / (target_probability_swd * (const.N_CLASSES - 1)))
         self.is_label_mask = is_label_mask
         self.multilabel = multilabel
         self.divergence = divergence
@@ -29,7 +31,7 @@ class ContrastiveLoss(nn.Module):
         if self.multilabel:
             target_mask = fg_mask.to(torch.float)
             target_mask.view(-1, n_cam_pixels)[(y[1].flatten() - 1).nonzero()] = -1 / n_cam_pixels
-            target_mask = const.LAMBDAS[0] * (target_mask.T / (y[1] * target_mask.sum(2).sum(2) + 1 - y[1]).T).T.view(*target_mask.shape[:2], n_cam_pixels)
+            target_mask = self.target_logit * (target_mask.T / (y[1] * target_mask.sum(2).sum(2) + 1 - y[1]).T).T.view(*target_mask.shape[:2], n_cam_pixels)
 
             cc = cc.view(*cc.shape[:2], n_cam_pixels)
 
@@ -46,7 +48,7 @@ class ContrastiveLoss(nn.Module):
                 cc = torch.hstack((cc.view(-1, n_cam_pixels).unsqueeze(1), spatial_maps))
         else:
             spatial_maps = fg_mask[:, 0].flatten(1).unsqueeze(1).clone()
-            target_mask = (const.LAMBDAS[0] * spatial_maps / spatial_maps.sum(2, keepdim=True)).repeat(1, const.N_CLASSES - 1, 1)
+            target_mask = (self.target_logit * spatial_maps / spatial_maps.sum(2, keepdim=True)).repeat(1, const.N_CLASSES - 1, 1)
             spatial_maps *= spatial_scale_factor
 
             cc = cc[(1 - y[1]).to(torch.bool)].view(-1, const.N_CLASSES - 1, n_cam_pixels)
